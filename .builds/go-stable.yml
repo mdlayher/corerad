@@ -1,0 +1,23 @@
+image: archlinux
+packages:
+  - go
+sources:
+  - https://github.com/mdlayher/corerad
+environment:
+  GO111MODULE: "on"
+tasks:
+  - build: |
+      go version
+      go get golang.org/x/lint/golint
+      go get honnef.co/go/tools/cmd/staticcheck
+      cd corerad/
+      ./.cibuild.sh
+      go vet ./...
+      /home/build/go/bin/staticcheck ./...
+      /home/build/go/bin/golint -set_exit_status . ./cmd/... ./internal/...
+      go test -mod vendor -v -race ./...
+      # Ensure a valid and sane configuration can be generated.
+      go build -mod vendor ./cmd/corerad/
+      # go get github.com/BurntSushi/toml/cmd/tomlv
+      # ./corerad -init
+      # /home/build/go/bin/tomlv ./corerad.toml
