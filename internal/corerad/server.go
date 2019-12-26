@@ -74,6 +74,7 @@ func (s *Server) Run(ctx context.Context) error {
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
 	s.eg = eg
+	defer close(s.ready)
 
 	// Serve on each specified interface.
 	for _, ifi := range s.cfg.Interfaces {
@@ -101,7 +102,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Indicate readiness to any waiting callers, and then wait for all
 	// goroutines to be canceled and stopped successfully.
-	close(s.ready)
+	s.ready <- struct{}{}
 	if err := s.eg.Wait(); err != nil {
 		return fmt.Errorf("failed to serve: %v", err)
 	}
