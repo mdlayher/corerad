@@ -26,6 +26,9 @@ type Plugin interface {
 	// Name is the string name of the plugin.
 	Name() string
 
+	// String is the string representation of the plugin's configuration.
+	String() string
+
 	// Decode decodes raw TOML configuration into a Plugin's specific
 	// configuration.
 	Decode(md toml.MetaData, m map[string]toml.Primitive) error
@@ -70,6 +73,12 @@ type Prefix struct {
 
 // Name implements Plugin.
 func (p *Prefix) Name() string { return "prefix" }
+
+// String implements Plugin.
+func (p *Prefix) String() string {
+	// TODO: add more fields.
+	return p.Prefix.String()
+}
 
 // Decode implements Plugin.
 func (p *Prefix) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
