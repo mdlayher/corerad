@@ -1,0 +1,53 @@
+# CoreRAD vALPHA configuration file
+
+# Interfaces which will be used to serve IPv6 NDP router advertisements.
+[[interfaces]]
+name = "eth0"
+# AdvSendAdvertisements: indicates whether or not this interface will send
+# periodic router advertisements and respond to router solicitations.
+send_advertisements = true
+
+  # Zero or more plugins may be specified to modify the behavior of the router
+  # advertisements produced by CoreRAD.
+
+  # "prefix" plugin: attaches a NDP Prefix Information option to the router
+  # advertisement.
+  [[interfaces.plugins]]
+  name = "prefix"
+  # Serve Prefix Information options for each IPv6 prefix on this interface
+  # configured with a /64 CIDR mask. Any further options specified for this
+  # prefix plugin will be treated as defaults, but can be overridden for
+  # individual prefixes if more prefix plugins are configured.
+  prefix = "::/64"
+  on_link = true
+
+  # Serve a prefix with an explicit configuration that may override the defaults
+  # set by ::/64 above.
+  [[interfaces.plugins]]
+  name = "prefix"
+  prefix = "2001:db8::/64"
+  autonomous = true
+
+# Enable or disable the debug HTTP server for facilities such as Prometheus
+# metrics and pprof support.
+#
+# Warning: do not expose pprof on an untrusted network!
+[debug]
+address = "localhost:9430"
+prometheus = true
+pprof = false
+
+# WIP WIP WIP
+#
+# Expose these keys as makes sense on individual interfaces, prefixes, etc.
+# We will inherit the defaults from the NDP RFC.
+#
+#max_advertise_interval = "600s"
+#min_advertise_interval = "auto"
+#managed = false
+#other_config = false
+#link_mtu = 0
+#reachable_time = "0s"
+#retransmit_timer = "0s"
+#current_hop_limit = 0
+#default_lifetime = "auto"

@@ -18,6 +18,6 @@ tasks:
       go test -mod vendor -v -race ./...
       # Ensure a valid and sane configuration can be generated.
       go build -mod vendor ./cmd/corerad/
-      # go get github.com/BurntSushi/toml/cmd/tomlv
-      # ./corerad -init
-      # /home/build/go/bin/tomlv ./corerad.toml
+      go get github.com/BurntSushi/toml/cmd/tomlv
+      ./corerad -init
+      /home/build/go/bin/tomlv ./corerad.toml
