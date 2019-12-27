@@ -26,9 +26,13 @@ import (
 	"sync"
 
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/corerad"
 )
 
-const cfgFile = "corerad.toml"
+const (
+	cfgFile = "corerad.toml"
+	version = "vALPHA"
+)
 
 func main() {
 	var (
@@ -59,14 +63,14 @@ func main() {
 	}
 	_ = f.Close()
 
-	ll.Printf("starting with configuration file %q", f.Name())
+	ll.Printf("CoreRAD %s starting with configuration file %q", version, f.Name())
 
 	// Use a context to handle cancelation on signal.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
+	wg.Add(2)
 	defer wg.Wait()
 
 	go func() {
@@ -82,10 +86,15 @@ func main() {
 		cancel()
 	}()
 
-	_ = cfg
+	// Start the server's goroutines and run until context cancelation.
+	s := corerad.NewServer(*cfg, ll)
+	go func() {
+		// Consume readiness notification.
+		defer wg.Done()
+		<-s.Ready()
+	}()
 
-	select {
-	case <-ctx.Done():
-		ll.Println("exiting")
+	if err := s.Run(ctx); err != nil {
+		ll.Fatalf("failed to run: %v", err)
 	}
 }
