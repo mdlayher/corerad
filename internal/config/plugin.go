@@ -17,6 +17,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -53,6 +55,8 @@ func parsePlugin(md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) 
 	switch name {
 	case "prefix":
 		p = new(Prefix)
+	case "rdnss":
+		p = new(RDNSS)
 	default:
 		return nil, fmt.Errorf("unknown plugin %q", name)
 	}
@@ -99,6 +103,52 @@ func (p *Prefix) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
 			p.OnLink = &b
 		case "prefix":
 			p.Prefix = v.IPNet()
+		default:
+			return fmt.Errorf("invalid key %q", k)
+		}
+
+		if err := v.Err(); err != nil {
+			return fmt.Errorf("parsing key %q: %v", k, err)
+		}
+	}
+
+	return nil
+}
+
+// RDNSS configures a NDP Recursive DNS Servers option.
+type RDNSS struct {
+	Lifetime time.Duration
+	Servers  []net.IP
+}
+
+// Name implements Plugin.
+func (r *RDNSS) Name() string { return "rdnss" }
+
+// String implements Plugin.
+func (r *RDNSS) String() string {
+	ips := make([]string, 0, len(r.Servers))
+	for _, s := range r.Servers {
+		ips = append(ips, s.String())
+	}
+
+	return fmt.Sprintf("servers: [%s], lifetime: %s", strings.Join(ips, ", "), r.Lifetime)
+}
+
+// Decode implements Plugin.
+func (r *RDNSS) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
+	for k := range m {
+		var v value
+		if err := md.PrimitiveDecode(m[k], &v.v); err != nil {
+			return err
+		}
+
+		switch k {
+		case "name":
+			// Already handled.
+		case "lifetime":
+			r.Lifetime = v.Duration()
+		case "servers":
+			r.Servers = v.IPSlice()
 		default:
 			return fmt.Errorf("invalid key %q", k)
 		}

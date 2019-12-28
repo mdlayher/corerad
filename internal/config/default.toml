@@ -28,6 +28,15 @@ send_advertisements = true
   prefix = "2001:db8::/64"
   autonomous = true
 
+  # "rdnss" plugin: attaches a NDP Recursive DNS Servers option to the router
+  # advertisement.
+  [[interfaces.plugins]]
+  name = "rdnss"
+  # Durations are specified in Go time.ParseDuration format:
+  # https://golang.org/pkg/time/#ParseDuration.
+  lifetime = "60s"
+  servers = ["2001:db8::1", "2001:db8::2"]
+
 # Enable or disable the debug HTTP server for facilities such as Prometheus
 # metrics and pprof support.
 #

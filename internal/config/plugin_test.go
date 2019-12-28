@@ -11,15 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config_test
+package config
 
 import (
+	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/google/go-cmp/cmp"
-	"github.com/mdlayher/corerad/internal/config"
 )
 
 func TestPrefixDecode(t *testing.T) {
@@ -28,7 +29,7 @@ func TestPrefixDecode(t *testing.T) {
 	tests := []struct {
 		name string
 		s    string
-		p    *config.Prefix
+		p    *Prefix
 		ok   bool
 	}{
 		{
@@ -53,7 +54,7 @@ func TestPrefixDecode(t *testing.T) {
 			autonomous = false
 			on_link = true
 			`,
-			p: &config.Prefix{
+			p: &Prefix{
 				Prefix:     mustCIDR("::/64"),
 				Autonomous: boolp(false),
 				OnLink:     boolp(true),
@@ -64,30 +65,90 @@ func TestPrefixDecode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var m map[string]toml.Primitive
-
-			md, err := toml.DecodeReader(strings.NewReader(tt.s), &m)
-			if err != nil {
-				t.Fatalf("failed to decode TOML: %v", err)
-			}
-
-			p := new(config.Prefix)
-			err = p.Decode(md, m)
-			if tt.ok && err != nil {
-				t.Fatalf("failed to decode Prefix: %v", err)
-			}
-			if !tt.ok && err == nil {
-				t.Fatal("expected an error, but none occurred")
-			}
-			if err != nil {
-				t.Logf("err: %v", err)
-				return
-			}
-
-			if diff := cmp.Diff(tt.p, p); diff != "" {
-				t.Fatalf("unexpected Prefix (-want +got):\n%s", diff)
-			}
+			pluginDecode(t, tt.s, tt.ok, tt.p)
 		})
+	}
+}
+
+func TestRDNSSDecode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		s    string
+		r    *RDNSS
+		ok   bool
+	}{
+		{
+			name: "unknown key",
+			s: `
+			name = "rdnss"
+			bad = true
+			`,
+		},
+		{
+			name: "bad lifetime",
+			s: `
+			name = "rdnss"
+			lifetime = "foo"
+			`,
+		},
+		{
+			name: "bad servers",
+			s: `
+			name = "rdnss"
+			servers = ["192.0.2.1"]
+			`,
+		},
+		{
+			name: "OK",
+			s: `
+			name = "rdnss"
+			servers = ["2001:db8::1", "2001:db8::2"]
+			lifetime = "30s"
+			`,
+			r: &RDNSS{
+				Lifetime: 30 * time.Second,
+				Servers: []net.IP{
+					mustIP("2001:db8::1"),
+					mustIP("2001:db8::2"),
+				},
+			},
+			ok: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pluginDecode(t, tt.s, tt.ok, tt.r)
+		})
+	}
+}
+
+func pluginDecode(t *testing.T, s string, ok bool, want Plugin) {
+	t.Helper()
+
+	var m map[string]toml.Primitive
+
+	md, err := toml.DecodeReader(strings.NewReader(s), &m)
+	if err != nil {
+		t.Fatalf("failed to decode TOML: %v", err)
+	}
+
+	got, err := parsePlugin(md, m)
+	if ok && err != nil {
+		t.Fatalf("failed to parse Plugin: %v", err)
+	}
+	if !ok && err == nil {
+		t.Fatal("expected an error, but none occurred")
+	}
+	if err != nil {
+		t.Logf("err: %v", err)
+		return
+	}
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("unexpected Prefix (-want +got):\n%s", diff)
 	}
 }
 

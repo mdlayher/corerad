@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 )
 
 // A value is a raw configuration value which can be unwrapped into a proper
@@ -28,6 +29,22 @@ type value struct {
 
 // Err returns the error of any type conversions.
 func (v *value) Err() error { return v.err }
+
+// Duration interprets the value as a time.Duration.
+func (v *value) Duration() time.Duration {
+	s := v.string()
+	if v.err != nil {
+		return 0
+	}
+
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		v.err = err
+		return 0
+	}
+
+	return d
+}
 
 // IPNet interprets the value as an IPv6 *net.IPNet.
 func (v *value) IPNet() *net.IPNet {
@@ -55,6 +72,39 @@ func (v *value) IPNet() *net.IPNet {
 	}
 
 	return cidr
+}
+
+// IPSlice interprets the value as a []net.IP composed of IPv6 addresses.
+func (v *value) IPSlice() []net.IP {
+	vs, ok := v.v.([]interface{})
+	if !ok {
+		v.err = errors.New("value must be an array of strings")
+		return nil
+	}
+
+	ss := make([]string, 0, len(vs))
+	for _, vv := range vs {
+		s, ok := vv.(string)
+		if !ok {
+			v.err = errors.New("array values must be strings")
+			return nil
+		}
+
+		ss = append(ss, s)
+	}
+
+	ips := make([]net.IP, 0, len(ss))
+	for _, s := range ss {
+		ip := net.ParseIP(s)
+		if ip == nil || (ip.To16() != nil && ip.To4() != nil) {
+			v.err = fmt.Errorf("string %q is not an IPv6 address", s)
+			return nil
+		}
+
+		ips = append(ips, ip)
+	}
+
+	return ips
 }
 
 // Bool interprets the value as a bool.

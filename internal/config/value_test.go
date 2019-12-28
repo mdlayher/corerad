@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -63,6 +64,29 @@ func Test_value(t *testing.T) {
 			ok:   true,
 		},
 		{
+			name: "bad Duration type",
+			fn: func(v *value) interface{} {
+				return v.Duration()
+			},
+			in: 1,
+		},
+		{
+			name: "bad Duration string",
+			fn: func(v *value) interface{} {
+				return v.Duration()
+			},
+			in: "foo",
+		},
+		{
+			name: "OK Duration",
+			fn: func(v *value) interface{} {
+				return v.Duration()
+			},
+			in:   "60s",
+			want: 1 * time.Minute,
+			ok:   true,
+		},
+		{
 			name: "bad IPNet CIDR",
 			fn: func(v *value) interface{} {
 				return v.IPNet()
@@ -92,6 +116,46 @@ func Test_value(t *testing.T) {
 			want: mustCIDR("2001:db8::/64"),
 			ok:   true,
 		},
+		{
+			name: "bad IPSlice array",
+			fn: func(v *value) interface{} {
+				return v.IPSlice()
+			},
+			in: "foo",
+		},
+		{
+			name: "bad IPSlice array types",
+			fn: func(v *value) interface{} {
+				return v.IPSlice()
+			},
+			in: []interface{}{"foo", 1},
+		},
+		{
+			name: "bad IPSlice IP",
+			fn: func(v *value) interface{} {
+				return v.IPSlice()
+			},
+			in: []interface{}{"foo"},
+		},
+		{
+			name: "bad IPSlice IPv4",
+			fn: func(v *value) interface{} {
+				return v.IPSlice()
+			},
+			in: []interface{}{"192.0.2.1"},
+		},
+		{
+			name: "OK IPSlice",
+			fn: func(v *value) interface{} {
+				return v.IPSlice()
+			},
+			in: []interface{}{"2001:db8::1", "2001:db8::2"},
+			want: []net.IP{
+				mustIP("2001:db8::1"),
+				mustIP("2001:db8::2"),
+			},
+			ok: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -117,6 +181,15 @@ func Test_value(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustIP(s string) net.IP {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		panicf("failed to parse %q as IP address", s)
+	}
+
+	return ip
 }
 
 func mustCIDR(s string) *net.IPNet {
