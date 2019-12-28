@@ -15,26 +15,29 @@ send_advertisements = true
   [[interfaces.plugins]]
   name = "prefix"
   # Serve Prefix Information options for each IPv6 prefix on this interface
-  # configured with a /64 CIDR mask. Any further options specified for this
-  # prefix plugin will be treated as defaults, but can be overridden for
-  # individual prefixes if more prefix plugins are configured.
+  # configured with a /64 CIDR mask.
   prefix = "::/64"
   on_link = true
+  autonomous = true
+  # Durations are specified in Go time.ParseDuration format:
+  # https://golang.org/pkg/time/#ParseDuration.
+  preferred_lifetime = "5m"
+  valid_lifetime = "10m"
 
-  # Serve a prefix with an explicit configuration that may override the defaults
-  # set by ::/64 above.
+  # Alternatively, serve an explicit IPv6 prefix.
   [[interfaces.plugins]]
   name = "prefix"
   prefix = "2001:db8::/64"
+  on_link = true
   autonomous = true
+  preferred_lifetime = "5m"
+  valid_lifetime = "10m"
 
   # "rdnss" plugin: attaches a NDP Recursive DNS Servers option to the router
   # advertisement.
   [[interfaces.plugins]]
   name = "rdnss"
-  # Durations are specified in Go time.ParseDuration format:
-  # https://golang.org/pkg/time/#ParseDuration.
-  lifetime = "60s"
+  lifetime = "10m"
   servers = ["2001:db8::1", "2001:db8::2"]
 
 # Enable or disable the debug HTTP server for facilities such as Prometheus
@@ -45,18 +48,3 @@ send_advertisements = true
 address = "localhost:9430"
 prometheus = true
 pprof = false
-
-# WIP WIP WIP
-#
-# Expose these keys as makes sense on individual interfaces, prefixes, etc.
-# We will inherit the defaults from the NDP RFC.
-#
-#max_advertise_interval = "600s"
-#min_advertise_interval = "auto"
-#managed = false
-#other_config = false
-#link_mtu = 0
-#reachable_time = "0s"
-#retransmit_timer = "0s"
-#current_hop_limit = 0
-#default_lifetime = "auto"

@@ -70,9 +70,11 @@ func parsePlugin(md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) 
 
 // A Prefix configures a NDP Prefix Information option.
 type Prefix struct {
-	Prefix     *net.IPNet
-	OnLink     *bool
-	Autonomous *bool
+	Prefix            *net.IPNet
+	OnLink            bool
+	Autonomous        bool
+	ValidLifetime     time.Duration
+	PreferredLifetime time.Duration
 }
 
 // Name implements Plugin.
@@ -80,8 +82,20 @@ func (p *Prefix) Name() string { return "prefix" }
 
 // String implements Plugin.
 func (p *Prefix) String() string {
-	// TODO: add more fields.
-	return p.Prefix.String()
+	var flags []string
+	if p.OnLink {
+		flags = append(flags, "on-link")
+	}
+	if p.Autonomous {
+		flags = append(flags, "autonomous")
+	}
+
+	return fmt.Sprintf("%s [%s], preferred: %s, valid: %s",
+		p.Prefix,
+		strings.Join(flags, ","),
+		p.PreferredLifetime,
+		p.ValidLifetime,
+	)
 }
 
 // Decode implements Plugin.
@@ -96,13 +110,15 @@ func (p *Prefix) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
 		case "name":
 			// Already handled.
 		case "autonomous":
-			b := v.Bool()
-			p.Autonomous = &b
+			p.Autonomous = v.Bool()
 		case "on_link":
-			b := v.Bool()
-			p.OnLink = &b
+			p.OnLink = v.Bool()
+		case "preferred_lifetime":
+			p.PreferredLifetime = v.Duration()
 		case "prefix":
 			p.Prefix = v.IPNet()
+		case "valid_lifetime":
+			p.ValidLifetime = v.Duration()
 		default:
 			return fmt.Errorf("invalid key %q", k)
 		}
@@ -110,6 +126,20 @@ func (p *Prefix) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
 		if err := v.Err(); err != nil {
 			return fmt.Errorf("parsing key %q: %v", k, err)
 		}
+	}
+
+	return p.validate()
+}
+
+// validate verifies that a Prefix is valid.
+func (p *Prefix) validate() error {
+	if p.Prefix == nil {
+		return errors.New("prefix must not be empty")
+	}
+
+	// See: https://tools.ietf.org/html/rfc4861#section-4.6.2.
+	if p.PreferredLifetime > p.ValidLifetime {
+		return fmt.Errorf("preferred lifetime of %s exceeds valid lifetime of %s", p.PreferredLifetime, p.ValidLifetime)
 	}
 
 	return nil

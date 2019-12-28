@@ -40,10 +40,25 @@ func TestPrefixDecode(t *testing.T) {
 			`,
 		},
 		{
+			name: "no prefix",
+			s: `
+			name = "prefix"
+			`,
+		},
+		{
 			name: "bad prefix",
 			s: `
 			name = "prefix"
 			prefix = "foo"
+			`,
+		},
+		{
+			name: "bad lifetimes",
+			s: `
+			name = "prefix"
+			prefix = "::/64"
+			preferred_lifetime = "2s"
+			valid_lifetime = "1s"
 			`,
 		},
 		{
@@ -53,11 +68,14 @@ func TestPrefixDecode(t *testing.T) {
 			prefix = "::/64"
 			autonomous = false
 			on_link = true
+			preferred_lifetime = "30s"
+			valid_lifetime = "60s"
 			`,
 			p: &Prefix{
-				Prefix:     mustCIDR("::/64"),
-				Autonomous: boolp(false),
-				OnLink:     boolp(true),
+				Prefix:            mustCIDR("::/64"),
+				OnLink:            true,
+				PreferredLifetime: 30 * time.Second,
+				ValidLifetime:     60 * time.Second,
 			},
 			ok: true,
 		},
@@ -151,5 +169,3 @@ func pluginDecode(t *testing.T, s string, ok bool, want Plugin) {
 		t.Fatalf("unexpected Prefix (-want +got):\n%s", diff)
 	}
 }
-
-func boolp(v bool) *bool { return &v }
