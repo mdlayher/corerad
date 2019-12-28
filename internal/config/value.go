@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/mdlayher/ndp"
 )
 
 // A value is a raw configuration value which can be unwrapped into a proper
@@ -35,6 +37,11 @@ func (v *value) Duration() time.Duration {
 	s := v.string()
 	if v.err != nil {
 		return 0
+	}
+
+	// Allow for "infinite" durations per the NDP RFC.
+	if s == "infinite" {
+		return ndp.Infinity
 	}
 
 	d, err := time.ParseDuration(s)

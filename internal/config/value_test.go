@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/mdlayher/ndp"
 )
 
 func Test_value(t *testing.T) {
@@ -76,6 +77,15 @@ func Test_value(t *testing.T) {
 				return v.Duration()
 			},
 			in: "foo",
+		},
+		{
+			name: "OK infinite Duration",
+			fn: func(v *value) interface{} {
+				return v.Duration()
+			},
+			in:   "infinite",
+			want: ndp.Infinity,
+			ok:   true,
 		},
 		{
 			name: "OK Duration",

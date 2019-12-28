@@ -23,6 +23,8 @@ send_advertisements = true
   # https://golang.org/pkg/time/#ParseDuration.
   preferred_lifetime = "5m"
   valid_lifetime = "10m"
+  # As a special case, lifetime values can be infinite by specifying "infinite".
+  # valid_lifetime = "infinite"
 
   # Alternatively, serve an explicit IPv6 prefix.
   [[interfaces.plugins]]
