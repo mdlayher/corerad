@@ -23,13 +23,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/sync/errgroup"
 )
 
 func TestAdvertiserAdvertiseUnsolicitedOneShot(t *testing.T) {
-	ad, c, done := testAdvertiser(t)
+	// No configuration, bare minimum router advertisement.
+	ad, c, done := testAdvertiser(t, nil)
 	defer done()
 
 	if err := c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
@@ -41,7 +43,7 @@ func TestAdvertiserAdvertiseUnsolicitedOneShot(t *testing.T) {
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx, config.Interface{}); err != nil {
+		if err := ad.Advertise(ctx); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 
@@ -64,12 +66,21 @@ func TestAdvertiserAdvertiseUnsolicitedOneShot(t *testing.T) {
 		t.Fatalf("did not receive an RA: %#v", m)
 	}
 
-	// TODO: verify the RA's fields against configuration.
-	_ = ra
+	// There was no config specified, so assume the bare minimum for a valid RA.
+	want := &ndp.RouterAdvertisement{
+		Options: []ndp.Option{&ndp.LinkLayerAddress{
+			Direction: ndp.Source,
+			Addr:      ad.ifi.HardwareAddr,
+		}},
+	}
+
+	if diff := cmp.Diff(want, ra); diff != "" {
+		t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
+	}
 }
 
 func TestAdvertiserAdvertiseContextCanceled(t *testing.T) {
-	ad, _, done := testAdvertiser(t)
+	ad, _, done := testAdvertiser(t, nil)
 	defer done()
 
 	timer := time.AfterFunc(5*time.Second, func() {
@@ -81,15 +92,22 @@ func TestAdvertiserAdvertiseContextCanceled(t *testing.T) {
 	cancel()
 
 	// This should not block because the context is already canceled.
-	if err := ad.Advertise(ctx, config.Interface{}); err != nil {
+	if err := ad.Advertise(ctx); err != nil {
 		t.Fatalf("failed to advertise: %v", err)
 	}
 }
 
-func testAdvertiser(t *testing.T) (*Advertiser, *ndp.Conn, func()) {
+func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn, func()) {
 	t.Helper()
 
-	ad, err := NewAdvertiser("cradveth0", nil)
+	// Allow empty config but always populate the interface name.
+	// TODO: consider building veth pairs within the tests.
+	if cfg == nil {
+		cfg = &config.Interface{}
+	}
+	cfg.Name = "cradveth0"
+
+	ad, err := NewAdvertiser(*cfg, nil)
 	if err != nil {
 		if errors.Is(err, os.ErrPermission) {
 			t.Skip("skipping, permission denied (run this test with CAP_NET_RAW)")

@@ -28,23 +28,26 @@ import (
 
 // An Advertiser sends NDP router advertisements.
 type Advertiser struct {
-	c     *ndp.Conn
-	iface string
-	mac   net.HardwareAddr
-	ip    net.IP
-	ll    *log.Logger
+	c   *ndp.Conn
+	ifi *net.Interface
+	ip  net.IP
+
+	cfg config.Interface
+	b   *builder
+
+	ll *log.Logger
 }
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded.
-func NewAdvertiser(iface string, ll *log.Logger) (*Advertiser, error) {
+func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
 
-	ifi, err := net.InterfaceByName(iface)
+	ifi, err := net.InterfaceByName(cfg.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to look up interface %q: %v", iface, err)
+		return nil, fmt.Errorf("failed to look up interface %q: %v", cfg.Name, err)
 	}
 
 	c, ip, err := ndp.Dial(ifi, ndp.LinkLocal)
@@ -68,11 +71,18 @@ func NewAdvertiser(iface string, ll *log.Logger) (*Advertiser, error) {
 	}
 
 	return &Advertiser{
-		c:     c,
-		iface: iface,
-		mac:   ifi.HardwareAddr,
-		ip:    ip,
-		ll:    ll,
+		c:   c,
+		ifi: ifi,
+		ip:  ip,
+
+		cfg: cfg,
+		// Set up a builder to construct RAs from configuration.
+		b: &builder{
+			// Fetch the configured interface's addresses.
+			Addrs: ifi.Addrs,
+		},
+
+		ll: ll,
 	}, nil
 }
 
@@ -83,18 +93,8 @@ func (a *Advertiser) Close() error {
 
 // Advertise begins sending router advertisements at regular intervals. Advertise
 // will block until ctx is canceled or an error occurs.
-func (a *Advertiser) Advertise(ctx context.Context, icfg config.Interface) error {
+func (a *Advertiser) Advertise(ctx context.Context) error {
 	a.logf("initialized, sending router advertisements from %s", a.ip)
-
-	// TODO: configure with plugins.
-	m := &ndp.RouterAdvertisement{
-		Options: []ndp.Option{
-			&ndp.LinkLayerAddress{
-				Direction: ndp.Source,
-				Addr:      a.mac,
-			},
-		},
-	}
 
 	for {
 		// Enable cancelation before sending any messages, if necessary.
@@ -104,7 +104,21 @@ func (a *Advertiser) Advertise(ctx context.Context, icfg config.Interface) error
 		default:
 		}
 
-		if err := a.c.WriteTo(m, nil, net.IPv6linklocalallnodes); err != nil {
+		// Build a router advertisement from configuration and always append
+		// the source address option.
+		ra, err := a.b.Build(a.cfg)
+		if err != nil {
+			return fmt.Errorf("failed to build NDP router advertisement: %v", err)
+		}
+
+		// TODO: apparently it is also valid to omit this, but we can think
+		// about that later.
+		ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
+			Direction: ndp.Source,
+			Addr:      a.ifi.HardwareAddr,
+		})
+
+		if err := a.c.WriteTo(ra, nil, net.IPv6linklocalallnodes); err != nil {
 			return fmt.Errorf("failed to send NDP router advertisement: %v", err)
 		}
 
@@ -118,5 +132,5 @@ func (a *Advertiser) Advertise(ctx context.Context, icfg config.Interface) error
 }
 
 func (a *Advertiser) logf(format string, v ...interface{}) {
-	a.ll.Println(a.iface + ": " + fmt.Sprintf(format, v...))
+	a.ll.Println(a.ifi.Name + ": " + fmt.Sprintf(format, v...))
 }

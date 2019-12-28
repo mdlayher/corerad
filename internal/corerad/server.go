@@ -97,7 +97,7 @@ func (s *Server) Run(ctx context.Context) error {
 		// TODO: find a way to reasonably test this.
 
 		// Begin advertising on this interface.
-		ad, err := NewAdvertiser(ifi.Name, s.ll)
+		ad, err := NewAdvertiser(ifi, s.ll)
 		if err != nil {
 			return fmt.Errorf("failed to create NDP advertiser: %v", err)
 		}
@@ -109,7 +109,7 @@ func (s *Server) Run(ctx context.Context) error {
 		})
 
 		s.eg.Go(func() error {
-			if err := ad.Advertise(ctx, ifi); err != nil {
+			if err := ad.Advertise(ctx); err != nil {
 				return fmt.Errorf("failed to advertise NDP: %v", err)
 			}
 
