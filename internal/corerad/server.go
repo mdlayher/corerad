@@ -93,6 +93,28 @@ func (s *Server) Run(ctx context.Context) error {
 		for i, p := range ifi.Plugins {
 			logf("plugin %02d: %q: %s", i, p.Name(), p)
 		}
+
+		// TODO: find a way to reasonably test this.
+
+		// Begin advertising on this interface.
+		ad, err := NewAdvertiser(ifi.Name, s.ll)
+		if err != nil {
+			return fmt.Errorf("failed to create NDP advertiser: %v", err)
+		}
+
+		// Advertise until the context is canceled.
+		s.eg.Go(func() error {
+			<-ctx.Done()
+			return ad.Close()
+		})
+
+		s.eg.Go(func() error {
+			if err := ad.Advertise(ctx, ifi); err != nil {
+				return fmt.Errorf("failed to advertise NDP: %v", err)
+			}
+
+			return nil
+		})
 	}
 
 	// Configure the HTTP debug server, if applicable.
