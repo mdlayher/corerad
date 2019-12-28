@@ -118,11 +118,37 @@ func (v *value) IPSlice() []net.IP {
 func (v *value) Bool() bool {
 	b, ok := v.v.(bool)
 	if !ok {
-		v.err = errors.New("value must be a bool")
+		v.err = errors.New("value must be a boolean")
 		return false
 	}
 
 	return b
+}
+
+// Int interprets the value as an int within the specified range.
+func (v *value) Int(min, max int) int {
+	if max < min {
+		panic("max is less than min")
+	}
+
+	// Gracefully handle integers in both tests and from the TOML parser.
+	var i int
+	switch x := v.v.(type) {
+	case int:
+		i = x
+	case int64:
+		i = int(x)
+	default:
+		v.err = errors.New("value must be an integer")
+		return 0
+	}
+
+	if i < min || i > max {
+		v.err = fmt.Errorf("integer %d is not within range %d-%d", i, min, max)
+		return 0
+	}
+
+	return i
 }
 
 // string interprets the value as a string.

@@ -108,6 +108,19 @@ func Test_builderBuild(t *testing.T) {
 			},
 		},
 		{
+			name: "MTU",
+			ifi: config.Interface{
+				Plugins: []config.Plugin{
+					newMTU(1500),
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					ndp.NewMTU(1500),
+				},
+			},
+		},
+		{
 			name: "RDNSS",
 			ifi: config.Interface{
 				Plugins: []config.Plugin{
@@ -164,6 +177,11 @@ func mustCIDR(s string) *net.IPNet {
 	}
 
 	return ipn
+}
+
+func newMTU(i int) *config.MTU {
+	m := config.MTU(i)
+	return &m
 }
 
 func panicf(format string, a ...interface{}) {

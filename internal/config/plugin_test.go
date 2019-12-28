@@ -88,6 +88,47 @@ func TestPrefixDecode(t *testing.T) {
 	}
 }
 
+func TestMTUDecode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		s    string
+		m    *MTU
+		ok   bool
+	}{
+		{
+			name: "unknown key",
+			s: `
+			name = "mtu"
+			bad = true
+			`,
+		},
+		{
+			name: "bad",
+			s: `
+			name = "mtu"
+			mtu = 99999999
+			`,
+		},
+		{
+			name: "OK",
+			s: `
+			name = "mtu"
+			mtu = 1500
+			`,
+			m:  newMTU(1500),
+			ok: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pluginDecode(t, tt.s, tt.ok, tt.m)
+		})
+	}
+}
+
 func TestRDNSSDecode(t *testing.T) {
 	t.Parallel()
 
@@ -168,4 +209,9 @@ func pluginDecode(t *testing.T, s string, ok bool, want Plugin) {
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("unexpected Prefix (-want +got):\n%s", diff)
 	}
+}
+
+func newMTU(i int) *MTU {
+	m := MTU(i)
+	return &m
 }

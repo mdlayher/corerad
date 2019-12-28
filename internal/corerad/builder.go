@@ -39,6 +39,8 @@ func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) 
 			}
 
 			ra.Options = append(ra.Options, opts...)
+		case *config.MTU:
+			ra.Options = append(ra.Options, ndp.NewMTU(uint32(*p)))
 		case *config.RDNSS:
 			ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{
 				Lifetime: p.Lifetime,

@@ -49,6 +49,36 @@ func Test_value(t *testing.T) {
 			ok:   true,
 		},
 		{
+			name: "bad int",
+			fn: func(v *value) interface{} {
+				return v.Int(0, 0)
+			},
+			in: "foo",
+		},
+		{
+			name: "bad int min",
+			fn: func(v *value) interface{} {
+				return v.Int(0, 1)
+			},
+			in: -1,
+		},
+		{
+			name: "bad int max",
+			fn: func(v *value) interface{} {
+				return v.Int(0, 1)
+			},
+			in: 2,
+		},
+		{
+			name: "OK int",
+			fn: func(v *value) interface{} {
+				return v.Int(0, 1)
+			},
+			in:   1,
+			want: 1,
+			ok:   true,
+		},
+		{
 			name: "bad string",
 			fn: func(v *value) interface{} {
 				return v.string()

@@ -42,6 +42,11 @@ send_advertisements = true
   lifetime = "10m"
   servers = ["2001:db8::1", "2001:db8::2"]
 
+  # "mtu" plugin: attaches a NDP MTU option to the router advertisement.
+  [[interfaces.plugins]]
+  name = "mtu"
+  mtu = 1500
+
 # Enable or disable the debug HTTP server for facilities such as Prometheus
 # metrics and pprof support.
 #

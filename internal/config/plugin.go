@@ -53,6 +53,8 @@ func parsePlugin(md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) 
 	// required and decode its individual configuration.
 	var p Plugin
 	switch name {
+	case "mtu":
+		p = new(MTU)
 	case "prefix":
 		p = new(Prefix)
 	case "rdnss":
@@ -140,6 +142,41 @@ func (p *Prefix) validate() error {
 	// See: https://tools.ietf.org/html/rfc4861#section-4.6.2.
 	if p.PreferredLifetime > p.ValidLifetime {
 		return fmt.Errorf("preferred lifetime of %s exceeds valid lifetime of %s", p.PreferredLifetime, p.ValidLifetime)
+	}
+
+	return nil
+}
+
+// MTU configures a NDP MTU option.
+type MTU int
+
+// Name implements Plugin.
+func (m *MTU) Name() string { return "mtu" }
+
+// String implements Plugin.
+func (m *MTU) String() string { return fmt.Sprintf("MTU: %d", m) }
+
+// Decode implements Plugin.
+func (m *MTU) Decode(md toml.MetaData, mp map[string]toml.Primitive) error {
+	for k := range mp {
+		var v value
+		if err := md.PrimitiveDecode(mp[k], &v.v); err != nil {
+			return err
+		}
+
+		switch k {
+		case "name":
+			// Already handled.
+		case "mtu":
+			// Loopback has an MTU of 65536 on Linux. Good enough?
+			*m = MTU(v.Int(0, 65536))
+		default:
+			return fmt.Errorf("invalid key %q", k)
+		}
+
+		if err := v.Err(); err != nil {
+			return fmt.Errorf("parsing key %q: %v", k, err)
+		}
 	}
 
 	return nil
