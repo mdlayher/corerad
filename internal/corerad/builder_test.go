@@ -107,6 +107,31 @@ func Test_builderBuild(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "RDNSS",
+			ifi: config.Interface{
+				Plugins: []config.Plugin{
+					&config.RDNSS{
+						Lifetime: 10 * time.Second,
+						Servers: []net.IP{
+							mustIP("2001:db8::1"),
+							mustIP("2001:db8::2"),
+						},
+					},
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{
+						Lifetime: 10 * time.Second,
+						Servers: []net.IP{
+							mustIP("2001:db8::1"),
+							mustIP("2001:db8::2"),
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
