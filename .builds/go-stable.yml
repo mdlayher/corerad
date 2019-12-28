@@ -16,6 +16,13 @@ tasks:
       /home/build/go/bin/staticcheck ./...
       /home/build/go/bin/golint -set_exit_status . ./cmd/... ./internal/...
       go test -mod vendor -v -race ./...
+      # Run tests which require CAP_NET_RAW and a test veth pair.
+      sudo ip link add cradveth0 type veth peer name cradveth1
+      sudo ip link set up cradveth0
+      sudo ip link set up cradveth1
+      ip a
+      go test -c -mod vendor -race ./internal/corerad/
+      sudo ./corerad.test -test.v -test.run TestAdvertiser
       # Ensure a valid and sane configuration can be generated.
       go build -mod vendor ./cmd/corerad/
       go get github.com/BurntSushi/toml/cmd/tomlv
