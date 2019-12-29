@@ -29,9 +29,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func TestAdvertiserAdvertiseUnsolicitedOneShot(t *testing.T) {
+func TestAdvertiserUnsolicited(t *testing.T) {
 	// No configuration, bare minimum router advertisement.
-	ad, c, done := testAdvertiser(t, nil)
+	ad, c, _, done := testAdvertiser(t, nil)
 	defer done()
 
 	if err := c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
@@ -79,8 +79,73 @@ func TestAdvertiserAdvertiseUnsolicitedOneShot(t *testing.T) {
 	}
 }
 
-func TestAdvertiserAdvertiseContextCanceled(t *testing.T) {
-	ad, _, done := testAdvertiser(t, nil)
+func TestAdvertiserSolicited(t *testing.T) {
+	// No configuration, bare minimum router advertisement.
+	ad, c, mac, done := testAdvertiser(t, nil)
+	defer done()
+
+	if err := c.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatalf("failed to set client read deadline: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		if err := ad.Advertise(ctx); err != nil {
+			return fmt.Errorf("failed to advertise: %v", err)
+		}
+
+		return nil
+	})
+
+	rs := &ndp.RouterSolicitation{
+		Options: []ndp.Option{&ndp.LinkLayerAddress{
+			Direction: ndp.Source,
+			Addr:      mac,
+		}},
+	}
+
+	// There was no config specified, so assume the bare minimum for a valid RA.
+	want := &ndp.RouterAdvertisement{
+		Options: []ndp.Option{&ndp.LinkLayerAddress{
+			Direction: ndp.Source,
+			Addr:      ad.ifi.HardwareAddr,
+		}},
+	}
+
+	// Issue repeated router solicitations and expect router advertisements
+	// in response.
+	for i := 0; i < 5; i++ {
+		if err := c.WriteTo(rs, nil, net.IPv6linklocalallrouters); err != nil {
+			t.Fatalf("failed to send RS: %v", err)
+		}
+
+		// Read a single advertisement and then ensure the advertiser can be halted.
+		ra, _, _, err := c.ReadFrom()
+		if err != nil {
+			t.Fatalf("failed to read RA: %v", err)
+		}
+
+		ra, ok := ra.(*ndp.RouterAdvertisement)
+		if !ok {
+			t.Fatalf("did not receive an RA: %#v", ra)
+		}
+
+		if diff := cmp.Diff(want, ra); diff != "" {
+			t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
+		}
+	}
+
+	cancel()
+	if err := eg.Wait(); err != nil {
+		t.Fatalf("failed to stop advertiser: %v", err)
+	}
+}
+
+func TestAdvertiserContextCanceled(t *testing.T) {
+	ad, _, _, done := testAdvertiser(t, nil)
 	defer done()
 
 	timer := time.AfterFunc(5*time.Second, func() {
@@ -97,7 +162,7 @@ func TestAdvertiserAdvertiseContextCanceled(t *testing.T) {
 	}
 }
 
-func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn, func()) {
+func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn, net.HardwareAddr, func()) {
 	t.Helper()
 
 	// Allow empty config but always populate the interface name.
@@ -137,5 +202,5 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 		}
 	}
 
-	return ad, c, done
+	return ad, c, ifi.HardwareAddr, done
 }

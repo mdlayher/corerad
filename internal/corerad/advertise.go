@@ -110,9 +110,19 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
 
+	// Multicast RA sender.
 	eg.Go(func() error {
 		if err := a.multicast(ctx); err != nil {
 			return fmt.Errorf("failed to multicast: %v", err)
+		}
+
+		return nil
+	})
+
+	// RS listener which also issues unicast RAs.
+	eg.Go(func() error {
+		if err := a.listen(ctx); err != nil {
+			return fmt.Errorf("failed to listen: %v", err)
 		}
 
 		return nil
@@ -158,22 +168,8 @@ func (a *Advertiser) multicast(ctx context.Context) error {
 		default:
 		}
 
-		// Build a router advertisement from configuration and always append
-		// the source address option.
-		ra, err := a.b.Build(a.cfg)
-		if err != nil {
-			return fmt.Errorf("failed to build NDP router advertisement: %v", err)
-		}
-
-		// TODO: apparently it is also valid to omit this, but we can think
-		// about that later.
-		ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
-			Direction: ndp.Source,
-			Addr:      a.ifi.HardwareAddr,
-		})
-
-		if err := a.c.WriteTo(ra, nil, net.IPv6linklocalallnodes); err != nil {
-			return fmt.Errorf("failed to send NDP router advertisement: %v", err)
+		if err := a.send(net.IPv6linklocalallnodes); err != nil {
+			return fmt.Errorf("failed to send multicast router advertisement: %v", err)
 		}
 
 		// TODO: set via configuration.
@@ -183,6 +179,72 @@ func (a *Advertiser) multicast(ctx context.Context) error {
 		case <-time.After(3 * time.Second):
 		}
 	}
+}
+
+// listen issues unicast router advertisements in response to router
+// solicitations, until ctx is canceled.
+func (a *Advertiser) listen(ctx context.Context) error {
+	for {
+		// Enable cancelation before sending any messages, if necessary.
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		// Only block for a short time so that context cancelation can halt this
+		// goroutine.
+		if err := a.c.SetReadDeadline(time.Now().Add(250 * time.Millisecond)); err != nil {
+			return fmt.Errorf("failed to set listener deadline: %v", err)
+		}
+
+		m, _, host, err := a.c.ReadFrom()
+		if err != nil {
+			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+				// Temporary error or timeout, just continue.
+				continue
+			}
+
+			return fmt.Errorf("failed to read router solicitations: %v", err)
+		}
+
+		rs, ok := m.(*ndp.RouterSolicitation)
+		if !ok {
+			a.logf("received NDP message of type %T, ignoring", m)
+			continue
+		}
+
+		// TODO: metrics for RS fields.
+		_ = rs
+
+		if err := a.send(host); err != nil {
+			return fmt.Errorf("failed to send unicast router advertisement: %v", err)
+		}
+	}
+}
+
+// send sends a single router advertisement to the destination IP address,
+// which may be a unicast or multicast address.
+func (a *Advertiser) send(dst net.IP) error {
+	// Build a router advertisement from configuration and always append
+	// the source address option.
+	ra, err := a.b.Build(a.cfg)
+	if err != nil {
+		return fmt.Errorf("failed to build router advertisement: %v", err)
+	}
+
+	// TODO: apparently it is also valid to omit this, but we can think
+	// about that later.
+	ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
+		Direction: ndp.Source,
+		Addr:      a.ifi.HardwareAddr,
+	})
+
+	if err := a.c.WriteTo(ra, nil, dst); err != nil {
+		return fmt.Errorf("failed to send router advertisement to %s: %v", dst, err)
+	}
+
+	return nil
 }
 
 func (a *Advertiser) logf(format string, v ...interface{}) {
