@@ -15,10 +15,12 @@ package corerad
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
@@ -28,9 +30,10 @@ import (
 
 // An Advertiser sends NDP router advertisements.
 type Advertiser struct {
-	c   *ndp.Conn
-	ifi *net.Interface
-	ip  net.IP
+	c        *ndp.Conn
+	ifi      *net.Interface
+	ip       net.IP
+	autoPrev bool
 
 	cfg config.Interface
 	b   *builder
@@ -48,6 +51,18 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 	ifi, err := net.InterfaceByName(cfg.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to look up interface %q: %v", cfg.Name, err)
+	}
+
+	// If possible, disable IPv6 autoconfiguration on this interface so that
+	// our RAs don't configure more IP addresses on this interface.
+	autoPrev, err := interfaceIPv6Autoconf(ifi.Name, false)
+	if err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			// Continue anyway but provide a hint.
+			ll.Printf("%s: permission denied while disabling IPv6 autoconfiguration, continuing anyway (try setting CAP_NET_ADMIN)", ifi.Name)
+		} else {
+			return nil, fmt.Errorf("failed to disable IPv6 autoconfiguration on %q: %v", ifi.Name, err)
+		}
 	}
 
 	c, ip, err := ndp.Dial(ifi, ndp.LinkLocal)
@@ -71,9 +86,10 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 	}
 
 	return &Advertiser{
-		c:   c,
-		ifi: ifi,
-		ip:  ip,
+		c:        c,
+		ifi:      ifi,
+		ip:       ip,
+		autoPrev: autoPrev,
 
 		cfg: cfg,
 		// Set up a builder to construct RAs from configuration.
@@ -86,9 +102,24 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 	}, nil
 }
 
-// Close closes the Advertiser's connection.
+// Close restores the previous state of the interface and cleans up the
+// Advertiser's internal connections.
 func (a *Advertiser) Close() error {
-	return a.c.Close()
+	if err := a.c.Close(); err != nil {
+		return err
+	}
+
+	// If possible, restore the previous IPv6 autoconfiguration state.
+	if _, err := interfaceIPv6Autoconf(a.ifi.Name, a.autoPrev); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			// Continue anyway but provide a hint.
+			a.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
+		} else {
+			return fmt.Errorf("failed to restore IPv6 autoconfiguration on %q: %v", a.ifi.Name, err)
+		}
+	}
+
+	return nil
 }
 
 // Advertise begins sending router advertisements at regular intervals. Advertise
