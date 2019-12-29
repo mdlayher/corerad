@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -25,16 +26,20 @@ import (
 //go:generate embed file -var Default --source default.toml
 
 // Default is the toml representation of the default configuration.
-var Default = "# CoreRAD vALPHA configuration file\n\n# Interfaces which will be used to serve IPv6 NDP router advertisements.\n[[interfaces]]\nname = \"eth0\"\n# AdvSendAdvertisements: indicates whether or not this interface will send\n# periodic router advertisements and respond to router solicitations.\nsend_advertisements = true\n\n  # Zero or more plugins may be specified to modify the behavior of the router\n  # advertisements produced by CoreRAD.\n\n  # \"prefix\" plugin: attaches a NDP Prefix Information option to the router\n  # advertisement.\n  [[interfaces.plugins]]\n  name = \"prefix\"\n  # Serve Prefix Information options for each IPv6 prefix on this interface\n  # configured with a /64 CIDR mask.\n  prefix = \"::/64\"\n  on_link = true\n  autonomous = true\n  # Durations are specified in Go time.ParseDuration format:\n  # https://golang.org/pkg/time/#ParseDuration.\n  preferred_lifetime = \"5m\"\n  valid_lifetime = \"10m\"\n  # As a special case, lifetime values can be infinite by specifying \"infinite\".\n  # valid_lifetime = \"infinite\"\n\n  # Alternatively, serve an explicit IPv6 prefix.\n  [[interfaces.plugins]]\n  name = \"prefix\"\n  prefix = \"2001:db8::/64\"\n  on_link = true\n  autonomous = true\n  preferred_lifetime = \"5m\"\n  valid_lifetime = \"10m\"\n\n  # \"rdnss\" plugin: attaches a NDP Recursive DNS Servers option to the router\n  # advertisement.\n  [[interfaces.plugins]]\n  name = \"rdnss\"\n  lifetime = \"10m\"\n  servers = [\"2001:db8::1\", \"2001:db8::2\"]\n\n# Enable or disable the debug HTTP server for facilities such as Prometheus\n# metrics and pprof support.\n#\n# Warning: do not expose pprof on an untrusted network!\n[debug]\naddress = \"localhost:9430\"\nprometheus = true\npprof = false\n"
+var Default = "# CoreRAD vALPHA configuration file\n\n# Interfaces which will be used to serve IPv6 NDP router advertisements.\n[[interfaces]]\nname = \"eth0\"\n\n# AdvSendAdvertisements: indicates whether or not this interface will send\n# periodic router advertisements and respond to router solicitations.\nsend_advertisements = true\n\n# MaxRtrAdvInterval: the maximum time between sending unsoliciated multicast\n# router advertisements. Must be between 4 and 1800 seconds.\nmax_interval = \"600s\"\n\n  # Zero or more plugins may be specified to modify the behavior of the router\n  # advertisements produced by CoreRAD.\n\n  # \"prefix\" plugin: attaches a NDP Prefix Information option to the router\n  # advertisement.\n  [[interfaces.plugins]]\n  name = \"prefix\"\n  # Serve Prefix Information options for each IPv6 prefix on this interface\n  # configured with a /64 CIDR mask.\n  prefix = \"::/64\"\n  on_link = true\n  autonomous = true\n  # Durations are specified in Go time.ParseDuration format:\n  # https://golang.org/pkg/time/#ParseDuration.\n  preferred_lifetime = \"5m\"\n  valid_lifetime = \"10m\"\n  # As a special case, lifetime values can be infinite by specifying \"infinite\".\n  # valid_lifetime = \"infinite\"\n\n  # Alternatively, serve an explicit IPv6 prefix.\n  [[interfaces.plugins]]\n  name = \"prefix\"\n  prefix = \"2001:db8::/64\"\n  on_link = true\n  autonomous = true\n  preferred_lifetime = \"5m\"\n  valid_lifetime = \"10m\"\n\n  # \"rdnss\" plugin: attaches a NDP Recursive DNS Servers option to the router\n  # advertisement.\n  [[interfaces.plugins]]\n  name = \"rdnss\"\n  lifetime = \"10m\"\n  servers = [\"2001:db8::1\", \"2001:db8::2\"]\n\n  # \"mtu\" plugin: attaches a NDP MTU option to the router advertisement.\n  [[interfaces.plugins]]\n  name = \"mtu\"\n  mtu = 1500\n\n# Enable or disable the debug HTTP server for facilities such as Prometheus\n# metrics and pprof support.\n#\n# Warning: do not expose pprof on an untrusted network!\n[debug]\naddress = \"localhost:9430\"\nprometheus = true\npprof = false\n"
 
 // A file is the raw top-level configuration file representation.
 type file struct {
-	Interfaces []struct {
-		Name               string                      `toml:"name"`
-		SendAdvertisements bool                        `toml:"send_advertisements"`
-		Plugins            []map[string]toml.Primitive `toml:"plugins"`
-	} `toml:"interfaces"`
-	Debug Debug `toml:"debug"`
+	Interfaces []rawInterface `toml:"interfaces"`
+	Debug      Debug          `toml:"debug"`
+}
+
+// A rawInterface is the raw configuration file representation of an Interface.
+type rawInterface struct {
+	Name               string                      `toml:"name"`
+	SendAdvertisements bool                        `toml:"send_advertisements"`
+	MaxInterval        string                      `toml:"max_interval"`
+	Plugins            []map[string]toml.Primitive `toml:"plugins"`
 }
 
 // Config specifies the configuration for CoreRAD.
@@ -47,6 +52,7 @@ type Config struct {
 type Interface struct {
 	Name               string
 	SendAdvertisements bool
+	MaxInterval        time.Duration
 	Plugins            []Plugin
 }
 
@@ -93,27 +99,50 @@ func Parse(r io.Reader) (*Config, error) {
 			return nil, fmt.Errorf("interface %d: empty interface name", i)
 		}
 
-		plugins := make([]Plugin, 0, len(ifi.Plugins))
-		for j, p := range ifi.Plugins {
+		iface, err := parseInterface(ifi)
+		if err != nil {
 			// Narrow down the location of a configuration error.
-			handle := func(err error) error {
-				return fmt.Errorf("interface %d/%q, plugin %d: %v", i, ifi.Name, j, err)
-			}
-
-			plug, err := parsePlugin(md, p)
-			if err != nil {
-				return nil, handle(err)
-			}
-
-			plugins = append(plugins, plug)
+			return nil, fmt.Errorf("interface %d/%q: %v", i, ifi.Name, err)
 		}
 
-		c.Interfaces = append(c.Interfaces, Interface{
-			Name:               ifi.Name,
-			SendAdvertisements: ifi.SendAdvertisements,
-			Plugins:            plugins,
-		})
+		iface.Plugins = make([]Plugin, 0, len(ifi.Plugins))
+		for j, p := range ifi.Plugins {
+			plug, err := parsePlugin(md, p)
+			if err != nil {
+				// Narrow down the location of a configuration error.
+				return nil, fmt.Errorf("interface %d/%q, plugin %d: %v", i, ifi.Name, j, err)
+			}
+
+			iface.Plugins = append(iface.Plugins, plug)
+		}
+
+		c.Interfaces = append(c.Interfaces, *iface)
 	}
 
 	return c, nil
+}
+
+// parseInterfaces parses a rawInterface into an Interface.
+func parseInterface(ifi rawInterface) (*Interface, error) {
+	// Default values in this section  come from the RFC:
+	// https://tools.ietf.org/html/rfc4861#section-6.2.1.
+
+	maxInterval := 600 * time.Second
+	if ifi.MaxInterval != "" {
+		d, err := time.ParseDuration(ifi.MaxInterval)
+		if err != nil {
+			return nil, fmt.Errorf("invalid max interval: %v", err)
+		}
+		maxInterval = d
+	}
+
+	if maxInterval < 4*time.Second || maxInterval > 1800*time.Second {
+		return nil, errors.New("max interval must be between 4 and 1800 seconds")
+	}
+
+	return &Interface{
+		Name:               ifi.Name,
+		SendAdvertisements: ifi.SendAdvertisements,
+		MaxInterval:        maxInterval,
+	}, nil
 }

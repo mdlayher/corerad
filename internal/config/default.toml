@@ -3,9 +3,14 @@
 # Interfaces which will be used to serve IPv6 NDP router advertisements.
 [[interfaces]]
 name = "eth0"
+
 # AdvSendAdvertisements: indicates whether or not this interface will send
 # periodic router advertisements and respond to router solicitations.
 send_advertisements = true
+
+# MaxRtrAdvInterval: the maximum time between sending unsoliciated multicast
+# router advertisements. Must be between 4 and 1800 seconds.
+max_interval = "600s"
 
   # Zero or more plugins may be specified to modify the behavior of the router
   # advertisements produced by CoreRAD.

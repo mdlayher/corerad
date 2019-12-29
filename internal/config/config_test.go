@@ -18,6 +18,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
@@ -93,6 +94,7 @@ func TestParse(t *testing.T) {
 				Interfaces: []config.Interface{{
 					Name:               "eth0",
 					SendAdvertisements: true,
+					MaxInterval:        10 * time.Minute,
 					Plugins:            []config.Plugin{},
 				}},
 			},
@@ -104,6 +106,7 @@ func TestParse(t *testing.T) {
 			[[interfaces]]
 			name = "eth0"
 			send_advertisements = true
+			max_interval = "600s"
 
 			  [[interfaces.plugins]]
 			  name = "prefix"
@@ -126,6 +129,7 @@ func TestParse(t *testing.T) {
 					{
 						Name:               "eth0",
 						SendAdvertisements: true,
+						MaxInterval:        10 * time.Minute,
 						Plugins: []config.Plugin{
 							&config.Prefix{
 								Prefix: mustCIDR("::/64"),
@@ -138,6 +142,7 @@ func TestParse(t *testing.T) {
 					{
 						Name:               "eth1",
 						SendAdvertisements: false,
+						MaxInterval:        10 * time.Minute,
 						Plugins:            []config.Plugin{},
 					},
 				},
