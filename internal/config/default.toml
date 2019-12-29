@@ -8,9 +8,14 @@ name = "eth0"
 # periodic router advertisements and respond to router solicitations.
 send_advertisements = true
 
-# MaxRtrAdvInterval: the maximum time between sending unsoliciated multicast
+# MaxRtrAdvInterval: the maximum time between sending unsolicited multicast
 # router advertisements. Must be between 4 and 1800 seconds.
 max_interval = "600s"
+
+# MinRtrAdvInterval: the minimum time between sending unsolicited multicast
+# router advertisements. Must be between 3 and (.75 * max_interval) seconds.
+# An empty string or the value "auto" will compute a sane default.
+min_interval = "auto"
 
   # Zero or more plugins may be specified to modify the behavior of the router
   # advertisements produced by CoreRAD.

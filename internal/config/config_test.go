@@ -94,6 +94,7 @@ func TestParse(t *testing.T) {
 				Interfaces: []config.Interface{{
 					Name:               "eth0",
 					SendAdvertisements: true,
+					MinInterval:        3*time.Minute + 18*time.Second,
 					MaxInterval:        10 * time.Minute,
 					Plugins:            []config.Plugin{},
 				}},
@@ -106,7 +107,8 @@ func TestParse(t *testing.T) {
 			[[interfaces]]
 			name = "eth0"
 			send_advertisements = true
-			max_interval = "600s"
+			max_interval = "10m"
+			min_interval = "6m"
 
 			  [[interfaces.plugins]]
 			  name = "prefix"
@@ -118,6 +120,8 @@ func TestParse(t *testing.T) {
 
 			[[interfaces]]
 			name = "eth1"
+			min_interval = "auto"
+			max_interval = "4s"
 
 			[debug]
 			address = "localhost:9430"
@@ -129,6 +133,7 @@ func TestParse(t *testing.T) {
 					{
 						Name:               "eth0",
 						SendAdvertisements: true,
+						MinInterval:        6 * time.Minute,
 						MaxInterval:        10 * time.Minute,
 						Plugins: []config.Plugin{
 							&config.Prefix{
@@ -142,7 +147,8 @@ func TestParse(t *testing.T) {
 					{
 						Name:               "eth1",
 						SendAdvertisements: false,
-						MaxInterval:        10 * time.Minute,
+						MinInterval:        4 * time.Second,
+						MaxInterval:        4 * time.Second,
 						Plugins:            []config.Plugin{},
 					},
 				},
