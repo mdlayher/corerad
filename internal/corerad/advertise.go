@@ -56,7 +56,7 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 
 	// If possible, disable IPv6 autoconfiguration on this interface so that
 	// our RAs don't configure more IP addresses on this interface.
-	autoPrev, err := interfaceIPv6Autoconf(ifi.Name, false)
+	autoPrev, err := setIPv6Autoconf(ifi.Name, false)
 	if err != nil {
 		if errors.Is(err, os.ErrPermission) {
 			// Continue anyway but provide a hint.
@@ -146,7 +146,7 @@ func (a *Advertiser) cleanup() error {
 	}
 
 	// If possible, restore the previous IPv6 autoconfiguration state.
-	if _, err := interfaceIPv6Autoconf(a.ifi.Name, a.autoPrev); err != nil {
+	if _, err := setIPv6Autoconf(a.ifi.Name, a.autoPrev); err != nil {
 		if errors.Is(err, os.ErrPermission) {
 			// Continue anyway but provide a hint.
 			a.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
