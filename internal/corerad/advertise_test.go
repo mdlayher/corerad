@@ -132,14 +132,9 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	}
 
 	done := func() {
-		if err := ad.Close(); err != nil {
-			t.Fatalf("failed to stop Advertiser: %v", err)
-		}
-
 		if err := c.Close(); err != nil {
 			t.Fatalf("failed to close NDP router solicitation connection: %v", err)
 		}
-
 	}
 
 	return ad, c, done

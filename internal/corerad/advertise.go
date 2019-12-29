@@ -26,6 +26,7 @@ import (
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
+	"golang.org/x/sync/errgroup"
 )
 
 // An Advertiser sends NDP router advertisements.
@@ -102,11 +103,36 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 	}, nil
 }
 
-// Close restores the previous state of the interface and cleans up the
+// Advertise begins router solicitation and advertisement handling. Advertise
+// will block until ctx is canceled or an error occurs.
+func (a *Advertiser) Advertise(ctx context.Context) error {
+	// Attach the context to the errgroup so that goroutines are canceled when
+	// one of them returns an error.
+	eg, ctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		if err := a.multicast(ctx); err != nil {
+			return fmt.Errorf("failed to multicast: %v", err)
+		}
+
+		return nil
+	})
+
+	a.logf("initialized, sending router advertisements from %s", a.ip)
+
+	if err := eg.Wait(); err != nil {
+		return fmt.Errorf("failed to run advertiser: %v", err)
+	}
+
+	return a.cleanup()
+}
+
+// cleanup restores the previous state of the interface and cleans up the
 // Advertiser's internal connections.
-func (a *Advertiser) Close() error {
+func (a *Advertiser) cleanup() error {
 	if err := a.c.Close(); err != nil {
-		return err
+		// Warn, but don't halt cleanup.
+		a.logf("failed to stop NDP listener: %v", err)
 	}
 
 	// If possible, restore the previous IPv6 autoconfiguration state.
@@ -122,11 +148,8 @@ func (a *Advertiser) Close() error {
 	return nil
 }
 
-// Advertise begins sending router advertisements at regular intervals. Advertise
-// will block until ctx is canceled or an error occurs.
-func (a *Advertiser) Advertise(ctx context.Context) error {
-	a.logf("initialized, sending router advertisements from %s", a.ip)
-
+// multicast runs a multicast advertising loop until ctx is canceled.
+func (a *Advertiser) multicast(ctx context.Context) error {
 	for {
 		// Enable cancelation before sending any messages, if necessary.
 		select {
