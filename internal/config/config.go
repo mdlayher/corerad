@@ -40,6 +40,7 @@ type rawInterface struct {
 	SendAdvertisements bool                        `toml:"send_advertisements"`
 	MaxInterval        string                      `toml:"max_interval"`
 	MinInterval        string                      `toml:"min_interval"`
+	DefaultLifetime    string                      `toml:"default_lifetime"`
 	Plugins            []map[string]toml.Primitive `toml:"plugins"`
 }
 
@@ -54,6 +55,7 @@ type Interface struct {
 	Name                     string
 	SendAdvertisements       bool
 	MinInterval, MaxInterval time.Duration
+	DefaultLifetime          time.Duration
 	Plugins                  []Plugin
 }
 

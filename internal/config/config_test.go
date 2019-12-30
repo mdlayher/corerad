@@ -89,6 +89,7 @@ func TestParse(t *testing.T) {
 			[[interfaces]]
 			name = "eth0"
 			send_advertisements = true
+			default_lifetime = ""
 			`,
 			c: &config.Config{
 				Interfaces: []config.Interface{{
@@ -109,6 +110,7 @@ func TestParse(t *testing.T) {
 			send_advertisements = true
 			max_interval = "10m"
 			min_interval = "6m"
+			default_lifetime = "auto"
 
 			  [[interfaces.plugins]]
 			  name = "prefix"
@@ -122,6 +124,7 @@ func TestParse(t *testing.T) {
 			name = "eth1"
 			min_interval = "auto"
 			max_interval = "4s"
+			default_lifetime = "8s"
 
 			[debug]
 			address = "localhost:9430"
@@ -135,6 +138,7 @@ func TestParse(t *testing.T) {
 						SendAdvertisements: true,
 						MinInterval:        6 * time.Minute,
 						MaxInterval:        10 * time.Minute,
+						DefaultLifetime:    30 * time.Minute,
 						Plugins: []config.Plugin{
 							&config.Prefix{
 								Prefix: mustCIDR("::/64"),
@@ -149,6 +153,7 @@ func TestParse(t *testing.T) {
 						SendAdvertisements: false,
 						MinInterval:        4 * time.Second,
 						MaxInterval:        4 * time.Second,
+						DefaultLifetime:    8 * time.Second,
 						Plugins:            []config.Plugin{},
 					},
 				},

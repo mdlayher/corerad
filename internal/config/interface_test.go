@@ -57,6 +57,25 @@ func Test_parseInterfaceErrors(t *testing.T) {
 				MaxInterval: "4s",
 			},
 		},
+		{
+			name: "default lifetime duration",
+			ifi: rawInterface{
+				DefaultLifetime: "foo",
+			},
+		},
+		{
+			name: "default lifetime too low",
+			ifi: rawInterface{
+				MaxInterval:     "4s",
+				DefaultLifetime: "2s",
+			},
+		},
+		{
+			name: "default lifetime too high",
+			ifi: rawInterface{
+				DefaultLifetime: "9001s",
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -14,7 +14,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"time"
 )
@@ -34,10 +33,15 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 	}
 
 	if maxInterval < 4*time.Second || maxInterval > 1800*time.Second {
-		return nil, errors.New("max interval must be between 4 and 1800 seconds")
+		return nil, fmt.Errorf("max interval (%d) must be between 4 and 1800 seconds", int(maxInterval.Seconds()))
 	}
 
 	minInterval, err := parseMinInterval(ifi.MinInterval, maxInterval)
+	if err != nil {
+		return nil, err
+	}
+
+	lifetime, err := parseDefaultLifetime(ifi.DefaultLifetime, maxInterval)
 	if err != nil {
 		return nil, err
 	}
@@ -47,35 +51,59 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		SendAdvertisements: ifi.SendAdvertisements,
 		MinInterval:        minInterval,
 		MaxInterval:        maxInterval,
+		DefaultLifetime:    lifetime,
 	}, nil
 }
 
 // parseMinInterval parses a min_interval string and computes its value
 // based on user input or the relationship with max.
-func parseMinInterval(minRaw string, max time.Duration) (time.Duration, error) {
-	var min time.Duration
-	if minRaw == "" || minRaw == "auto" {
+func parseMinInterval(s string, max time.Duration) (time.Duration, error) {
+	if s == "" || s == "auto" {
 		// Compute a sane default per the RFC.
 		if max >= 9*time.Second {
-			min = time.Duration(0.33 * float64(max)).Truncate(time.Second)
-		} else {
-			min = max
+			return time.Duration(0.33 * float64(max)).Truncate(time.Second), nil
 		}
 
-		return min, nil
+		// For lower values, use the same value as max.
+		return max, nil
 	}
 
 	// Use the user's value, but validate it per the RFC.
-	d, err := time.ParseDuration(minRaw)
+	min, err := time.ParseDuration(s)
 	if err != nil {
 		return 0, fmt.Errorf("invalid min interval: %v", err)
 	}
-	min = d
 
 	upper := time.Duration(0.75 * float64(max)).Truncate(time.Second)
 	if min < 3*time.Second || min > upper {
-		return 0, fmt.Errorf("min interval must be between 3 and (.75 * max_interval = %d) seconds", int(upper.Seconds()))
+		return 0, fmt.Errorf("min interval (%d) must be between 3 and (.75 * max_interval = %d) seconds",
+			int(min.Seconds()), int(upper.Seconds()))
 	}
 
 	return min, nil
+}
+
+// parseDefaultLifetime parses a default_lifetime string and computes its value
+// based on user input or the relationship with max.
+func parseDefaultLifetime(s string, max time.Duration) (time.Duration, error) {
+	switch s {
+	case "":
+		// No value specified, no default lifetime.
+		return 0, nil
+	case "auto":
+		// Compute a sane default per the RFC.
+		return 3 * max, nil
+	}
+
+	// Use the user's value, but validate it per the RFC.
+	lt, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid default lifetime: %v", err)
+	}
+
+	if lt < max || lt > 9000*time.Second {
+		return 0, fmt.Errorf("default lifetime (%d) must be between (max_interval = %d) and 9000 seconds", int(lt.Seconds()), int(max.Seconds()))
+	}
+
+	return lt, nil
 }
