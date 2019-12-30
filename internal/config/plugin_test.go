@@ -23,6 +23,58 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestDNSSLDecode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		s    string
+		d    *DNSSL
+		ok   bool
+	}{
+		{
+			name: "unknown key",
+			s: `
+			name = "dnssl"
+			bad = true
+			`,
+		},
+		{
+			name: "bad lifetime",
+			s: `
+			name = "dnssl"
+			lifetime = "foo"
+			`,
+		},
+		{
+			name: "bad domain names",
+			s: `
+			name = "dnssl"
+			domain_names = [1]
+			`,
+		},
+		{
+			name: "OK",
+			s: `
+			name = "dnssl"
+			domain_names = ["foo.example.com", "bar.example.com"]
+			lifetime = "30s"
+			`,
+			d: &DNSSL{
+				Lifetime:    30 * time.Second,
+				DomainNames: []string{"foo.example.com", "bar.example.com"},
+			},
+			ok: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pluginDecode(t, tt.s, tt.ok, tt.d)
+		})
+	}
+}
+
 func TestPrefixDecode(t *testing.T) {
 	t.Parallel()
 

@@ -53,6 +53,8 @@ func parsePlugin(md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) 
 	// required and decode its individual configuration.
 	var p Plugin
 	switch name {
+	case "dnssl":
+		p = new(DNSSL)
 	case "mtu":
 		p = new(MTU)
 	case "prefix":
@@ -68,6 +70,48 @@ func parsePlugin(md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) 
 	}
 
 	return p, nil
+}
+
+// DNSSL configures a NDP DNS Search List option.
+type DNSSL struct {
+	Lifetime    time.Duration
+	DomainNames []string
+}
+
+// Name implements Plugin.
+func (d *DNSSL) Name() string { return "DNSSL" }
+
+// String implements Plugin.
+func (d *DNSSL) String() string {
+	return fmt.Sprintf("domain names: [%s], lifetime: %s",
+		strings.Join(d.DomainNames, ", "), d.Lifetime)
+}
+
+// Decode implements Plugin.
+func (d *DNSSL) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
+	for k := range m {
+		var v value
+		if err := md.PrimitiveDecode(m[k], &v.v); err != nil {
+			return err
+		}
+
+		switch k {
+		case "name":
+			// Already handled.
+		case "lifetime":
+			d.Lifetime = v.Duration()
+		case "domain_names":
+			d.DomainNames = v.StringSlice()
+		default:
+			return fmt.Errorf("invalid key %q", k)
+		}
+
+		if err := v.Err(); err != nil {
+			return fmt.Errorf("parsing key %q: %v", k, err)
+		}
+	}
+
+	return nil
 }
 
 // A Prefix configures a NDP Prefix Information option.

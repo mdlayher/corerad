@@ -83,21 +83,9 @@ func (v *value) IPNet() *net.IPNet {
 
 // IPSlice interprets the value as a []net.IP composed of IPv6 addresses.
 func (v *value) IPSlice() []net.IP {
-	vs, ok := v.v.([]interface{})
-	if !ok {
-		v.err = errors.New("value must be an array of strings")
+	ss := v.StringSlice()
+	if v.err != nil {
 		return nil
-	}
-
-	ss := make([]string, 0, len(vs))
-	for _, vv := range vs {
-		s, ok := vv.(string)
-		if !ok {
-			v.err = errors.New("array values must be strings")
-			return nil
-		}
-
-		ss = append(ss, s)
 	}
 
 	ips := make([]net.IP, 0, len(ss))
@@ -149,6 +137,28 @@ func (v *value) Int(min, max int) int {
 	}
 
 	return i
+}
+
+// StringSlice interprets the value as a []string.
+func (v *value) StringSlice() []string {
+	vs, ok := v.v.([]interface{})
+	if !ok {
+		v.err = errors.New("value must be an array of strings")
+		return nil
+	}
+
+	ss := make([]string, 0, len(vs))
+	for _, vv := range vs {
+		s, ok := vv.(string)
+		if !ok {
+			v.err = errors.New("array values must be strings")
+			return nil
+		}
+
+		ss = append(ss, s)
+	}
+
+	return ss
 }
 
 // string interprets the value as a string.

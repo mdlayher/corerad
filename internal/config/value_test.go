@@ -196,6 +196,29 @@ func Test_value(t *testing.T) {
 			},
 			ok: true,
 		},
+		{
+			name: "bad StringSlice array",
+			fn: func(v *value) interface{} {
+				return v.StringSlice()
+			},
+			in: "foo",
+		},
+		{
+			name: "bad StringSlice array types",
+			fn: func(v *value) interface{} {
+				return v.StringSlice()
+			},
+			in: []interface{}{"foo", 1},
+		},
+		{
+			name: "OK StringSlice",
+			fn: func(v *value) interface{} {
+				return v.StringSlice()
+			},
+			in:   []interface{}{"foo.example.com", "bar.example.com"},
+			want: []string{"foo.example.com", "bar.example.com"},
+			ok:   true,
+		},
 	}
 
 	for _, tt := range tests {
