@@ -94,6 +94,18 @@ func Test_parseInterfaceErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "hop limit too low",
+			ifi: rawInterface{
+				HopLimit: -1,
+			},
+		},
+		{
+			name: "hop limit too high",
+			ifi: rawInterface{
+				HopLimit: 256,
+			},
+		},
+		{
 			name: "default lifetime duration",
 			ifi: rawInterface{
 				DefaultLifetime: "foo",

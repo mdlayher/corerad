@@ -68,6 +68,10 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		return nil, fmt.Errorf("retransmit timer (%d) must be between 0 and 3600 seconds", int(retrans.Seconds()))
 	}
 
+	if ifi.HopLimit < 0 || ifi.HopLimit > 255 {
+		return nil, fmt.Errorf("hop limit (%d) must be between 0 and 255", ifi.HopLimit)
+	}
+
 	lifetime, err := parseDefaultLifetime(ifi.DefaultLifetime, maxInterval)
 	if err != nil {
 		return nil, err
@@ -82,6 +86,7 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		OtherConfig:        ifi.OtherConfig,
 		ReachableTime:      reachable,
 		RetransmitTimer:    retrans,
+		HopLimit:           uint8(ifi.HopLimit),
 		DefaultLifetime:    lifetime,
 	}, nil
 }

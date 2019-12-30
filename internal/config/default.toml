@@ -34,6 +34,11 @@ reachable_time = "0s"
 # this router.
 retransmit_timer = "0s"
 
+# AdvCurHopLimit: indicates the value that should be placed in the Hop Limit
+# field in the IPv6 header. Must be between 0 and 255. 0 means this value
+# is unspecified by this router.
+hop_limit = 64
+
 # AdvDefaultLifetime: the value sent in the router lifetime field. Must be
 # 0 or between max_interval and 9000 seconds. An empty string is treated as 0,
 # or the value "auto" will compute a sane default.

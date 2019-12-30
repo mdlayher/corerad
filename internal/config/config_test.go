@@ -110,6 +110,7 @@ func TestParse(t *testing.T) {
 			send_advertisements = true
 			max_interval = "10m"
 			min_interval = "6m"
+			hop_limit = 64
 			default_lifetime = "auto"
 
 			  [[interfaces.plugins]]
@@ -142,6 +143,7 @@ func TestParse(t *testing.T) {
 						SendAdvertisements: true,
 						MinInterval:        6 * time.Minute,
 						MaxInterval:        10 * time.Minute,
+						HopLimit:           64,
 						DefaultLifetime:    30 * time.Minute,
 						Plugins: []config.Plugin{
 							&config.Prefix{

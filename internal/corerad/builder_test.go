@@ -38,6 +38,7 @@ func Test_builderBuild(t *testing.T) {
 		{
 			name: "interface",
 			ifi: config.Interface{
+				HopLimit:        64,
 				DefaultLifetime: 3 * time.Second,
 				Managed:         true,
 				OtherConfig:     true,
@@ -45,6 +46,7 @@ func Test_builderBuild(t *testing.T) {
 				RetransmitTimer: 1 * time.Second,
 			},
 			ra: &ndp.RouterAdvertisement{
+				CurrentHopLimit:      64,
 				RouterLifetime:       3 * time.Second,
 				ManagedConfiguration: true,
 				OtherConfiguration:   true,
