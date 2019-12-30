@@ -159,18 +159,23 @@ func (a *Advertiser) cleanup() error {
 	return nil
 }
 
+// Constants taken from https://tools.ietf.org/html/rfc4861#section-10.
+const (
+	maxInitialAdvInterval = 16 * time.Second
+	maxInitialAdv         = 3
+)
+
 // multicast runs a multicast advertising loop until ctx is canceled.
 func (a *Advertiser) multicast(ctx context.Context) error {
 	// Initialize PRNG so we can add jitter to our unsolicited multicast RA
-	// delay times, per the RFC:
-	// https://tools.ietf.org/html/rfc4861#section-6.2.4.
+	// delay times.
 	var (
-		rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+		prng = rand.New(rand.NewSource(time.Now().UnixNano()))
 		min  = a.cfg.MinInterval.Nanoseconds()
 		max  = a.cfg.MaxInterval.Nanoseconds()
 	)
 
-	for {
+	for i := 0; ; i++ {
 		// Enable cancelation before sending any messages, if necessary.
 		select {
 		case <-ctx.Done():
@@ -182,19 +187,10 @@ func (a *Advertiser) multicast(ctx context.Context) error {
 			return fmt.Errorf("failed to send multicast router advertisement: %v", err)
 		}
 
-		var wait time.Duration
-		if min == max {
-			// Identical min/max, use a static interval.
-			wait = (time.Duration(max) * time.Nanosecond).Round(time.Second)
-		} else {
-			// min <= wait <= max, rounded to 1 second granularity.
-			wait = (time.Duration(min+rand.Int63n(max-min)) * time.Nanosecond).Round(time.Second)
-		}
-
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(wait):
+		case <-time.After(multicastDelay(prng, i, min, max)):
 		}
 	}
 }
@@ -274,6 +270,31 @@ func (a *Advertiser) send(dst net.IP) error {
 	return nil
 }
 
+// logf prints a formatted log with the Advertiser's interface name.
 func (a *Advertiser) logf(format string, v ...interface{}) {
 	a.ll.Println(a.ifi.Name + ": " + fmt.Sprintf(format, v...))
+}
+
+// multicastDelay selects an appropriate delay duration for unsolicited
+// multicast RA sending.
+func multicastDelay(r *rand.Rand, i int, min, max int64) time.Duration {
+	// Implements the algorithm described in:
+	// https://tools.ietf.org/html/rfc4861#section-6.2.4.
+
+	var d time.Duration
+	if min == max {
+		// Identical min/max, use a static interval.
+		d = (time.Duration(max) * time.Nanosecond).Round(time.Second)
+	} else {
+		// min <= wait <= max, rounded to 1 second granularity.
+		d = (time.Duration(min+rand.Int63n(max-min)) * time.Nanosecond).Round(time.Second)
+	}
+
+	// For first few advertisements, select a shorter wait time so routers
+	// can be discovered quickly, per the RFC.
+	if i < maxInitialAdv && d > maxInitialAdvInterval {
+		d = maxInitialAdvInterval
+	}
+
+	return d
 }
