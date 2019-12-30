@@ -341,12 +341,12 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	// Set up a temporary veth pair in the appropriate state for use with
 	// the tests.
 	// TODO: use rtnetlink.
-	shell(t, "ip", "link", "add", veth0, "type", "veth", "peer", "name", veth1)
+	shell(t, "/sbin/ip", "link", "add", veth0, "type", "veth", "peer", "name", veth1)
 	mustSysctl(t, veth0, "accept_dad", "0")
 	mustSysctl(t, veth1, "accept_dad", "0")
 	mustSysctl(t, veth0, "forwarding", "1")
-	shell(t, "ip", "link", "set", "up", veth0)
-	shell(t, "ip", "link", "set", "up", veth1)
+	shell(t, "/sbin/ip", "link", "set", "up", veth0)
+	shell(t, "/sbin/ip", "link", "set", "up", veth1)
 
 	// Allow empty config but always populate the interface name.
 	// TODO: consider building veth pairs within the tests.
@@ -389,7 +389,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 		}
 
 		// Clean up the veth pair.
-		shell(t, "ip", "link", "del", veth0)
+		shell(t, "/sbin/ip", "link", "del", veth0)
 	}
 
 	return ad, c, ifi.HardwareAddr, done
