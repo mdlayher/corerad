@@ -22,4 +22,4 @@ func setIPv6Autoconf(_ string, _ bool) (bool, error) { return false, nil }
 func getIPv6Forwarding(_ string) (bool, error) {
 	// Assume that an interface running CoreRAD is forwarding packets.
 	return true, nil
- }
+}
