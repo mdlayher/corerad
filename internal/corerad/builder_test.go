@@ -36,6 +36,15 @@ func Test_builderBuild(t *testing.T) {
 			ra:   &ndp.RouterAdvertisement{},
 		},
 		{
+			name: "interface",
+			ifi: config.Interface{
+				DefaultLifetime: 3 * time.Second,
+			},
+			ra: &ndp.RouterAdvertisement{
+				RouterLifetime: 3 * time.Second,
+			},
+		},
+		{
 			name: "static prefix",
 			ifi: config.Interface{
 				Plugins: []config.Plugin{

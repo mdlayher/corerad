@@ -81,6 +81,70 @@ func TestAdvertiserUnsolicited(t *testing.T) {
 	}
 }
 
+func TestAdvertiserUnsolicitedShutdown(t *testing.T) {
+	// The advertiser will act as a default router until it shuts down.
+	const lifetime = 3 * time.Second
+	ad, c, _, done := testAdvertiser(t, &config.Interface{
+		DefaultLifetime: lifetime,
+	})
+	defer done()
+
+	if err := c.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatalf("failed to set client read deadline: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		if err := ad.Advertise(ctx); err != nil {
+			return fmt.Errorf("failed to advertise: %v", err)
+		}
+
+		return nil
+	})
+
+	// Read the RA the advertiser sends on startup, then stop it and capture the
+	// one it sends on shutdown.
+	var got []ndp.Message
+	for i := 0; i < 2; i++ {
+		m, _, _, err := c.ReadFrom()
+		if err != nil {
+			t.Fatalf("failed to read RA: %v", err)
+		}
+
+		got = append(got, m)
+		cancel()
+	}
+
+	if err := eg.Wait(); err != nil {
+		t.Fatalf("failed to stop advertiser: %v", err)
+	}
+
+	options := []ndp.Option{&ndp.LinkLayerAddress{
+		Direction: ndp.Source,
+		Addr:      ad.ifi.HardwareAddr,
+	}}
+
+	// Expect only the first message to contain a RouterLifetime field as it
+	// should be cleared on shutdown.
+	want := []ndp.Message{
+		&ndp.RouterAdvertisement{
+			RouterLifetime: lifetime,
+			Options:        options,
+		},
+		&ndp.RouterAdvertisement{
+			RouterLifetime: 0,
+			Options:        options,
+		},
+	}
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("unexpected router advertisements (-want +got):\n%s", diff)
+	}
+}
+
 func TestAdvertiserSolicited(t *testing.T) {
 	// No configuration, bare minimum router advertisement.
 	ad, c, mac, done := testAdvertiser(t, nil)

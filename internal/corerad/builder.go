@@ -29,7 +29,10 @@ type builder struct {
 
 // Build creates a router advertisement from configuration.
 func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) {
-	var ra ndp.RouterAdvertisement
+	ra := &ndp.RouterAdvertisement{
+		RouterLifetime: ifi.DefaultLifetime,
+	}
+
 	for _, p := range ifi.Plugins {
 		switch p := p.(type) {
 		case *config.Prefix:
@@ -49,7 +52,7 @@ func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) 
 		}
 	}
 
-	return &ra, nil
+	return ra, nil
 }
 
 // prefixInformation produces ndp.PrefixInformation options for the prefix plugin.

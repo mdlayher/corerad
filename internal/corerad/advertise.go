@@ -135,14 +135,28 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 		return fmt.Errorf("failed to run advertiser: %v", err)
 	}
 
-	return a.cleanup()
+	return a.shutdown()
 }
 
-// cleanup restores the previous state of the interface and cleans up the
-// Advertiser's internal connections.
-func (a *Advertiser) cleanup() error {
+// shutdown indicates to hosts that this host is no longer a router and restores
+// the previous state of the interface.
+func (a *Advertiser) shutdown() error {
+	// In general, many of these actions are best-effort and should not halt
+	// shutdown on failure.
+
+	// Send a final router advertisement (TODO: more than one) with a router
+	// lifetime of 0 to indicate that hosts should not use this router as a
+	// default router, and then leave the all-routers group.
+	a.cfg.DefaultLifetime = 0
+	if err := a.send(net.IPv6linklocalallnodes); err != nil {
+		a.logf("failed to send final multicast router advertisement: %v", err)
+	}
+
+	if err := a.c.LeaveGroup(net.IPv6linklocalallrouters); err != nil {
+		a.logf("failed to leave IPv6 link-local all routers multicast group: %v", err)
+	}
+
 	if err := a.c.Close(); err != nil {
-		// Warn, but don't halt cleanup.
 		a.logf("failed to stop NDP listener: %v", err)
 	}
 
