@@ -21,6 +21,8 @@ tasks:
       sudo ip link add cradveth0 type veth peer name cradveth1
       echo 0 | sudo tee /proc/sys/net/ipv6/conf/cradveth0/accept_dad
       echo 0 | sudo tee /proc/sys/net/ipv6/conf/cradveth1/accept_dad
+      # Forwarding is enabled so we can specify router lifetime.
+      echo 1 | sudo tee /proc/sys/net/ipv6/conf/cradveth0/forwarding
       sudo ip link set up cradveth0
       sudo ip link set up cradveth1
       go test -c -mod vendor -race ./internal/corerad/

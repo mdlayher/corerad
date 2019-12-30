@@ -15,5 +15,11 @@
 
 package corerad
 
-// interfaceIPv6Autoconf is a no-op on non-Linux platforms.
-func interfaceIPv6Autoconf(_ string, _ bool) (bool, error) { return false, nil }
+// These functions are no-op on non-Linux platforms.
+
+func setIPv6Autoconf(_ string, _ bool) (bool, error) { return false, nil }
+
+func getIPv6Forwarding(_ string) (bool, error) {
+	// Assume that an interface running CoreRAD is forwarding packets.
+	return true, nil
+ }

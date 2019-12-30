@@ -277,6 +277,17 @@ func (a *Advertiser) send(dst net.IP) error {
 		Addr:      a.ifi.HardwareAddr,
 	})
 
+	// If the interface is not forwarding packets, we must set the router
+	// lifetime field to zero, per:
+	//  https://tools.ietf.org/html/rfc4861#section-6.2.5.
+	forwarding, err := getIPv6Forwarding(a.ifi.Name)
+	if err != nil {
+		return fmt.Errorf("failed to get IPv6 forwarding state: %v", err)
+	}
+	if !forwarding {
+		ra.RouterLifetime = 0
+	}
+
 	if err := a.c.WriteTo(ra, nil, dst); err != nil {
 		return fmt.Errorf("failed to send router advertisement to %s: %v", dst, err)
 	}

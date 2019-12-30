@@ -19,9 +19,8 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 )
-
-const autoconfFormat = "/proc/sys/net/ipv6/conf/%s/autoconf"
 
 // setIPv6Autoconf enables or disables IPv6 autoconfiguration for the
 // given interface on Linux systems, returning the previous state of the
@@ -41,7 +40,7 @@ func setIPv6Autoconf(iface string, enable bool) (bool, error) {
 		return false, err
 	}
 
-	if err := ioutil.WriteFile(fmt.Sprintf(autoconfFormat, iface), in, 0o644); err != nil {
+	if err := ioutil.WriteFile(sysctl(iface, "autoconf"), in, 0o644); err != nil {
 		return false, err
 	}
 
@@ -52,11 +51,26 @@ func setIPv6Autoconf(iface string, enable bool) (bool, error) {
 // getIPv6Autoconf fetches the current IPv6 autoconfiguration state for the
 // given interface on Linux systems.
 func getIPv6Autoconf(iface string) (bool, error) {
-	// Read the current state before setting a new one.
-	out, err := ioutil.ReadFile(fmt.Sprintf(autoconfFormat, iface))
+	return sysctlBool(sysctl(iface, "autoconf"))
+}
+
+// getIPv6Forwarding fetches the current IPv6 forwarding state for the
+// given interface on Linux systems.
+func getIPv6Forwarding(iface string) (bool, error) {
+	return sysctlBool(sysctl(iface, "forwarding"))
+}
+
+// sysctlBool reads a 0/1 boolean value from a file.
+func sysctlBool(file string) (bool, error) {
+	out, err := ioutil.ReadFile(file)
 	if err != nil {
 		return false, err
 	}
 
 	return bytes.Equal(out, []byte("1\n")), nil
+}
+
+// sysctl builds an IPv6 sysctl path for an interface and given key.
+func sysctl(iface, key string) string {
+	return filepath.Join(fmt.Sprintf("/proc/sys/net/ipv6/conf/%s", iface), key)
 }
