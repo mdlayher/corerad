@@ -37,6 +37,13 @@ func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) 
 
 	for _, p := range ifi.Plugins {
 		switch p := p.(type) {
+		case *config.DNSSL:
+			ra.Options = append(ra.Options, &ndp.DNSSearchList{
+				Lifetime:    p.Lifetime,
+				DomainNames: p.DomainNames,
+			})
+		case *config.MTU:
+			ra.Options = append(ra.Options, ndp.NewMTU(uint32(*p)))
 		case *config.Prefix:
 			opts, err := b.prefixInformation(p)
 			if err != nil {
@@ -44,8 +51,6 @@ func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) 
 			}
 
 			ra.Options = append(ra.Options, opts...)
-		case *config.MTU:
-			ra.Options = append(ra.Options, ndp.NewMTU(uint32(*p)))
 		case *config.RDNSS:
 			ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{
 				Lifetime: p.Lifetime,

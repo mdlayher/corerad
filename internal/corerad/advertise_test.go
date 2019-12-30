@@ -32,8 +32,36 @@ import (
 )
 
 func TestAdvertiserUnsolicited(t *testing.T) {
-	// No configuration, bare minimum router advertisement.
-	ad, c, _, done := testAdvertiser(t, nil)
+	// Configure a variety of plugins to ensure that everything is handled
+	// appropriately over the wire.
+	ad, c, _, done := testAdvertiser(t, &config.Interface{
+		OtherConfig: true,
+		Plugins: []config.Plugin{
+			&config.DNSSL{
+				Lifetime: 10 * time.Second,
+				DomainNames: []string{
+					"foo.example.com",
+					// Unicode was troublesome in package ndp for a while;
+					// verify it works here too.
+					"🔥.example.com",
+				},
+			},
+			newMTU(1500),
+			&config.Prefix{
+				Prefix:            mustCIDR("2001:db8::/32"),
+				OnLink:            true,
+				PreferredLifetime: 10 * time.Second,
+				ValidLifetime:     20 * time.Second,
+			},
+			&config.RDNSS{
+				Lifetime: 10 * time.Second,
+				Servers: []net.IP{
+					mustIP("2001:db8::1"),
+					mustIP("2001:db8::2"),
+				},
+			},
+		},
+	})
 	defer done()
 
 	if err := c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
@@ -68,12 +96,37 @@ func TestAdvertiserUnsolicited(t *testing.T) {
 		t.Fatalf("did not receive an RA: %#v", m)
 	}
 
-	// There was no config specified, so assume the bare minimum for a valid RA.
+	// Expect a complete RA.
 	want := &ndp.RouterAdvertisement{
-		Options: []ndp.Option{&ndp.LinkLayerAddress{
-			Direction: ndp.Source,
-			Addr:      ad.ifi.HardwareAddr,
-		}},
+		OtherConfiguration: true,
+		Options: []ndp.Option{
+			&ndp.DNSSearchList{
+				Lifetime: 10 * time.Second,
+				DomainNames: []string{
+					"foo.example.com",
+					"🔥.example.com",
+				},
+			},
+			ndp.NewMTU(1500),
+			&ndp.PrefixInformation{
+				PrefixLength:      32,
+				OnLink:            true,
+				PreferredLifetime: 10 * time.Second,
+				ValidLifetime:     20 * time.Second,
+				Prefix:            mustIP("2001:db8::"),
+			},
+			&ndp.RecursiveDNSServer{
+				Lifetime: 10 * time.Second,
+				Servers: []net.IP{
+					mustIP("2001:db8::1"),
+					mustIP("2001:db8::2"),
+				},
+			},
+			&ndp.LinkLayerAddress{
+				Direction: ndp.Source,
+				Addr:      ad.ifi.HardwareAddr,
+			},
+		},
 	}
 
 	if diff := cmp.Diff(want, ra); diff != "" {

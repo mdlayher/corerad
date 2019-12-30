@@ -49,6 +49,31 @@ func Test_builderBuild(t *testing.T) {
 			},
 		},
 		{
+			name: "DNSSL",
+			ifi: config.Interface{
+				Plugins: []config.Plugin{
+					&config.DNSSL{
+						Lifetime: 10 * time.Second,
+						DomainNames: []string{
+							"foo.example.com",
+							"bar.example.com",
+						},
+					},
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{
+						Lifetime: 10 * time.Second,
+						DomainNames: []string{
+							"foo.example.com",
+							"bar.example.com",
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "static prefix",
 			ifi: config.Interface{
 				Plugins: []config.Plugin{
