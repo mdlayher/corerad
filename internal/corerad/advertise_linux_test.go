@@ -37,7 +37,7 @@ import (
 func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 	// Configure a variety of plugins to ensure that everything is handled
 	// appropriately over the wire.
-	ad, c, _, done := testAdvertiser(t, &config.Interface{
+	cfg := &config.Interface{
 		OtherConfig: true,
 		Plugins: []config.Plugin{
 			&config.DNSSL{
@@ -64,40 +64,18 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 				},
 			},
 		},
+	}
+
+	var ra ndp.Message
+	ad, done := testAdvertiserClient(t, cfg, func(_ func(), cctx *clientContext) {
+		// Read a single advertisement and then ensure the advertiser can be halted.
+		m, _, _, err := cctx.c.ReadFrom()
+		if err != nil {
+			t.Fatalf("failed to read RA: %v", err)
+		}
+		ra = m
 	})
 	defer done()
-
-	if err := c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
-		t.Fatalf("failed to set client read deadline: %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var eg errgroup.Group
-	eg.Go(func() error {
-		if err := ad.Advertise(ctx); err != nil {
-			return fmt.Errorf("failed to advertise: %v", err)
-		}
-
-		return nil
-	})
-
-	// Read a single advertisement and then ensure the advertiser can be halted.
-	m, _, _, err := c.ReadFrom()
-	if err != nil {
-		t.Fatalf("failed to read RA: %v", err)
-	}
-
-	cancel()
-	if err := eg.Wait(); err != nil {
-		t.Fatalf("failed to stop advertiser: %v", err)
-	}
-
-	ra, ok := m.(*ndp.RouterAdvertisement)
-	if !ok {
-		t.Fatalf("did not receive an RA: %#v", m)
-	}
 
 	// Expect a complete RA.
 	want := &ndp.RouterAdvertisement{
@@ -140,43 +118,25 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 func TestAdvertiserLinuxUnsolicitedShutdown(t *testing.T) {
 	// The advertiser will act as a default router until it shuts down.
 	const lifetime = 3 * time.Second
-	ad, c, _, done := testAdvertiser(t, &config.Interface{
+	cfg := &config.Interface{
 		DefaultLifetime: lifetime,
+	}
+
+	var got []ndp.Message
+	ad, done := testAdvertiserClient(t, cfg, func(cancel func(), cctx *clientContext) {
+		// Read the RA the advertiser sends on startup, then stop it and capture the
+		// one it sends on shutdown.
+		for i := 0; i < 2; i++ {
+			m, _, _, err := cctx.c.ReadFrom()
+			if err != nil {
+				t.Fatalf("failed to read RA: %v", err)
+			}
+
+			got = append(got, m)
+			cancel()
+		}
 	})
 	defer done()
-
-	if err := c.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		t.Fatalf("failed to set client read deadline: %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var eg errgroup.Group
-	eg.Go(func() error {
-		if err := ad.Advertise(ctx); err != nil {
-			return fmt.Errorf("failed to advertise: %v", err)
-		}
-
-		return nil
-	})
-
-	// Read the RA the advertiser sends on startup, then stop it and capture the
-	// one it sends on shutdown.
-	var got []ndp.Message
-	for i := 0; i < 2; i++ {
-		m, _, _, err := c.ReadFrom()
-		if err != nil {
-			t.Fatalf("failed to read RA: %v", err)
-		}
-
-		got = append(got, m)
-		cancel()
-	}
-
-	if err := eg.Wait(); err != nil {
-		t.Fatalf("failed to stop advertiser: %v", err)
-	}
 
 	options := []ndp.Option{&ndp.LinkLayerAddress{
 		Direction: ndp.Source,
@@ -203,66 +163,39 @@ func TestAdvertiserLinuxUnsolicitedShutdown(t *testing.T) {
 
 func TestAdvertiserLinuxSolicited(t *testing.T) {
 	// No configuration, bare minimum router advertisement.
-	ad, c, mac, done := testAdvertiser(t, nil)
+	var got []ndp.Message
+	ad, done := testAdvertiserClient(t, nil, func(cancel func(), cctx *clientContext) {
+		// Issue repeated router solicitations and expect router advertisements
+		// in response.
+		for i := 0; i < 3; i++ {
+			if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
+				t.Fatalf("failed to send RS: %v", err)
+			}
+
+			// Read a single advertisement and then ensure the advertiser can be halted.
+			m, _, _, err := cctx.c.ReadFrom()
+			if err != nil {
+				t.Fatalf("failed to read RA: %v", err)
+			}
+
+			got = append(got, m)
+		}
+	})
 	defer done()
 
-	if err := c.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		t.Fatalf("failed to set client read deadline: %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var eg errgroup.Group
-	eg.Go(func() error {
-		if err := ad.Advertise(ctx); err != nil {
-			return fmt.Errorf("failed to advertise: %v", err)
-		}
-
-		return nil
-	})
-
-	rs := &ndp.RouterSolicitation{
-		Options: []ndp.Option{&ndp.LinkLayerAddress{
-			Direction: ndp.Source,
-			Addr:      mac,
-		}},
-	}
-
-	// There was no config specified, so assume the bare minimum for a valid RA.
-	want := &ndp.RouterAdvertisement{
+	ra := &ndp.RouterAdvertisement{
 		Options: []ndp.Option{&ndp.LinkLayerAddress{
 			Direction: ndp.Source,
 			Addr:      ad.ifi.HardwareAddr,
 		}},
 	}
 
-	// Issue repeated router solicitations and expect router advertisements
-	// in response.
-	for i := 0; i < 5; i++ {
-		if err := c.WriteTo(rs, nil, net.IPv6linklocalallrouters); err != nil {
-			t.Fatalf("failed to send RS: %v", err)
-		}
-
-		// Read a single advertisement and then ensure the advertiser can be halted.
-		m, _, _, err := c.ReadFrom()
-		if err != nil {
-			t.Fatalf("failed to read RA: %v", err)
-		}
-
-		ra, ok := m.(*ndp.RouterAdvertisement)
-		if !ok {
-			t.Fatalf("did not receive an RA: %#v", m)
-		}
-
-		if diff := cmp.Diff(want, ra); diff != "" {
-			t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
-		}
+	want := []ndp.Message{
+		ra, ra, ra,
 	}
 
-	cancel()
-	if err := eg.Wait(); err != nil {
-		t.Fatalf("failed to stop advertiser: %v", err)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
 	}
 }
 
@@ -326,57 +259,34 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 
 func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 	const lifetime = 3 * time.Second
-	ad, c, mac, done := testAdvertiser(t, &config.Interface{
+	cfg := &config.Interface{
 		DefaultLifetime: lifetime,
-	})
-	defer done()
-
-	if err := c.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		t.Fatalf("failed to set client read deadline: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var eg errgroup.Group
-	eg.Go(func() error {
-		if err := ad.Advertise(ctx); err != nil {
-			return fmt.Errorf("failed to advertise: %v", err)
+	var got []ndp.Message
+	ad, done := testAdvertiserClient(t, cfg, func(cancel func(), cctx *clientContext) {
+		m0, _, _, err := cctx.c.ReadFrom()
+		if err != nil {
+			t.Fatalf("failed to read RA: %v", err)
 		}
 
-		return nil
+		// Forwarding is disabled after the first RA arrives.
+		if err := setIPv6Forwarding(cctx.routerIface, false); err != nil {
+			t.Fatalf("failed to disable IPv6 forwarding: %v", err)
+		}
+
+		if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
+			t.Fatalf("failed to send RS: %v", err)
+		}
+
+		m1, _, _, err := cctx.c.ReadFrom()
+		if err != nil {
+			t.Fatalf("failed to read RA: %v", err)
+		}
+
+		got = []ndp.Message{m0, m1}
 	})
-
-	m0, _, _, err := c.ReadFrom()
-	if err != nil {
-		t.Fatalf("failed to read RA: %v", err)
-	}
-
-	// Forwarding is disabled after the first RA arrives.
-	if err := setIPv6Forwarding(ad.ifi.Name, false); err != nil {
-		t.Fatalf("failed to disable IPv6 forwarding: %v", err)
-	}
-
-	rs := &ndp.RouterSolicitation{
-		Options: []ndp.Option{&ndp.LinkLayerAddress{
-			Direction: ndp.Source,
-			Addr:      mac,
-		}},
-	}
-
-	if err := c.WriteTo(rs, nil, net.IPv6linklocalallrouters); err != nil {
-		t.Fatalf("failed to send RS: %v", err)
-	}
-
-	m1, _, _, err := c.ReadFrom()
-	if err != nil {
-		t.Fatalf("failed to read RA: %v", err)
-	}
-
-	cancel()
-	if err := eg.Wait(); err != nil {
-		t.Fatalf("failed to stop advertiser: %v", err)
-	}
+	defer done()
 
 	options := []ndp.Option{&ndp.LinkLayerAddress{
 		Direction: ndp.Source,
@@ -398,7 +308,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 		},
 	}
 
-	if diff := cmp.Diff(want, []ndp.Message{m0, m1}); diff != "" {
+	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("unexpected router advertisements (-want +got):\n%s", diff)
 	}
 }
@@ -466,6 +376,10 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 		t.Fatalf("failed to apply ICMPv6 filter: %v", err)
 	}
 
+	if err := c.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatalf("failed to set client read deadline: %v", err)
+	}
+
 	done := func() {
 		if err := c.Close(); err != nil {
 			t.Fatalf("failed to close NDP router solicitation connection: %v", err)
@@ -476,6 +390,56 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	}
 
 	return ad, c, ifi.HardwareAddr, done
+}
+
+type clientContext struct {
+	c           *ndp.Conn
+	rs          *ndp.RouterSolicitation
+	routerIface string
+}
+
+// testAdvertiserClient is a wrapper around testAdvertiser which focuses on
+// client interactions rather than server interactions.
+func testAdvertiserClient(t *testing.T, cfg *config.Interface, fn func(cancel func(), cctx *clientContext)) (*Advertiser, func()) {
+	t.Helper()
+
+	ad, c, mac, adDone := testAdvertiser(t, cfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		if err := ad.Advertise(ctx); err != nil {
+			return fmt.Errorf("failed to advertise: %v", err)
+		}
+
+		return nil
+	})
+
+	// Run the advertiser and invoke the client's input function with some
+	// context for the test, while also allowing the client to cancel the
+	// advertiser run loop.
+	fn(cancel, &clientContext{
+		c: c,
+		rs: &ndp.RouterSolicitation{
+			Options: []ndp.Option{&ndp.LinkLayerAddress{
+				Direction: ndp.Source,
+				Addr:      mac,
+			}},
+		},
+		routerIface: ad.ifi.Name,
+	})
+
+	done := func() {
+		cancel()
+		if err := eg.Wait(); err != nil {
+			t.Fatalf("failed to stop advertiser: %v", err)
+		}
+
+		adDone()
+	}
+
+	return ad, done
 }
 
 func waitInterfacesReady(t *testing.T, ifi0, ifi1 string) {
