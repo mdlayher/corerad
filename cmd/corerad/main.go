@@ -84,6 +84,10 @@ func main() {
 		s := <-sigC
 		ll.Printf("received %s, shutting down", s)
 		cancel()
+
+		// Stop handling signals at this point to allow the user to forcefully
+		// terminate the binary.
+		signal.Stop(sigC)
 	}()
 
 	// Start the server's goroutines and run until context cancelation.
