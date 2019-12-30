@@ -332,6 +332,8 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 		t.Skip("skipping, advertiser tests only run on Linux")
 	}
 
+	skipUnprivileged(t)
+
 	var (
 		r     = rand.New(rand.NewSource(time.Now().UnixNano()))
 		veth0 = fmt.Sprintf("cradveth%d", r.Intn(65535))
@@ -341,12 +343,15 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	// Set up a temporary veth pair in the appropriate state for use with
 	// the tests.
 	// TODO: use rtnetlink.
-	shell(t, "/sbin/ip", "link", "add", veth0, "type", "veth", "peer", "name", veth1)
+	shell(t, "ip", "link", "add", veth0, "type", "veth", "peer", "name", veth1)
 	mustSysctl(t, veth0, "accept_dad", "0")
 	mustSysctl(t, veth1, "accept_dad", "0")
 	mustSysctl(t, veth0, "forwarding", "1")
-	shell(t, "/sbin/ip", "link", "set", "up", veth0)
-	shell(t, "/sbin/ip", "link", "set", "up", veth1)
+	shell(t, "ip", "link", "set", "up", veth0)
+	shell(t, "ip", "link", "set", "up", veth1)
+
+	// Make sure the interfaces are up and ready.
+	waitInterfacesReady(t, veth0, veth1)
 
 	// Allow empty config but always populate the interface name.
 	// TODO: consider building veth pairs within the tests.
@@ -389,18 +394,65 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 		}
 
 		// Clean up the veth pair.
-		shell(t, "/sbin/ip", "link", "del", veth0)
+		shell(t, "ip", "link", "del", veth0)
 	}
 
 	return ad, c, ifi.HardwareAddr, done
 }
 
+func waitInterfacesReady(t *testing.T, ifi0, ifi1 string) {
+	t.Helper()
+
+	a, err := net.InterfaceByName(ifi0)
+	if err != nil {
+		t.Fatalf("failed to get first interface: %v", err)
+	}
+
+	b, err := net.InterfaceByName(ifi1)
+	if err != nil {
+		t.Fatalf("failed to get second interface: %v", err)
+	}
+
+	for i := 0; i < 5; i++ {
+		aaddrs, err := a.Addrs()
+		if err != nil {
+			t.Fatalf("failed to get first addresses: %v", err)
+		}
+
+		baddrs, err := b.Addrs()
+		if err != nil {
+			t.Fatalf("failed to get second addresses: %v", err)
+		}
+
+		if len(aaddrs) > 0 && len(baddrs) > 0 {
+			return
+		}
+
+		time.Sleep(1 * time.Second)
+		t.Log("waiting for interface readiness...")
+	}
+
+	t.Fatal("failed to wait for interface readiness")
+
+}
+
+func skipUnprivileged(t *testing.T) {
+	const ifName = "cradprobe0"
+	shell(t, "ip", "tuntap", "add", ifName, "mode", "tun")
+	shell(t, "ip", "link", "del", ifName)
+}
+
 func shell(t *testing.T, name string, arg ...string) {
 	t.Helper()
 
-	t.Logf("$ %s %v", name, arg)
+	bin, err := exec.LookPath(name)
+	if err != nil {
+		t.Fatalf("failed to look up binary path: %v", err)
+	}
 
-	cmd := exec.Command(name, arg...)
+	t.Logf("$ %s %v", bin, arg)
+
+	cmd := exec.Command(bin, arg...)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("failed to start command %q: %v", name, err)
 	}
