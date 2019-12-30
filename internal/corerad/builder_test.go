@@ -39,9 +39,13 @@ func Test_builderBuild(t *testing.T) {
 			name: "interface",
 			ifi: config.Interface{
 				DefaultLifetime: 3 * time.Second,
+				Managed:         true,
+				OtherConfig:     true,
 			},
 			ra: &ndp.RouterAdvertisement{
-				RouterLifetime: 3 * time.Second,
+				RouterLifetime:       3 * time.Second,
+				ManagedConfiguration: true,
+				OtherConfiguration:   true,
 			},
 		},
 		{

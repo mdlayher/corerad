@@ -30,7 +30,9 @@ type builder struct {
 // Build creates a router advertisement from configuration.
 func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) {
 	ra := &ndp.RouterAdvertisement{
-		RouterLifetime: ifi.DefaultLifetime,
+		ManagedConfiguration: ifi.Managed,
+		OtherConfiguration:   ifi.OtherConfig,
+		RouterLifetime:       ifi.DefaultLifetime,
 	}
 
 	for _, p := range ifi.Plugins {
