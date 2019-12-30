@@ -58,6 +58,42 @@ func Test_parseInterfaceErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "reachable time duration",
+			ifi: rawInterface{
+				ReachableTime: "foo",
+			},
+		},
+		{
+			name: "reachable time too low",
+			ifi: rawInterface{
+				ReachableTime: "-1s",
+			},
+		},
+		{
+			name: "reachable time too high",
+			ifi: rawInterface{
+				ReachableTime: "9000s",
+			},
+		},
+		{
+			name: "retransmit timer duration",
+			ifi: rawInterface{
+				RetransmitTimer: "foo",
+			},
+		},
+		{
+			name: "retransmit timer too low",
+			ifi: rawInterface{
+				RetransmitTimer: "-1s",
+			},
+		},
+		{
+			name: "retransmit timer too high",
+			ifi: rawInterface{
+				RetransmitTimer: "9000s",
+			},
+		},
+		{
 			name: "default lifetime duration",
 			ifi: rawInterface{
 				DefaultLifetime: "foo",

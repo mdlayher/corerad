@@ -127,6 +127,8 @@ func TestParse(t *testing.T) {
 			default_lifetime = "8s"
 			managed = true
 			other_config = true
+			reachable_time = "30s"
+			retransmit_timer = "5s"
 
 			[debug]
 			address = "localhost:9430"
@@ -157,6 +159,8 @@ func TestParse(t *testing.T) {
 						MaxInterval:        4 * time.Second,
 						Managed:            true,
 						OtherConfig:        true,
+						ReachableTime:      30 * time.Second,
+						RetransmitTimer:    5 * time.Second,
 						DefaultLifetime:    8 * time.Second,
 						Plugins:            []config.Plugin{},
 					},

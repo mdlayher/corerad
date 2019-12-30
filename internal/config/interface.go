@@ -41,6 +41,33 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		return nil, err
 	}
 
+	var reachable time.Duration
+	if ifi.ReachableTime != "" {
+		d, err := time.ParseDuration(ifi.ReachableTime)
+		if err != nil {
+			return nil, fmt.Errorf("invalid reachable time: %v", err)
+		}
+		reachable = d
+	}
+
+	if reachable < 0*time.Second || reachable > 1*time.Hour {
+		return nil, fmt.Errorf("reachable time (%d) must be between 0 and 3600 seconds", int(reachable.Seconds()))
+	}
+
+	var retrans time.Duration
+	if ifi.RetransmitTimer != "" {
+		d, err := time.ParseDuration(ifi.RetransmitTimer)
+		if err != nil {
+			return nil, fmt.Errorf("invalid retransmit timer: %v", err)
+		}
+		retrans = d
+	}
+
+	// TODO: is this upper bound right?
+	if retrans < 0*time.Second || retrans > 1*time.Hour {
+		return nil, fmt.Errorf("retransmit timer (%d) must be between 0 and 3600 seconds", int(retrans.Seconds()))
+	}
+
 	lifetime, err := parseDefaultLifetime(ifi.DefaultLifetime, maxInterval)
 	if err != nil {
 		return nil, err
@@ -53,6 +80,8 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		MaxInterval:        maxInterval,
 		Managed:            ifi.Managed,
 		OtherConfig:        ifi.OtherConfig,
+		ReachableTime:      reachable,
+		RetransmitTimer:    retrans,
 		DefaultLifetime:    lifetime,
 	}, nil
 }
