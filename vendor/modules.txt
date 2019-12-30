@@ -14,7 +14,7 @@ github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/mdlayher/ndp v0.0.0-20191223215734-1181730bf6e2
+# github.com/mdlayher/ndp v0.0.0-20191228172402-28f2de0da526
 github.com/mdlayher/ndp
 # github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
 github.com/mdlayher/promtest
@@ -34,9 +34,9 @@ github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
 # github.com/prometheus/prometheus v2.5.0+incompatible
 github.com/prometheus/prometheus/util/promlint
-# gitlab.com/golang-commonmark/puny v0.0.0-20180912090636-2cd490539afe
+# gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f
 gitlab.com/golang-commonmark/puny
-# golang.org/x/net v0.0.0-20190613194153-d28f0bde5980
+# golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 golang.org/x/net/bpf
 golang.org/x/net/icmp
 golang.org/x/net/internal/iana
@@ -45,6 +45,6 @@ golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20191220142924-d4481acd189f
+# golang.org/x/sys v0.0.0-20191224085550-c709ea063b76
 golang.org/x/sys/unix
 golang.org/x/sys/windows

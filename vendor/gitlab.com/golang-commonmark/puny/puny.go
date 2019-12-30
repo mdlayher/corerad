@@ -38,7 +38,7 @@ func adapt(delta, numPoints int32, firstTime bool) int32 {
 	delta += delta / numPoints
 	k := int32(0)
 	for delta > baseMinusTMin*tMax/2 {
-		delta = delta / baseMinusTMin
+		delta /= baseMinusTMin
 		k += base
 	}
 	return k + (baseMinusTMin+1)*delta/(delta+skew)
@@ -146,7 +146,7 @@ func Decode(s string) (string, error) {
 
 		output = append(output, 0)
 		copy(output[i+1:], output[i:])
-		output[i] = rune(n)
+		output[i] = n
 
 		i++
 	}
