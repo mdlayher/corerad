@@ -17,6 +17,19 @@ max_interval = "600s"
 # An empty string or the value "auto" will compute a sane default.
 min_interval = "auto"
 
+# AdvManagedFlag: indicates if hosts should request address configuration from a
+# DHCPv6 server.
+managed = false
+
+# AdvOtherConfigFlag: indicates if additional configuration options are
+# available from a DHCPv6 server.
+other_config = false
+
+# AdvDefaultLifetime: the value sent in the router lifetime field. Must be
+# 0 or between max_interval and 9000 seconds. An empty string is treated as 0,
+# or the value "auto" will compute a sane default.
+default_lifetime = "auto"
+
   # Zero or more plugins may be specified to modify the behavior of the router
   # advertisements produced by CoreRAD.
 

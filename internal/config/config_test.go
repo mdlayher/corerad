@@ -125,6 +125,8 @@ func TestParse(t *testing.T) {
 			min_interval = "auto"
 			max_interval = "4s"
 			default_lifetime = "8s"
+			managed = true
+			other_config = true
 
 			[debug]
 			address = "localhost:9430"
@@ -153,6 +155,8 @@ func TestParse(t *testing.T) {
 						SendAdvertisements: false,
 						MinInterval:        4 * time.Second,
 						MaxInterval:        4 * time.Second,
+						Managed:            true,
+						OtherConfig:        true,
 						DefaultLifetime:    8 * time.Second,
 						Plugins:            []config.Plugin{},
 					},

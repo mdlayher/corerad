@@ -51,6 +51,8 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		SendAdvertisements: ifi.SendAdvertisements,
 		MinInterval:        minInterval,
 		MaxInterval:        maxInterval,
+		Managed:            ifi.Managed,
+		OtherConfig:        ifi.OtherConfig,
 		DefaultLifetime:    lifetime,
 	}, nil
 }
