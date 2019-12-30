@@ -181,21 +181,30 @@ func (a *Advertiser) multicast(ctx context.Context) error {
 	}
 }
 
+// deadlineNow causes connection deadlines to trigger immediately.
+var deadlineNow = time.Unix(1, 0)
+
 // listen issues unicast router advertisements in response to router
 // solicitations, until ctx is canceled.
 func (a *Advertiser) listen(ctx context.Context) error {
+	// Wait for cancelation and then force any pending reads to time out.
+	var eg errgroup.Group
+	eg.Go(func() error {
+		<-ctx.Done()
+
+		if err := a.c.SetReadDeadline(deadlineNow); err != nil {
+			return fmt.Errorf("failed to interrupt listener: %v", err)
+		}
+
+		return nil
+	})
+
 	for {
 		// Enable cancelation before sending any messages, if necessary.
 		select {
 		case <-ctx.Done():
-			return nil
+			return eg.Wait()
 		default:
-		}
-
-		// Only block for a short time so that context cancelation can halt this
-		// goroutine.
-		if err := a.c.SetReadDeadline(time.Now().Add(250 * time.Millisecond)); err != nil {
-			return fmt.Errorf("failed to set listener deadline: %v", err)
 		}
 
 		m, _, host, err := a.c.ReadFrom()
