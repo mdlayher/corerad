@@ -25,6 +25,15 @@ managed = false
 # available from a DHCPv6 server.
 other_config = false
 
+# AdvReachableTime: indicates how long a node should treat a neighbor as
+# reachable. 0 or empty string mean this value is unspecified by this router.
+reachable_time = "0s"
+
+# AdvRetransTimer: indicates how long a node should wait before retransmitting
+# neighbor solicitations. 0 or empty string mean this value is unspecified by
+# this router.
+retransmit_timer = "0s"
+
 # AdvDefaultLifetime: the value sent in the router lifetime field. Must be
 # 0 or between max_interval and 9000 seconds. An empty string is treated as 0,
 # or the value "auto" will compute a sane default.

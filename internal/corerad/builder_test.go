@@ -41,11 +41,15 @@ func Test_builderBuild(t *testing.T) {
 				DefaultLifetime: 3 * time.Second,
 				Managed:         true,
 				OtherConfig:     true,
+				ReachableTime:   30 * time.Second,
+				RetransmitTimer: 1 * time.Second,
 			},
 			ra: &ndp.RouterAdvertisement{
 				RouterLifetime:       3 * time.Second,
 				ManagedConfiguration: true,
 				OtherConfiguration:   true,
+				ReachableTime:        30 * time.Second,
+				RetransmitTimer:      1 * time.Second,
 			},
 		},
 		{

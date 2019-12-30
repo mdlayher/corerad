@@ -33,6 +33,8 @@ func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) 
 		ManagedConfiguration: ifi.Managed,
 		OtherConfiguration:   ifi.OtherConfig,
 		RouterLifetime:       ifi.DefaultLifetime,
+		ReachableTime:        ifi.ReachableTime,
+		RetransmitTimer:      ifi.RetransmitTimer,
 	}
 
 	for _, p := range ifi.Plugins {
