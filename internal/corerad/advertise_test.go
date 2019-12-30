@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/ndp"
+	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -194,6 +195,15 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	c, _, err := ndp.Dial(ifi, ndp.LinkLocal)
 	if err != nil {
 		t.Fatalf("failed to create NDP client connection: %v", err)
+	}
+
+	// Only accept RAs.
+	var f ipv6.ICMPFilter
+	f.SetAll(true)
+	f.Accept(ipv6.ICMPTypeRouterAdvertisement)
+
+	if err := c.SetICMPFilter(&f); err != nil {
+		t.Fatalf("failed to apply ICMPv6 filter: %v", err)
 	}
 
 	done := func() {
