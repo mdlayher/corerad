@@ -26,11 +26,6 @@ import (
 // given interface on Linux systems, returning the previous state of the
 // interface so it can be restored at a later time.
 func setIPv6Autoconf(iface string, enable bool) (bool, error) {
-	in := []byte("0")
-	if enable {
-		in = []byte("1")
-	}
-
 	// The calling function can provide additional insight and we need to check
 	// for permission errors, so no need to wrap these errors.
 
@@ -40,7 +35,7 @@ func setIPv6Autoconf(iface string, enable bool) (bool, error) {
 		return false, err
 	}
 
-	if err := ioutil.WriteFile(sysctl(iface, "autoconf"), in, 0o644); err != nil {
+	if err := sysctlEnable(iface, "autoconf", enable); err != nil {
 		return false, err
 	}
 
@@ -52,6 +47,12 @@ func setIPv6Autoconf(iface string, enable bool) (bool, error) {
 // given interface on Linux systems.
 func getIPv6Autoconf(iface string) (bool, error) {
 	return sysctlBool(sysctl(iface, "autoconf"))
+}
+
+// setIpv6Forwarding enables or disables IPv6 forwarding for the given interface
+// on Linux systems.
+func setIPv6Forwarding(iface string, enable bool) error {
+	return sysctlEnable(iface, "forwarding", enable)
 }
 
 // getIPv6Forwarding fetches the current IPv6 forwarding state for the
@@ -73,4 +74,14 @@ func sysctlBool(file string) (bool, error) {
 // sysctl builds an IPv6 sysctl path for an interface and given key.
 func sysctl(iface, key string) string {
 	return filepath.Join(fmt.Sprintf("/proc/sys/net/ipv6/conf/%s", iface), key)
+}
+
+// sysctlEnable enable or disables a boolean sysctl.
+func sysctlEnable(iface, key string, enable bool) error {
+	in := []byte("0")
+	if enable {
+		in = []byte("1")
+	}
+
+	return ioutil.WriteFile(sysctl(iface, key), in, 0o644)
 }
