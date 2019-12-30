@@ -161,6 +161,46 @@ func TestAdvertiserLinuxUnsolicitedShutdown(t *testing.T) {
 	}
 }
 
+func TestAdvertiserLinuxUnsolicitedDelayed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	// Configure a variety of plugins to ensure that everything is handled
+	// appropriately over the wire.
+	var got []ndp.Message
+	ad, done := testAdvertiserClient(t, nil, func(_ func(), cctx *clientContext) {
+		// Expect a significant delay between the multicast RAs.
+		start := time.Now()
+		for i := 0; i < 2; i++ {
+			m, _, _, err := cctx.c.ReadFrom()
+			if err != nil {
+				t.Fatalf("failed to read RA: %v", err)
+			}
+			got = append(got, m)
+		}
+
+		if d := time.Since(start); d < minDelayBetweenRAs {
+			t.Fatalf("delay too short between multicast RAs: %s", d)
+		}
+	})
+	defer done()
+
+	// Expect identical RAs.
+	ra := &ndp.RouterAdvertisement{
+		Options: []ndp.Option{
+			&ndp.LinkLayerAddress{
+				Direction: ndp.Source,
+				Addr:      ad.ifi.HardwareAddr,
+			},
+		},
+	}
+
+	if diff := cmp.Diff([]ndp.Message{ra, ra}, got); diff != "" {
+		t.Fatalf("unexpected router advertisements (-want +got):\n%s", diff)
+	}
+}
+
 func TestAdvertiserLinuxSolicited(t *testing.T) {
 	// No configuration, bare minimum router advertisement.
 	var got []ndp.Message
@@ -344,12 +384,11 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	// Allow empty config but always populate the interface name.
 	// TODO: consider building veth pairs within the tests.
 	if cfg == nil {
-		cfg = &config.Interface{
-			// Fixed interval for multicast advertisements.
-			MinInterval: 1 * time.Second,
-			MaxInterval: 1 * time.Second,
-		}
+		cfg = &config.Interface{}
 	}
+	// Fixed interval for multicast advertisements.
+	cfg.MinInterval = 1 * time.Second
+	cfg.MaxInterval = 1 * time.Second
 	cfg.Name = veth0
 
 	ad, err := NewAdvertiser(*cfg, nil)

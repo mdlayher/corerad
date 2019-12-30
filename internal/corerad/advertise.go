@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
@@ -104,6 +105,12 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 	}, nil
 }
 
+// A request indicates that a router advertisement should be sent to the
+// specified IP address.
+type request struct {
+	IP net.IP
+}
+
 // Advertise begins router solicitation and advertisement handling. Advertise
 // will block until ctx is canceled or an error occurs.
 func (a *Advertiser) Advertise(ctx context.Context) error {
@@ -111,18 +118,30 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
 
-	// Multicast RA sender.
+	reqC := make(chan request, 16)
+
+	// RA scheduler which consumes requests to send RAs and dispatches them
+	// at the appropriate times.
 	eg.Go(func() error {
-		if err := a.multicast(ctx); err != nil {
+		if err := a.schedule(ctx, reqC); err != nil {
+			return fmt.Errorf("failed to schedule router advertisements: %v", err)
+		}
+
+		return nil
+	})
+
+	// Multicast RA generator.
+	eg.Go(func() error {
+		if err := a.multicast(ctx, reqC); err != nil {
 			return fmt.Errorf("failed to multicast: %v", err)
 		}
 
 		return nil
 	})
 
-	// RS listener which also issues unicast RAs.
+	// Listener which issues RAs in response to RS messages.
 	eg.Go(func() error {
-		if err := a.listen(ctx); err != nil {
+		if err := a.listen(ctx, reqC); err != nil {
 			return fmt.Errorf("failed to listen: %v", err)
 		}
 
@@ -177,10 +196,12 @@ func (a *Advertiser) shutdown() error {
 const (
 	maxInitialAdvInterval = 16 * time.Second
 	maxInitialAdv         = 3
+	minDelayBetweenRAs    = 3 * time.Second
+	maxRADelay            = 500 * time.Millisecond
 )
 
 // multicast runs a multicast advertising loop until ctx is canceled.
-func (a *Advertiser) multicast(ctx context.Context) error {
+func (a *Advertiser) multicast(ctx context.Context, reqC chan<- request) error {
 	// Initialize PRNG so we can add jitter to our unsolicited multicast RA
 	// delay times.
 	var (
@@ -197,8 +218,8 @@ func (a *Advertiser) multicast(ctx context.Context) error {
 		default:
 		}
 
-		if err := a.send(net.IPv6linklocalallnodes); err != nil {
-			return fmt.Errorf("failed to send multicast router advertisement: %v", err)
+		reqC <- request{
+			IP: net.IPv6linklocalallnodes,
 		}
 
 		select {
@@ -214,7 +235,7 @@ var deadlineNow = time.Unix(1, 0)
 
 // listen issues unicast router advertisements in response to router
 // solicitations, until ctx is canceled.
-func (a *Advertiser) listen(ctx context.Context) error {
+func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 	// Wait for cancelation and then force any pending reads to time out.
 	var eg errgroup.Group
 	eg.Go(func() error {
@@ -254,8 +275,99 @@ func (a *Advertiser) listen(ctx context.Context) error {
 		// TODO: metrics for RS fields.
 		_ = rs
 
-		if err := a.send(host); err != nil {
-			return fmt.Errorf("failed to send unicast router advertisement: %v", err)
+		// Issue a unicast RA.
+		// TODO: consider checking for numerous RS in succession and issuing
+		// a multicast RA in response.
+		reqC <- request{IP: host}
+	}
+}
+
+// schedule consumes RA requests and schedules them with workers so they may
+// occur at the appropriate times.
+func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
+	// Start a worker pool where timers can run without blocking the scheduler.
+	const n = 16
+	schedC := make(chan schedWork, n)
+
+	var wg sync.WaitGroup
+	wg.Add(n)
+	defer wg.Wait()
+
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			a.schedWorker(ctx, schedC)
+		}()
+	}
+
+	var (
+		prng          = rand.New(rand.NewSource(time.Now().UnixNano()))
+		m             request
+		lastMulticast time.Time
+	)
+
+	for {
+		// Enable cancelation before sending any messages, if necessary.
+		select {
+		case <-ctx.Done():
+			return nil
+		case m = <-reqC:
+		}
+
+		if !m.IP.IsMulticast() {
+			// This is a unicast RA. Delay it for a short period of time per
+			// the RFC and then send it.
+			schedC <- schedWork{
+				Delay: time.Duration(prng.Int63n(maxRADelay.Nanoseconds())) * time.Nanosecond,
+				IP:    m.IP,
+			}
+			continue
+		}
+
+		var delay time.Duration
+		if lastMulticast.IsZero() {
+			// We have not sent any multicast RAs; no delay.
+			delay = 0
+		} else {
+			// Ensure that we space out multicast RAs as required by the RFC.
+			delay = time.Since(lastMulticast)
+			if delay < minDelayBetweenRAs {
+				delay = minDelayBetweenRAs
+			}
+		}
+
+		// Ready to send this multicast RA.
+		lastMulticast = time.Now()
+		schedC <- schedWork{
+			Delay: delay,
+			IP:    m.IP,
+		}
+	}
+}
+
+// schedWork is an item of scheduled work for a schedWorker.
+type schedWork struct {
+	Delay time.Duration
+	IP    net.IP
+}
+
+// schedWorker runs a single worker which handles schedWork until ctx is canceled.
+func (a *Advertiser) schedWorker(ctx context.Context, schedC <-chan schedWork) {
+	var s schedWork
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case s = <-schedC:
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(s.Delay):
+			if err := a.send(s.IP); err != nil {
+				a.logf("failed to send scheduled router advertisement to %s: %v", s.IP, err)
+			}
 		}
 	}
 }
