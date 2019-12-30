@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"time"
@@ -160,6 +161,15 @@ func (a *Advertiser) cleanup() error {
 
 // multicast runs a multicast advertising loop until ctx is canceled.
 func (a *Advertiser) multicast(ctx context.Context) error {
+	// Initialize PRNG so we can add jitter to our unsolicited multicast RA
+	// delay times, per the RFC:
+	// https://tools.ietf.org/html/rfc4861#section-6.2.4.
+	var (
+		rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+		min  = a.cfg.MinInterval.Nanoseconds()
+		max  = a.cfg.MaxInterval.Nanoseconds()
+	)
+
 	for {
 		// Enable cancelation before sending any messages, if necessary.
 		select {
@@ -172,11 +182,19 @@ func (a *Advertiser) multicast(ctx context.Context) error {
 			return fmt.Errorf("failed to send multicast router advertisement: %v", err)
 		}
 
-		// TODO: set via configuration.
+		var wait time.Duration
+		if min == max {
+			// Identical min/max, use a static interval.
+			wait = (time.Duration(max) * time.Nanosecond).Round(time.Second)
+		} else {
+			// min <= wait <= max, rounded to 1 second granularity.
+			wait = (time.Duration(min+rand.Int63n(max-min)) * time.Nanosecond).Round(time.Second)
+		}
+
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(3 * time.Second):
+		case <-time.After(wait):
 		}
 	}
 }

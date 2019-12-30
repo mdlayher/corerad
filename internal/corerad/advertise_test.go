@@ -169,7 +169,11 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	// Allow empty config but always populate the interface name.
 	// TODO: consider building veth pairs within the tests.
 	if cfg == nil {
-		cfg = &config.Interface{}
+		cfg = &config.Interface{
+			// Fixed interval for multicast advertisements.
+			MinInterval: 1 * time.Second,
+			MaxInterval: 1 * time.Second,
+		}
 	}
 	cfg.Name = "cradveth0"
 
