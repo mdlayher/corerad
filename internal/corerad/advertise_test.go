@@ -123,14 +123,14 @@ func TestAdvertiserSolicited(t *testing.T) {
 		}
 
 		// Read a single advertisement and then ensure the advertiser can be halted.
-		ra, _, _, err := c.ReadFrom()
+		m, _, _, err := c.ReadFrom()
 		if err != nil {
 			t.Fatalf("failed to read RA: %v", err)
 		}
 
-		ra, ok := ra.(*ndp.RouterAdvertisement)
+		ra, ok := m.(*ndp.RouterAdvertisement)
 		if !ok {
-			t.Fatalf("did not receive an RA: %#v", ra)
+			t.Fatalf("did not receive an RA: %#v", m)
 		}
 
 		if diff := cmp.Diff(want, ra); diff != "" {
