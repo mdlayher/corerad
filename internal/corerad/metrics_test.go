@@ -14,7 +14,6 @@
 package corerad
 
 import (
-	"fmt"
 	"net"
 	"testing"
 
@@ -42,7 +41,9 @@ func Test_interfaceCollector(t *testing.T) {
 				SendAdvertisements: true,
 			}},
 			metrics: []string{
-				fmt.Sprintf(`corerad_interface_info{autoconfiguration="true",forwarding="false",interface="%s",send_advertisements="true"} 1`, loop.Name),
+				`corerad_interface_autoconfiguration{interface="lo"} 1`,
+				`corerad_interface_forwarding{interface="lo"} 0`,
+				`corerad_interface_send_advertisements{interface="lo"} 1`,
 			},
 		},
 	}
