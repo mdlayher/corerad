@@ -27,6 +27,8 @@ import (
 func TestParse(t *testing.T) {
 	t.Parallel()
 
+	defaultPrefix := config.NewPrefix()
+
 	tests := []struct {
 		name string
 		s    string
@@ -120,6 +122,7 @@ func TestParse(t *testing.T) {
 			  [[interfaces.plugins]]
 			  name = "prefix"
 			  prefix = "2001:db8::/64"
+			  autonomous = false
 
 			[[interfaces]]
 			name = "eth1"
@@ -147,10 +150,18 @@ func TestParse(t *testing.T) {
 						DefaultLifetime:    30 * time.Minute,
 						Plugins: []config.Plugin{
 							&config.Prefix{
-								Prefix: mustCIDR("::/64"),
+								Prefix:            mustCIDR("::/64"),
+								OnLink:            defaultPrefix.OnLink,
+								Autonomous:        defaultPrefix.Autonomous,
+								ValidLifetime:     defaultPrefix.ValidLifetime,
+								PreferredLifetime: defaultPrefix.PreferredLifetime,
 							},
 							&config.Prefix{
-								Prefix: mustCIDR("2001:db8::/64"),
+								Prefix:            mustCIDR("2001:db8::/64"),
+								OnLink:            defaultPrefix.OnLink,
+								Autonomous:        false,
+								ValidLifetime:     defaultPrefix.ValidLifetime,
+								PreferredLifetime: defaultPrefix.PreferredLifetime,
 							},
 						},
 					},

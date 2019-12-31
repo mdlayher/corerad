@@ -58,7 +58,7 @@ func parsePlugin(md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) 
 	case "mtu":
 		p = new(MTU)
 	case "prefix":
-		p = new(Prefix)
+		p = NewPrefix()
 	case "rdnss":
 		p = new(RDNSS)
 	default:
@@ -121,6 +121,17 @@ type Prefix struct {
 	Autonomous        bool
 	ValidLifetime     time.Duration
 	PreferredLifetime time.Duration
+}
+
+// NewPrefix creates a Prefix with default values configured as specified in
+// RFC 4861, section 6.2.1.
+func NewPrefix() *Prefix {
+	return &Prefix{
+		OnLink:            true,
+		Autonomous:        true,
+		ValidLifetime:     30 * 24 * time.Hour, // 30 days
+		PreferredLifetime: 7 * 24 * time.Hour,  // 7 days
+	}
 }
 
 // Name implements Plugin.
