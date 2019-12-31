@@ -79,6 +79,8 @@ func (s *Server) Run(ctx context.Context) error {
 	s.eg = eg
 	defer close(s.ready)
 
+	mm := NewAdvertiserMetrics(s.reg)
+
 	// Serve on each specified interface.
 	for _, ifi := range s.cfg.Interfaces {
 		// Prepend the interface name to all logs for this server.
@@ -100,7 +102,7 @@ func (s *Server) Run(ctx context.Context) error {
 		// TODO: find a way to reasonably test this.
 
 		// Begin advertising on this interface until the context is canceled.
-		ad, err := NewAdvertiser(ifi, s.ll)
+		ad, err := NewAdvertiser(ifi, s.ll, mm)
 		if err != nil {
 			return fmt.Errorf("failed to create NDP advertiser: %v", err)
 		}

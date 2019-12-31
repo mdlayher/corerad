@@ -391,7 +391,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	cfg.MaxInterval = 1 * time.Second
 	cfg.Name = veth0
 
-	ad, err := NewAdvertiser(*cfg, nil)
+	ad, err := NewAdvertiser(*cfg, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create advertiser: %v", err)
 	}

@@ -20,6 +20,88 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// AdvertiserMetrics contains metrics for an Advertiser.
+type AdvertiserMetrics struct {
+	LastMulticastTime         *prometheus.GaugeVec
+	MessagesReceivedTotal     *prometheus.CounterVec
+	RouterAdvertisementsTotal *prometheus.CounterVec
+	ErrorsTotal               *prometheus.CounterVec
+	SchedulerWorkers          *prometheus.GaugeVec
+	SchedulerWorkersBusy      *prometheus.GaugeVec
+}
+
+// NewAdvertiserMetrics creates and registers AdvertiserMetrics. If reg is nil
+// the metrics are not registered.
+func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
+	const subsystem = "advertiser"
+
+	var (
+		names = []string{"interface"}
+	)
+
+	mm := &AdvertiserMetrics{
+		LastMulticastTime: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "last_multicast_time_seconds",
+
+			Help: "The UNIX timestamp of when the last multicast router advertisement was sent.",
+		}, names),
+
+		MessagesReceivedTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "messages_received_total",
+
+			Help: "The total number of NDP messages received on a listening interface.",
+		}, []string{"interface", "message"}),
+
+		RouterAdvertisementsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "router_advertisements_total",
+
+			Help: "The total number of NDP router advertisements sent by the advertiser on an interface.",
+		}, []string{"interface", "type"}),
+
+		ErrorsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "errors_total",
+
+			Help: "The total number and type of errors that occurred while advertising.",
+		}, []string{"interface", "error"}),
+
+		SchedulerWorkers: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "scheduler_workers",
+
+			Help: "The number of configured router advertisement scheduler worker goroutines.",
+		}, names),
+
+		SchedulerWorkersBusy: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "scheduler_workers_busy",
+
+			Help: "The number of router advertisement scheduler worker goroutines that are busy working.",
+		}, names),
+	}
+
+	if reg != nil {
+		reg.MustRegister(
+			mm.LastMulticastTime,
+			mm.MessagesReceivedTotal,
+			mm.RouterAdvertisementsTotal,
+			mm.SchedulerWorkers,
+			mm.SchedulerWorkersBusy,
+		)
+	}
+
+	return mm
+}
+
 // An interfaceCollector collects Prometheus metrics for a network interface.
 type interfaceCollector struct {
 	Info *prometheus.Desc

@@ -42,13 +42,17 @@ type Advertiser struct {
 	b   *builder
 
 	ll *log.Logger
+	mm *AdvertiserMetrics
 }
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
-// nil, logs are discarded.
-func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
+// nil, logs are discarded. If mm is nil, metrics are discarded.
+func NewAdvertiser(cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) (*Advertiser, error) {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
+	}
+	if mm == nil {
+		mm = NewAdvertiserMetrics(nil)
 	}
 
 	ifi, err := net.InterfaceByName(cfg.Name)
@@ -63,6 +67,7 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 		if errors.Is(err, os.ErrPermission) {
 			// Continue anyway but provide a hint.
 			ll.Printf("%s: permission denied while disabling IPv6 autoconfiguration, continuing anyway (try setting CAP_NET_ADMIN)", ifi.Name)
+			mm.ErrorsTotal.WithLabelValues(ifi.Name, "configuration").Inc()
 		} else {
 			return nil, fmt.Errorf("failed to disable IPv6 autoconfiguration on %q: %v", ifi.Name, err)
 		}
@@ -102,6 +107,7 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger) (*Advertiser, error) {
 		},
 
 		ll: ll,
+		mm: mm,
 	}, nil
 }
 
@@ -184,6 +190,7 @@ func (a *Advertiser) shutdown() error {
 		if errors.Is(err, os.ErrPermission) {
 			// Continue anyway but provide a hint.
 			a.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
+			a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "configuration").Inc()
 		} else {
 			return fmt.Errorf("failed to restore IPv6 autoconfiguration on %q: %v", a.ifi.Name, err)
 		}
@@ -258,22 +265,29 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 
 		m, _, host, err := a.c.ReadFrom()
 		if err != nil {
+			if ctx.Err() != nil {
+				// Context canceled.
+				return eg.Wait()
+			}
+
+			a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "receive").Inc()
+
 			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
 				// Temporary error or timeout, just continue.
+				// TODO: smarter backoff/retry.
+				time.Sleep(50 * time.Millisecond)
 				continue
 			}
 
 			return fmt.Errorf("failed to read router solicitations: %v", err)
 		}
 
-		rs, ok := m.(*ndp.RouterSolicitation)
-		if !ok {
+		a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+
+		if _, ok := m.(*ndp.RouterSolicitation); !ok {
 			a.logf("received NDP message of type %T, ignoring", m)
 			continue
 		}
-
-		// TODO: metrics for RS fields.
-		_ = rs
 
 		// Issue a unicast RA.
 		// TODO: consider checking for numerous RS in succession and issuing
@@ -286,8 +300,10 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 // occur at the appropriate times.
 func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 	// Start a worker pool where timers can run without blocking the scheduler.
+	// TODO: configurable number of workers?
 	const n = 16
 	schedC := make(chan schedWork, n)
+	a.mm.SchedulerWorkers.WithLabelValues(a.cfg.Name).Set(n)
 
 	var wg sync.WaitGroup
 	wg.Add(n)
@@ -353,22 +369,39 @@ type schedWork struct {
 
 // schedWorker runs a single worker which handles schedWork until ctx is canceled.
 func (a *Advertiser) schedWorker(ctx context.Context, schedC <-chan schedWork) {
-	var s schedWork
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case s = <-schedC:
+		case s := <-schedC:
+			a.work(ctx, s)
+		}
+	}
+}
+
+// work performs the task assigned to a schedWorker.
+func (a *Advertiser) work(ctx context.Context, s schedWork) {
+	busy := a.mm.SchedulerWorkersBusy.WithLabelValues(a.cfg.Name)
+	busy.Inc()
+	defer busy.Dec()
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(s.Delay):
+		if err := a.send(s.IP); err != nil {
+			a.logf("failed to send scheduled router advertisement to %s: %v", s.IP, err)
+			a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
+			return
 		}
 
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(s.Delay):
-			if err := a.send(s.IP); err != nil {
-				a.logf("failed to send scheduled router advertisement to %s: %v", s.IP, err)
-			}
+		typ := "unicast"
+		if s.IP.IsMulticast() {
+			typ = "multicast"
+			a.mm.LastMulticastTime.WithLabelValues(a.cfg.Name).SetToCurrentTime()
 		}
+
+		a.mm.RouterAdvertisementsTotal.WithLabelValues(a.cfg.Name, typ).Add(1)
 	}
 }
 
