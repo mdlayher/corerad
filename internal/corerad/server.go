@@ -29,6 +29,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const namespace = "corerad"
+
 // A Server coordinates the goroutines that handle various pieces of the
 // CoreRAD server.
 type Server struct {
@@ -53,6 +55,7 @@ func NewServer(cfg config.Config, ll *log.Logger) *Server {
 	reg.MustRegister(
 		prometheus.NewGoCollector(),
 		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
+		newInterfaceCollector(cfg.Interfaces),
 	)
 
 	return &Server{
