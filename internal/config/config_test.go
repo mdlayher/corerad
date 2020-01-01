@@ -129,6 +129,11 @@ func TestParse(t *testing.T) {
 			  lifetime = "auto"
 			  servers = ["2001:db8::1"]
 
+			  [[interfaces.plugins]]
+			  name = "dnssl"
+			  lifetime = "auto"
+			  domain_names = ["lan.example.com"]
+
 			[[interfaces]]
 			name = "eth1"
 			min_interval = "auto"
@@ -171,6 +176,10 @@ func TestParse(t *testing.T) {
 							&config.RDNSS{
 								Lifetime: config.DurationAuto,
 								Servers:  []net.IP{mustIP("2001:db8::1")},
+							},
+							&config.DNSSL{
+								Lifetime:    config.DurationAuto,
+								DomainNames: []string{"lan.example.com"},
 							},
 						},
 					},

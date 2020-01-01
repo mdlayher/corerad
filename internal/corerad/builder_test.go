@@ -80,6 +80,26 @@ func Test_builderBuild(t *testing.T) {
 			},
 		},
 		{
+			name: "DNSSL auto",
+			ifi: config.Interface{
+				MaxInterval: 10 * time.Second,
+				Plugins: []config.Plugin{
+					&config.DNSSL{
+						Lifetime:    config.DurationAuto,
+						DomainNames: []string{"foo.example.com"},
+					},
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{
+						Lifetime:    30 * time.Second,
+						DomainNames: []string{"foo.example.com"},
+					},
+				},
+			},
+		},
+		{
 			name: "static prefix",
 			ifi: config.Interface{
 				Plugins: []config.Plugin{

@@ -88,7 +88,11 @@ default_lifetime = "auto"
   # advertisement.
   [[interfaces.plugins]]
   name = "dnssl"
-  lifetime = "10m"
+  # The maximum time these DNSSL domain names may be used for name resolution.
+  # An empty string or 0 means these search domains should no longer be used.
+  # "auto" will compute a sane default. "infinite" means these search domains
+  # should be used forever.
+  lifetime = "auto"
   domain_names = ["foo.example.com"]
 
   # "mtu" plugin: attaches a NDP MTU option to the router advertisement.
