@@ -189,6 +189,26 @@ func Test_builderBuild(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "RDNSS auto",
+			ifi: config.Interface{
+				MaxInterval: 10 * time.Second,
+				Plugins: []config.Plugin{
+					&config.RDNSS{
+						Lifetime: config.DurationAuto,
+						Servers:  []net.IP{mustIP("2001:db8::1")},
+					},
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{
+						Lifetime: 30 * time.Second,
+						Servers:  []net.IP{mustIP("2001:db8::1")},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

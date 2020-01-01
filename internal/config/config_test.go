@@ -124,6 +124,11 @@ func TestParse(t *testing.T) {
 			  prefix = "2001:db8::/64"
 			  autonomous = false
 
+			  [[interfaces.plugins]]
+			  name = "rdnss"
+			  lifetime = "auto"
+			  servers = ["2001:db8::1"]
+
 			[[interfaces]]
 			name = "eth1"
 			min_interval = "auto"
@@ -162,6 +167,10 @@ func TestParse(t *testing.T) {
 								Autonomous:        false,
 								ValidLifetime:     defaultPrefix.ValidLifetime,
 								PreferredLifetime: defaultPrefix.PreferredLifetime,
+							},
+							&config.RDNSS{
+								Lifetime: config.DurationAuto,
+								Servers:  []net.IP{mustIP("2001:db8::1")},
 							},
 						},
 					},
@@ -207,6 +216,15 @@ func TestParse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustIP(s string) net.IP {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		panicf("failed to parse %q as IP address", s)
+	}
+
+	return ip
 }
 
 func mustCIDR(s string) *net.IPNet {

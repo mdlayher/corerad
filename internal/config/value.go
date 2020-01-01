@@ -22,6 +22,10 @@ import (
 	"github.com/mdlayher/ndp"
 )
 
+// DurationAuto is a sentinel value which indicates a duration should be
+// computed by CoreRAD.
+const DurationAuto = -1 * time.Second
+
 // A value is a raw configuration value which can be unwrapped into a proper
 // Go type by calling its methods.
 type value struct {
@@ -39,9 +43,14 @@ func (v *value) Duration() time.Duration {
 		return 0
 	}
 
-	// Allow for "infinite" durations per the NDP RFC.
-	if s == "infinite" {
+	// Special case lifetimes.
+	switch s {
+	case "auto":
+		return DurationAuto
+	case "infinite":
 		return ndp.Infinity
+	case "":
+		return 0
 	}
 
 	d, err := time.ParseDuration(s)

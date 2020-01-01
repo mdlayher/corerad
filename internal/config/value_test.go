@@ -109,12 +109,30 @@ func Test_value(t *testing.T) {
 			in: "foo",
 		},
 		{
+			name: "OK auto Duration",
+			fn: func(v *value) interface{} {
+				return v.Duration()
+			},
+			in:   "auto",
+			want: DurationAuto,
+			ok:   true,
+		},
+		{
 			name: "OK infinite Duration",
 			fn: func(v *value) interface{} {
 				return v.Duration()
 			},
 			in:   "infinite",
 			want: ndp.Infinity,
+			ok:   true,
+		},
+		{
+			name: "OK zero Duration",
+			fn: func(v *value) interface{} {
+				return v.Duration()
+			},
+			in:   "",
+			want: 0 * time.Second,
 			ok:   true,
 		},
 		{

@@ -55,6 +55,11 @@ func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) 
 
 			ra.Options = append(ra.Options, opts...)
 		case *config.RDNSS:
+			// If auto, compute lifetime as recommended by the RFC.
+			if p.Lifetime == config.DurationAuto {
+				p.Lifetime = 3 * ifi.MaxInterval
+			}
+
 			ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{
 				Lifetime: p.Lifetime,
 				Servers:  p.Servers,

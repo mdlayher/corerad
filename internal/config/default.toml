@@ -76,7 +76,11 @@ default_lifetime = "auto"
   # advertisement.
   [[interfaces.plugins]]
   name = "rdnss"
-  lifetime = "10m"
+  # The maximum time these RDNSS addresses may be used for name resolution.
+  # An empty string or 0 means these servers should no longer be used.
+  # "auto" will compute a sane default. "infinite" means these servers should
+  # be used forever.
+  lifetime = "auto"
   servers = ["2001:db8::1", "2001:db8::2"]
 
   # "dnssl" plugin: attaches a NDP DNS Search List option to the router
