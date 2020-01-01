@@ -25,7 +25,6 @@ type AdvertiserMetrics struct {
 	RouterAdvertisementsTotal *prometheus.CounterVec
 	ErrorsTotal               *prometheus.CounterVec
 	SchedulerWorkers          *prometheus.GaugeVec
-	SchedulerWorkersBusy      *prometheus.GaugeVec
 }
 
 // NewAdvertiserMetrics creates and registers AdvertiserMetrics. If reg is nil
@@ -75,15 +74,7 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 			Subsystem: subsystem,
 			Name:      "scheduler_workers",
 
-			Help: "The number of configured router advertisement scheduler worker goroutines.",
-		}, names),
-
-		SchedulerWorkersBusy: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "scheduler_workers_busy",
-
-			Help: "The number of router advertisement scheduler worker goroutines that are busy working.",
+			Help: "The number of router advertisement scheduler worker goroutines that are running.",
 		}, names),
 	}
 
@@ -93,7 +84,6 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 			mm.MessagesReceivedTotal,
 			mm.RouterAdvertisementsTotal,
 			mm.SchedulerWorkers,
-			mm.SchedulerWorkersBusy,
 		)
 	}
 

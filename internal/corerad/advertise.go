@@ -22,11 +22,11 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/ndp"
+	"github.com/mdlayher/schedgroup"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 )
@@ -299,44 +299,36 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 // schedule consumes RA requests and schedules them with workers so they may
 // occur at the appropriate times.
 func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
-	// Start a worker pool where timers can run without blocking the scheduler.
-	// TODO: configurable number of workers?
-	const n = 16
-	schedC := make(chan schedWork, n)
-	a.mm.SchedulerWorkers.WithLabelValues(a.cfg.Name).Set(n)
-
-	var wg sync.WaitGroup
-	wg.Add(n)
-	defer wg.Wait()
-
-	for i := 0; i < n; i++ {
-		go func() {
-			defer wg.Done()
-			a.schedWorker(ctx, schedC)
-		}()
-	}
-
 	var (
+		sg = schedgroup.New(ctx)
+
 		prng          = rand.New(rand.NewSource(time.Now().UnixNano()))
-		m             request
 		lastMulticast time.Time
 	)
 
 	for {
+		// New request for each loop iteration to prevent races.
+		var req request
+
 		// Enable cancelation before sending any messages, if necessary.
 		select {
 		case <-ctx.Done():
+			// Context cancelation is expected.
+			if err := sg.Wait(); err != nil && err != context.Canceled {
+				return err
+			}
+
 			return nil
-		case m = <-reqC:
+		case req = <-reqC:
 		}
 
-		if !m.IP.IsMulticast() {
+		if !req.IP.IsMulticast() {
 			// This is a unicast RA. Delay it for a short period of time per
 			// the RFC and then send it.
-			schedC <- schedWork{
-				Delay: time.Duration(prng.Int63n(maxRADelay.Nanoseconds())) * time.Nanosecond,
-				IP:    m.IP,
-			}
+			delay := time.Duration(prng.Int63n(maxRADelay.Nanoseconds())) * time.Nanosecond
+			sg.Delay(delay, func() error {
+				return a.sendWorker(req.IP)
+			})
 			continue
 		}
 
@@ -354,55 +346,34 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 
 		// Ready to send this multicast RA.
 		lastMulticast = time.Now()
-		schedC <- schedWork{
-			Delay: delay,
-			IP:    m.IP,
-		}
+		sg.Delay(delay, func() error {
+			return a.sendWorker(req.IP)
+		})
 	}
 }
 
-// schedWork is an item of scheduled work for a schedWorker.
-type schedWork struct {
-	Delay time.Duration
-	IP    net.IP
-}
-
-// schedWorker runs a single worker which handles schedWork until ctx is canceled.
-func (a *Advertiser) schedWorker(ctx context.Context, schedC <-chan schedWork) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case s := <-schedC:
-			a.work(ctx, s)
-		}
-	}
-}
-
-// work performs the task assigned to a schedWorker.
-func (a *Advertiser) work(ctx context.Context, s schedWork) {
-	busy := a.mm.SchedulerWorkersBusy.WithLabelValues(a.cfg.Name)
+// sendWorker is a goroutine worker which sends a router advertisemnt to ip.
+func (a *Advertiser) sendWorker(ip net.IP) error {
+	busy := a.mm.SchedulerWorkers.WithLabelValues(a.cfg.Name)
 	busy.Inc()
 	defer busy.Dec()
 
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(s.Delay):
-		if err := a.send(s.IP); err != nil {
-			a.logf("failed to send scheduled router advertisement to %s: %v", s.IP, err)
-			a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
-			return
-		}
+	if err := a.send(ip); err != nil {
+		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
+		a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
 
-		typ := "unicast"
-		if s.IP.IsMulticast() {
-			typ = "multicast"
-			a.mm.LastMulticastTime.WithLabelValues(a.cfg.Name).SetToCurrentTime()
-		}
-
-		a.mm.RouterAdvertisementsTotal.WithLabelValues(a.cfg.Name, typ).Add(1)
+		// TODO: figure out which errors are recoverable or not.
+		return nil
 	}
+
+	typ := "unicast"
+	if ip.IsMulticast() {
+		typ = "multicast"
+		a.mm.LastMulticastTime.WithLabelValues(a.cfg.Name).SetToCurrentTime()
+	}
+
+	a.mm.RouterAdvertisementsTotal.WithLabelValues(a.cfg.Name, typ).Add(1)
+	return nil
 }
 
 // send sends a single router advertisement to the destination IP address,

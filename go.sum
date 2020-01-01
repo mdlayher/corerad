@@ -38,6 +38,8 @@ github.com/mdlayher/ndp v0.0.0-20191228172402-28f2de0da526 h1:Mzowkr4QTEqijFRiLV
 github.com/mdlayher/ndp v0.0.0-20191228172402-28f2de0da526/go.mod h1:RA3SuKRKhMBigwJnFonlsRE0H9FuhUBsfhIOXtojQig=
 github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3 h1:M/HpEFh7AFSyOVYDiXfQHtukLE1YB0IXIRsSUh5+AF0=
 github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3/go.mod h1:mou3PlTVe2DTu6A2lSzFYgN0LTDipz/0AkujMDxA8ew=
+github.com/mdlayher/schedgroup v0.0.0-20200101184649-cfc878d48fa1 h1:mslXasUXJUwraE6JJvhIu3edIOiFK0OV/LL9fYaY17s=
+github.com/mdlayher/schedgroup v0.0.0-20200101184649-cfc878d48fa1/go.mod h1:FQcKdUv7icrSRGPHekRFjUekg8ZiSIlKR1DoPqadQEA=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
