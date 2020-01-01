@@ -12,13 +12,6 @@ import (
 // A Group is a goroutine worker pool which schedules tasks to be performed
 // after a specified time. A Group must be created with the New constructor.
 type Group struct {
-	// Interval controls how often the Group will check for scheduled tasks
-	// to run. A lower Interval will schedule tasks more accurately, but will
-	// consume more CPU cycles.
-	//
-	// By default, Interval is 1 millisecond.
-	Interval time.Duration
-
 	// Context/cancelation support.
 	ctx    context.Context
 	cancel func()
@@ -27,6 +20,10 @@ type Group struct {
 	eg    *errgroup.Group
 	mu    sync.Mutex
 	tasks tasks
+
+	// Signals for when a task is added and how many tasks remain on the heap.
+	addC chan struct{}
+	lenC chan int
 }
 
 // New creates a new Group which will use ctx for cancelation. If cancelation
@@ -36,12 +33,13 @@ func New(ctx context.Context) *Group {
 	mctx, cancel := context.WithCancel(ctx)
 
 	g := &Group{
-		Interval: 1 * time.Millisecond,
-
 		ctx:    ctx,
 		cancel: cancel,
 
 		eg: &errgroup.Group{},
+
+		addC: make(chan struct{}),
+		lenC: make(chan int),
 	}
 
 	g.eg.Go(func() error {
@@ -66,81 +64,105 @@ func (g *Group) Schedule(when time.Time, fn func() error) {
 		Deadline: when,
 		Call:     fn,
 	})
+
+	// Notify monitor that a new task has been pushed on to the heap.
+	select {
+	case g.addC <- struct{}{}:
+	default:
+	}
 }
 
 // Wait waits for the completion of all scheduled tasks, or for cancelation of
 // the context passed to New.
 func (g *Group) Wait() error {
-	t := time.NewTicker(g.Interval)
-
 	// Tick and wait repeatedly to see if the monitor goroutine has consumed
 	// and processed all of the available work.
+	var n int
 	for {
 		select {
 		case <-g.ctx.Done():
 			return g.ctx.Err()
-		case <-t.C:
-			// Context cancelation takes priority over new ticks.
+		case n = <-g.lenC:
+			// Context cancelation takes priority.
 			if err := g.ctx.Err(); err != nil {
 				return err
 			}
 		}
 
-		g.mu.Lock()
-		if len(g.tasks) == 0 {
-			// No more tasks left, cancel the monitor goroutine.
-			defer g.mu.Unlock()
+		if n == 0 {
+			// No more tasks left, cancel the monitor goroutine and wait for
+			// all tasks to complete.
 			g.cancel()
-			break
+			return g.eg.Wait()
 		}
-		g.mu.Unlock()
 	}
-
-	// Wait for all running tasks to complete.
-	t.Stop()
-	return g.eg.Wait()
 }
 
 // monitor triggers tasks at the interval specified by g.Interval until ctx
 // is canceled.
 func (g *Group) monitor(ctx context.Context) error {
-	t := time.NewTicker(g.Interval)
+	t := time.NewTimer(0)
 	defer t.Stop()
 
 	for {
-		// monitor's cancelation is expected and should not result in an
-		// error being returned to the caller.
+		if ctx.Err() != nil {
+			// Context canceled.
+			return nil
+		}
+
+		now := time.Now()
+		var tick <-chan time.Time
+
+		// Start any tasks that are ready as of now.
+		next := g.trigger(now)
+		if !next.IsZero() {
+			// Wait until the next scheduled task is ready.
+			t.Reset(next.Sub(now))
+			tick = t.C
+		} else {
+			t.Stop()
+		}
+
 		select {
 		case <-ctx.Done():
+			// Context canceled.
 			return nil
-		case <-t.C:
-			// Context cancelation takes priority over new ticks.
-			if ctx.Err() != nil {
-				return nil
-			}
-
-			g.trigger(time.Now())
+		case <-g.addC:
+			// A new task was added, check task heap again.
+		case <-tick:
+			// An existing task should be ready as of now.
 		}
 	}
 }
 
 // trigger checks for scheduled tasks and runs them if they are scheduled
 // on or after the time specified by now.
-func (g *Group) trigger(now time.Time) {
+func (g *Group) trigger(now time.Time) time.Time {
 	g.mu.Lock()
-	defer g.mu.Unlock()
+	defer func() {
+		// Notify how many tasks are left on the heap so Wait can stop when
+		// appropriate.
+		select {
+		case g.lenC <- g.tasks.Len():
+		default:
+		}
+
+		g.mu.Unlock()
+	}()
 
 	for g.tasks.Len() > 0 {
 		next := &g.tasks[0]
 		if next.Deadline.After(now) {
 			// Earliest scheduled task is not ready.
-			return
+			return next.Deadline
 		}
 
 		// This task is ready, pop it from the heap and run it.
 		t := heap.Pop(&g.tasks).(task)
 		g.eg.Go(t.Call)
 	}
+
+	return time.Time{}
 }
 
 // A task is a function which is called after the specified deadline.
