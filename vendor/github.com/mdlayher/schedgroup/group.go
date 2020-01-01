@@ -76,17 +76,14 @@ func (g *Group) Wait() error {
 	// Tick and wait repeatedly to see if the monitor goroutine has consumed
 	// and processed all of the available work.
 	for {
-		// Context cancelation takes priority over new ticks.
-		select {
-		case <-g.ctx.Done():
-			return g.ctx.Err()
-		default:
-		}
-
 		select {
 		case <-g.ctx.Done():
 			return g.ctx.Err()
 		case <-t.C:
+			// Context cancelation takes priority over new ticks.
+			if err := g.ctx.Err(); err != nil {
+				return err
+			}
 		}
 
 		g.mu.Lock()
@@ -111,19 +108,17 @@ func (g *Group) monitor(ctx context.Context) error {
 	defer t.Stop()
 
 	for {
-		// Context cancelation takes priority over new ticks.
-		select {
 		// monitor's cancelation is expected and should not result in an
 		// error being returned to the caller.
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-t.C:
+			// Context cancelation takes priority over new ticks.
+			if ctx.Err() != nil {
+				return nil
+			}
+
 			g.trigger(time.Now())
 		}
 	}
