@@ -91,7 +91,7 @@ func TestParse(t *testing.T) {
 			[[interfaces]]
 			name = "eth0"
 			send_advertisements = true
-			default_lifetime = ""
+			default_lifetime = "0"
 			`,
 			c: &config.Config{
 				Interfaces: []config.Interface{{

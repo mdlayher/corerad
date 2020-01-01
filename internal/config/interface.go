@@ -137,8 +137,8 @@ func parseDefaultLifetime(s string, max time.Duration) (time.Duration, error) {
 		return 0, fmt.Errorf("invalid default lifetime: %v", err)
 	}
 
-	if lt < max || lt > 9000*time.Second {
-		return 0, fmt.Errorf("default lifetime (%d) must be between (max_interval = %d) and 9000 seconds", int(lt.Seconds()), int(max.Seconds()))
+	if lt != 0 && (lt < max || lt > 9000*time.Second) {
+		return 0, fmt.Errorf("default lifetime (%d) must be 0 or between (max_interval = %d) and 9000 seconds", int(lt.Seconds()), int(max.Seconds()))
 	}
 
 	return lt, nil
