@@ -58,6 +58,10 @@ func (v *value) Duration() time.Duration {
 		v.err = err
 		return 0
 	}
+	if d < 0 {
+		v.err = fmt.Errorf("durations must be positive: %s", d)
+		return 0
+	}
 
 	return d
 }

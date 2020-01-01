@@ -109,6 +109,13 @@ func Test_value(t *testing.T) {
 			in: "foo",
 		},
 		{
+			name: "bad negative Duration",
+			fn: func(v *value) interface{} {
+				return v.Duration()
+			},
+			in: "-1s",
+		},
+		{
 			name: "OK auto Duration",
 			fn: func(v *value) interface{} {
 				return v.Duration()
