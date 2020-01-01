@@ -194,6 +194,22 @@ func (p *Prefix) validate() error {
 		return errors.New("prefix must not be empty")
 	}
 
+	// Use defaults for auto values.
+	def := NewPrefix()
+	switch p.ValidLifetime {
+	case 0:
+		return errors.New("valid lifetime must be non-zero")
+	case DurationAuto:
+		p.ValidLifetime = def.ValidLifetime
+	}
+
+	switch p.PreferredLifetime {
+	case 0:
+		return errors.New("preferred lifetime must be non-zero")
+	case DurationAuto:
+		p.PreferredLifetime = def.PreferredLifetime
+	}
+
 	// See: https://tools.ietf.org/html/rfc4861#section-4.6.2.
 	if p.PreferredLifetime > p.ValidLifetime {
 		return fmt.Errorf("preferred lifetime of %s exceeds valid lifetime of %s", p.PreferredLifetime, p.ValidLifetime)

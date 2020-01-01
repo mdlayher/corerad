@@ -21,6 +21,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/google/go-cmp/cmp"
+	"github.com/mdlayher/ndp"
 )
 
 func TestDNSSLDecode(t *testing.T) {
@@ -78,6 +79,14 @@ func TestDNSSLDecode(t *testing.T) {
 func TestPrefixDecode(t *testing.T) {
 	t.Parallel()
 
+	defaults := &Prefix{
+		Prefix:            mustCIDR("::/64"),
+		OnLink:            true,
+		Autonomous:        true,
+		PreferredLifetime: 7 * 24 * time.Hour,
+		ValidLifetime:     30 * 24 * time.Hour,
+	}
+
 	tests := []struct {
 		name string
 		s    string
@@ -105,6 +114,24 @@ func TestPrefixDecode(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad valid lifetime",
+			s: `
+			name = "prefix"
+			prefix = "::/64"
+			preferred_lifetime = "2s"
+			valid_lifetime = ""
+			`,
+		},
+		{
+			name: "bad preferred lifetime",
+			s: `
+			name = "prefix"
+			prefix = "::/64"
+			preferred_lifetime = ""
+			valid_lifetime = "2s"
+			`,
+		},
+		{
 			name: "bad lifetimes",
 			s: `
 			name = "prefix"
@@ -114,7 +141,44 @@ func TestPrefixDecode(t *testing.T) {
 			`,
 		},
 		{
-			name: "OK",
+			name: "OK defaults",
+			s: `
+			name = "prefix"
+			prefix = "::/64"
+			`,
+			p:  defaults,
+			ok: true,
+		},
+		{
+			name: "OK auto durations",
+			s: `
+			name = "prefix"
+			prefix = "::/64"
+			preferred_lifetime = "auto"
+			valid_lifetime = "auto"
+			`,
+			p:  defaults,
+			ok: true,
+		},
+		{
+			name: "OK infinite durations",
+			s: `
+			name = "prefix"
+			prefix = "::/64"
+			preferred_lifetime = "infinite"
+			valid_lifetime = "infinite"
+			`,
+			p: &Prefix{
+				Prefix:            mustCIDR("::/64"),
+				OnLink:            true,
+				Autonomous:        true,
+				PreferredLifetime: ndp.Infinity,
+				ValidLifetime:     ndp.Infinity,
+			},
+			ok: true,
+		},
+		{
+			name: "OK explicit",
 			s: `
 			name = "prefix"
 			prefix = "::/64"

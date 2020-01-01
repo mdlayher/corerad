@@ -1,5 +1,8 @@
 # CoreRAD vALPHA configuration file
 
+# All duration values are specified in Go time.ParseDuration format:
+# https://golang.org/pkg/time/#ParseDuration.
+
 # Interfaces which will be used to serve IPv6 NDP router advertisements.
 [[interfaces]]
 name = "eth0"
@@ -54,23 +57,21 @@ default_lifetime = "auto"
   # Serve Prefix Information options for each IPv6 prefix on this interface
   # configured with a /64 CIDR mask.
   prefix = "::/64"
+  # Specifies on-link and autonomous address autoconfiguration (SLAAC) flags
+  # for this prefix. Both default to true.
   on_link = true
   autonomous = true
-  # Durations are specified in Go time.ParseDuration format:
-  # https://golang.org/pkg/time/#ParseDuration.
+  # Specifies the preferred and valid lifetimes for this prefix. The preferred
+  # lifetime must not exceed the valid lifetime. By default, the preferred
+  # lifetime is 7 days and the valid lifetime is 30 days. "auto" uses the
+  # defaults. "infinite" means this prefix should be used forever.
   preferred_lifetime = "5m"
   valid_lifetime = "10m"
-  # As a special case, lifetime values can be infinite by specifying "infinite".
-  # valid_lifetime = "infinite"
 
   # Alternatively, serve an explicit IPv6 prefix.
   [[interfaces.plugins]]
   name = "prefix"
   prefix = "2001:db8::/64"
-  on_link = true
-  autonomous = true
-  preferred_lifetime = "5m"
-  valid_lifetime = "10m"
 
   # "rdnss" plugin: attaches a NDP Recursive DNS Servers option to the router
   # advertisement.
