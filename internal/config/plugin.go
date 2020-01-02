@@ -79,7 +79,7 @@ type DNSSL struct {
 }
 
 // Name implements Plugin.
-func (d *DNSSL) Name() string { return "DNSSL" }
+func (d *DNSSL) Name() string { return "dnssl" }
 
 // String implements Plugin.
 func (d *DNSSL) String() string {
