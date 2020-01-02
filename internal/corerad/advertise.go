@@ -327,7 +327,8 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 			// the RFC and then send it.
 			delay := time.Duration(prng.Int63n(maxRADelay.Nanoseconds())) * time.Nanosecond
 			sg.Delay(delay, func() error {
-				return a.sendWorker(req.IP)
+				a.sendWorker(req.IP)
+				return nil
 			})
 			continue
 		}
@@ -347,13 +348,14 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 		// Ready to send this multicast RA.
 		lastMulticast = time.Now()
 		sg.Delay(delay, func() error {
-			return a.sendWorker(req.IP)
+			a.sendWorker(req.IP)
+			return nil
 		})
 	}
 }
 
-// sendWorker is a goroutine worker which sends a router advertisemnt to ip.
-func (a *Advertiser) sendWorker(ip net.IP) error {
+// sendWorker is a goroutine worker which sends a router advertisement to ip.
+func (a *Advertiser) sendWorker(ip net.IP) {
 	busy := a.mm.SchedulerWorkers.WithLabelValues(a.cfg.Name)
 	busy.Inc()
 	defer busy.Dec()
@@ -363,7 +365,7 @@ func (a *Advertiser) sendWorker(ip net.IP) error {
 		a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
 
 		// TODO: figure out which errors are recoverable or not.
-		return nil
+		return
 	}
 
 	typ := "unicast"
@@ -373,7 +375,6 @@ func (a *Advertiser) sendWorker(ip net.IP) error {
 	}
 
 	a.mm.RouterAdvertisementsTotal.WithLabelValues(a.cfg.Name, typ).Add(1)
-	return nil
 }
 
 // send sends a single router advertisement to the destination IP address,
