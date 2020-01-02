@@ -9,6 +9,14 @@ existing projects such as radvd. More features will be added in the future.
 
 The default configuration file for CoreRAD can be found [in the `internal/config/default.toml`](https://github.com/mdlayher/corerad/blob/master/internal/config/default.toml) configuration file.
 
+This configuration file can be written to `corerad.toml` locally by running:
+
+```text
+$ corerad -init
+$ head -n 1 corerad.toml
+# CoreRAD vALPHA configuration file
+```
+
 Although numerous configuration parameters are available, many of them are
 unnecessary for typical use.
 
