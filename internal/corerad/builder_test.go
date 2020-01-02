@@ -80,26 +80,6 @@ func Test_builderBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "DNSSL auto",
-			ifi: config.Interface{
-				MaxInterval: 10 * time.Second,
-				Plugins: []config.Plugin{
-					&config.DNSSL{
-						Lifetime:    config.DurationAuto,
-						DomainNames: []string{"foo.example.com"},
-					},
-				},
-			},
-			ra: &ndp.RouterAdvertisement{
-				Options: []ndp.Option{
-					&ndp.DNSSearchList{
-						Lifetime:    30 * time.Second,
-						DomainNames: []string{"foo.example.com"},
-					},
-				},
-			},
-		},
-		{
 			name: "static prefix",
 			ifi: config.Interface{
 				Plugins: []config.Plugin{
@@ -205,26 +185,6 @@ func Test_builderBuild(t *testing.T) {
 							mustIP("2001:db8::1"),
 							mustIP("2001:db8::2"),
 						},
-					},
-				},
-			},
-		},
-		{
-			name: "RDNSS auto",
-			ifi: config.Interface{
-				MaxInterval: 10 * time.Second,
-				Plugins: []config.Plugin{
-					&config.RDNSS{
-						Lifetime: config.DurationAuto,
-						Servers:  []net.IP{mustIP("2001:db8::1")},
-					},
-				},
-			},
-			ra: &ndp.RouterAdvertisement{
-				Options: []ndp.Option{
-					&ndp.RecursiveDNSServer{
-						Lifetime: 30 * time.Second,
-						Servers:  []net.IP{mustIP("2001:db8::1")},
 					},
 				},
 			},

@@ -118,7 +118,9 @@ func Parse(r io.Reader) (*Config, error) {
 
 		iface.Plugins = make([]Plugin, 0, len(ifi.Plugins))
 		for j, p := range ifi.Plugins {
-			plug, err := parsePlugin(md, p)
+			// Pass along the current interface configuration so auto values
+			// can be computed.
+			plug, err := parsePlugin(*iface, md, p)
 			if err != nil {
 				// Narrow down the location of a configuration error.
 				return nil, fmt.Errorf("interface %d/%q, plugin %d: %v", i, ifi.Name, j, err)

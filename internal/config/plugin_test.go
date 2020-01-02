@@ -57,13 +57,13 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "RDNSS",
 			p: &RDNSS{
-				Lifetime: DurationAuto,
+				Lifetime: 30 * time.Second,
 				Servers: []net.IP{
 					mustIP("2001:db8::1"),
 					mustIP("2001:db8::2"),
 				},
 			},
-			s: "servers: [2001:db8::1, 2001:db8::2], lifetime: auto",
+			s: "servers: [2001:db8::1, 2001:db8::2], lifetime: 30s",
 		},
 	}
 
@@ -107,7 +107,7 @@ func TestDNSSLDecode(t *testing.T) {
 			`,
 		},
 		{
-			name: "OK",
+			name: "OK explicit",
 			s: `
 			name = "dnssl"
 			domain_names = ["foo.example.com", "bar.example.com"]
@@ -116,6 +116,19 @@ func TestDNSSLDecode(t *testing.T) {
 			d: &DNSSL{
 				Lifetime:    30 * time.Second,
 				DomainNames: []string{"foo.example.com", "bar.example.com"},
+			},
+			ok: true,
+		},
+		{
+			name: "OK auto",
+			s: `
+			name = "dnssl"
+			domain_names = ["foo.example.com"]
+			lifetime = "auto"
+			`,
+			d: &DNSSL{
+				Lifetime:    30 * time.Minute,
+				DomainNames: []string{"foo.example.com"},
 			},
 			ok: true,
 		},
@@ -328,7 +341,7 @@ func TestRDNSSDecode(t *testing.T) {
 			`,
 		},
 		{
-			name: "OK",
+			name: "OK explicit",
 			s: `
 			name = "rdnss"
 			servers = ["2001:db8::1", "2001:db8::2"]
@@ -340,6 +353,19 @@ func TestRDNSSDecode(t *testing.T) {
 					mustIP("2001:db8::1"),
 					mustIP("2001:db8::2"),
 				},
+			},
+			ok: true,
+		},
+		{
+			name: "OK auto",
+			s: `
+			name = "rdnss"
+			servers = ["2001:db8::1"]
+			lifetime = "auto"
+			`,
+			r: &RDNSS{
+				Lifetime: 30 * time.Minute,
+				Servers:  []net.IP{mustIP("2001:db8::1")},
 			},
 			ok: true,
 		},
@@ -362,7 +388,10 @@ func pluginDecode(t *testing.T, s string, ok bool, want Plugin) {
 		t.Fatalf("failed to decode TOML: %v", err)
 	}
 
-	got, err := parsePlugin(md, m)
+	// Defaults used when computing automatic values.
+	iface := Interface{MaxInterval: 10 * time.Minute}
+
+	got, err := parsePlugin(iface, md, m)
 	if ok && err != nil {
 		t.Fatalf("failed to parse Plugin: %v", err)
 	}

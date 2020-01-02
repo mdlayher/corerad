@@ -38,7 +38,7 @@ type Plugin interface {
 }
 
 // parsePlugin parses raw plugin key/values into a Plugin.
-func parsePlugin(md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) {
+func parsePlugin(iface Interface, md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) {
 	// Each plugin is identified by a name.
 	pname, ok := m["name"]
 	if !ok {
@@ -70,7 +70,27 @@ func parsePlugin(md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) 
 		return nil, fmt.Errorf("failed to configure plugin %q: %v", p.Name(), err)
 	}
 
+	// Finish computing any auto values.
+	computeAuto(iface, p)
+
 	return p, nil
+}
+
+// computeAuto applies configuration from iface to p for values set to auto.
+func computeAuto(iface Interface, p Plugin) {
+	switch p := p.(type) {
+	case *DNSSL:
+		// If auto, compute lifetime as recommended by the RFC.
+		// https://tools.ietf.org/html/rfc8106#section-5.1
+		if p.Lifetime == DurationAuto {
+			p.Lifetime = 3 * iface.MaxInterval
+		}
+	case *RDNSS:
+		// See DNSSL.
+		if p.Lifetime == DurationAuto {
+			p.Lifetime = 3 * iface.MaxInterval
+		}
+	}
 }
 
 // DNSSL configures a NDP DNS Search List option.
@@ -305,8 +325,6 @@ func (r *RDNSS) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
 // certain CoreRAD sentinel values.
 func durString(d time.Duration) string {
 	switch d {
-	case DurationAuto:
-		return "auto"
 	case ndp.Infinity:
 		return "infinite"
 	default:

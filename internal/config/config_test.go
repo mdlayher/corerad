@@ -174,11 +174,11 @@ func TestParse(t *testing.T) {
 								PreferredLifetime: defaultPrefix.PreferredLifetime,
 							},
 							&config.RDNSS{
-								Lifetime: config.DurationAuto,
+								Lifetime: 30 * time.Minute,
 								Servers:  []net.IP{mustIP("2001:db8::1")},
 							},
 							&config.DNSSL{
-								Lifetime:    config.DurationAuto,
+								Lifetime:    30 * time.Minute,
 								DomainNames: []string{"lan.example.com"},
 							},
 						},

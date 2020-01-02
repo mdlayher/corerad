@@ -41,11 +41,6 @@ func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) 
 	for _, p := range ifi.Plugins {
 		switch p := p.(type) {
 		case *config.DNSSL:
-			// If auto, compute lifetime as recommended by the RFC.
-			if p.Lifetime == config.DurationAuto {
-				p.Lifetime = 3 * ifi.MaxInterval
-			}
-
 			ra.Options = append(ra.Options, &ndp.DNSSearchList{
 				Lifetime:    p.Lifetime,
 				DomainNames: p.DomainNames,
@@ -60,11 +55,6 @@ func (b *builder) Build(ifi config.Interface) (*ndp.RouterAdvertisement, error) 
 
 			ra.Options = append(ra.Options, opts...)
 		case *config.RDNSS:
-			// If auto, compute lifetime as recommended by the RFC.
-			if p.Lifetime == config.DurationAuto {
-				p.Lifetime = 3 * ifi.MaxInterval
-			}
-
 			ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{
 				Lifetime: p.Lifetime,
 				Servers:  p.Servers,
