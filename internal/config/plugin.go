@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/mdlayher/ndp"
 )
 
 // A Plugin specifies a CoreRAD plugin's configuration.
@@ -84,7 +85,7 @@ func (d *DNSSL) Name() string { return "dnssl" }
 // String implements Plugin.
 func (d *DNSSL) String() string {
 	return fmt.Sprintf("domain names: [%s], lifetime: %s",
-		strings.Join(d.DomainNames, ", "), d.Lifetime)
+		strings.Join(d.DomainNames, ", "), durString(d.Lifetime))
 }
 
 // Decode implements Plugin.
@@ -149,9 +150,9 @@ func (p *Prefix) String() string {
 
 	return fmt.Sprintf("%s [%s], preferred: %s, valid: %s",
 		p.Prefix,
-		strings.Join(flags, ","),
-		p.PreferredLifetime,
-		p.ValidLifetime,
+		strings.Join(flags, ", "),
+		durString(p.PreferredLifetime),
+		durString(p.ValidLifetime),
 	)
 }
 
@@ -225,7 +226,7 @@ type MTU int
 func (m *MTU) Name() string { return "mtu" }
 
 // String implements Plugin.
-func (m *MTU) String() string { return fmt.Sprintf("MTU: %d", m) }
+func (m *MTU) String() string { return fmt.Sprintf("MTU: %d", *m) }
 
 // Decode implements Plugin.
 func (m *MTU) Decode(md toml.MetaData, mp map[string]toml.Primitive) error {
@@ -269,7 +270,8 @@ func (r *RDNSS) String() string {
 		ips = append(ips, s.String())
 	}
 
-	return fmt.Sprintf("servers: [%s], lifetime: %s", strings.Join(ips, ", "), r.Lifetime)
+	return fmt.Sprintf("servers: [%s], lifetime: %s",
+		strings.Join(ips, ", "), durString(r.Lifetime))
 }
 
 // Decode implements Plugin.
@@ -297,4 +299,17 @@ func (r *RDNSS) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
 	}
 
 	return nil
+}
+
+// durString converts a time.Duration into a string while also recognizing
+// certain CoreRAD sentinel values.
+func durString(d time.Duration) string {
+	switch d {
+	case DurationAuto:
+		return "auto"
+	case ndp.Infinity:
+		return "infinite"
+	default:
+		return d.String()
+	}
 }

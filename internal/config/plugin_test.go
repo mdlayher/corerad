@@ -24,6 +24,58 @@ import (
 	"github.com/mdlayher/ndp"
 )
 
+func TestPluginString(t *testing.T) {
+	tests := []struct {
+		name string
+		p    Plugin
+		s    string
+	}{
+		{
+			name: "DNSSL",
+			p: &DNSSL{
+				Lifetime:    30 * time.Second,
+				DomainNames: []string{"foo.example.com", "bar.example.com"},
+			},
+			s: "domain names: [foo.example.com, bar.example.com], lifetime: 30s",
+		},
+		{
+			name: "Prefix",
+			p: &Prefix{
+				Prefix:            mustCIDR("::/64"),
+				OnLink:            true,
+				Autonomous:        true,
+				PreferredLifetime: 15 * time.Minute,
+				ValidLifetime:     ndp.Infinity,
+			},
+			s: "::/64 [on-link, autonomous], preferred: 15m0s, valid: infinite",
+		},
+		{
+			name: "MTU",
+			p:    newMTU(1500),
+			s:    "MTU: 1500",
+		},
+		{
+			name: "RDNSS",
+			p: &RDNSS{
+				Lifetime: DurationAuto,
+				Servers: []net.IP{
+					mustIP("2001:db8::1"),
+					mustIP("2001:db8::2"),
+				},
+			},
+			s: "servers: [2001:db8::1, 2001:db8::2], lifetime: auto",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if diff := cmp.Diff(tt.s, tt.p.String()); diff != "" {
+				t.Fatalf("unexpected string (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestDNSSLDecode(t *testing.T) {
 	t.Parallel()
 
