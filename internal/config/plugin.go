@@ -55,13 +55,13 @@ func parsePlugin(iface Interface, md toml.MetaData, m map[string]toml.Primitive)
 	var p Plugin
 	switch name {
 	case "dnssl":
-		p = new(DNSSL)
+		p = &DNSSL{Lifetime: DurationAuto}
 	case "mtu":
 		p = new(MTU)
 	case "prefix":
 		p = NewPrefix()
 	case "rdnss":
-		p = new(RDNSS)
+		p = &RDNSS{Lifetime: DurationAuto}
 	default:
 		return nil, fmt.Errorf("unknown plugin %q", name)
 	}
@@ -80,15 +80,14 @@ func parsePlugin(iface Interface, md toml.MetaData, m map[string]toml.Primitive)
 func computeAuto(iface Interface, p Plugin) {
 	switch p := p.(type) {
 	case *DNSSL:
-		// If auto, compute lifetime as recommended by the RFC.
-		// https://tools.ietf.org/html/rfc8106#section-5.1
+		// If auto, compute lifetime as recommended by radvd.
 		if p.Lifetime == DurationAuto {
-			p.Lifetime = 3 * iface.MaxInterval
+			p.Lifetime = 2 * iface.MaxInterval
 		}
 	case *RDNSS:
 		// See DNSSL.
 		if p.Lifetime == DurationAuto {
-			p.Lifetime = 3 * iface.MaxInterval
+			p.Lifetime = 2 * iface.MaxInterval
 		}
 	}
 }
@@ -144,14 +143,14 @@ type Prefix struct {
 	PreferredLifetime time.Duration
 }
 
-// NewPrefix creates a Prefix with default values configured as specified in
-// RFC 4861, section 6.2.1.
+// NewPrefix creates a Prefix with default values configured as specified
+// by radvd.
 func NewPrefix() *Prefix {
 	return &Prefix{
 		OnLink:            true,
 		Autonomous:        true,
-		ValidLifetime:     30 * 24 * time.Hour, // 30 days
-		PreferredLifetime: 7 * 24 * time.Hour,  // 7 days
+		ValidLifetime:     24 * time.Hour,
+		PreferredLifetime: 4 * time.Hour,
 	}
 }
 

@@ -66,10 +66,10 @@ default_lifetime = "auto"
   autonomous = true
   # Specifies the preferred and valid lifetimes for this prefix. The preferred
   # lifetime must not exceed the valid lifetime. By default, the preferred
-  # lifetime is 7 days and the valid lifetime is 30 days. "auto" uses the
+  # lifetime is 4 hours and the valid lifetime is 24 hours. "auto" uses the
   # defaults. "infinite" means this prefix should be used forever.
-  preferred_lifetime = "5m"
-  valid_lifetime = "10m"
+  preferred_lifetime = "auto"
+  valid_lifetime = "auto"
 
   # Alternatively, serve an explicit IPv6 prefix.
   [[interfaces.plugins]]

@@ -179,11 +179,11 @@ func TestParse(t *testing.T) {
 								PreferredLifetime: defaultPrefix.PreferredLifetime,
 							},
 							&config.RDNSS{
-								Lifetime: 30 * time.Minute,
+								Lifetime: 20 * time.Minute,
 								Servers:  []net.IP{mustIP("2001:db8::1")},
 							},
 							&config.DNSSL{
-								Lifetime:    30 * time.Minute,
+								Lifetime:    20 * time.Minute,
 								DomainNames: []string{"lan.example.com"},
 							},
 						},
@@ -249,6 +249,26 @@ func TestParseDefaults(t *testing.T) {
 		[[interfaces]]
 		name = "eth0"
 
+		  [[interfaces.plugins]]
+		  name = "prefix"
+		  prefix = "::/64"
+
+		  [[interfaces.plugins]]
+		  name = "prefix"
+		  prefix = "2001:db8::/64"
+
+		  [[interfaces.plugins]]
+		  name = "rdnss"
+		  servers = ["2001:db8::1", "2001:db8::2"]
+
+		  [[interfaces.plugins]]
+		  name = "dnssl"
+		  domain_names = ["foo.example.com"]
+
+		  [[interfaces.plugins]]
+		  name = "mtu"
+		  mtu = 1500
+
 		[debug]
 		address = "localhost:9430"
 	`
@@ -261,10 +281,6 @@ func TestParseDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse default config: %v", err)
 	}
-
-	// Omit plugins from comparison.
-	min.Interfaces[0].Plugins = nil
-	defaults.Interfaces[0].Plugins = nil
 
 	if diff := cmp.Diff(defaults, min); diff != "" {
 		t.Fatalf("unexpected default Config (-want +got):\n%s", diff)

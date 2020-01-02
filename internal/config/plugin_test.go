@@ -120,6 +120,18 @@ func TestDNSSLDecode(t *testing.T) {
 			ok: true,
 		},
 		{
+			name: "OK implicit",
+			s: `
+			name = "dnssl"
+			domain_names = ["foo.example.com"]
+			`,
+			d: &DNSSL{
+				Lifetime:    20 * time.Minute,
+				DomainNames: []string{"foo.example.com"},
+			},
+			ok: true,
+		},
+		{
 			name: "OK auto",
 			s: `
 			name = "dnssl"
@@ -127,7 +139,7 @@ func TestDNSSLDecode(t *testing.T) {
 			lifetime = "auto"
 			`,
 			d: &DNSSL{
-				Lifetime:    30 * time.Minute,
+				Lifetime:    20 * time.Minute,
 				DomainNames: []string{"foo.example.com"},
 			},
 			ok: true,
@@ -148,8 +160,8 @@ func TestPrefixDecode(t *testing.T) {
 		Prefix:            mustCIDR("::/64"),
 		OnLink:            true,
 		Autonomous:        true,
-		PreferredLifetime: 7 * 24 * time.Hour,
-		ValidLifetime:     30 * 24 * time.Hour,
+		PreferredLifetime: 4 * time.Hour,
+		ValidLifetime:     24 * time.Hour,
 	}
 
 	tests := []struct {
@@ -357,6 +369,18 @@ func TestRDNSSDecode(t *testing.T) {
 			ok: true,
 		},
 		{
+			name: "OK implicit",
+			s: `
+			name = "rdnss"
+			servers = ["2001:db8::1"]
+			`,
+			r: &RDNSS{
+				Lifetime: 20 * time.Minute,
+				Servers:  []net.IP{mustIP("2001:db8::1")},
+			},
+			ok: true,
+		},
+		{
 			name: "OK auto",
 			s: `
 			name = "rdnss"
@@ -364,7 +388,7 @@ func TestRDNSSDecode(t *testing.T) {
 			lifetime = "auto"
 			`,
 			r: &RDNSS{
-				Lifetime: 30 * time.Minute,
+				Lifetime: 20 * time.Minute,
 				Servers:  []net.IP{mustIP("2001:db8::1")},
 			},
 			ok: true,
