@@ -7,69 +7,32 @@ existing projects such as radvd. More features will be added in the future.
 
 ## Example
 
-Here's an example of what a hypothetical CoreRAD configuration could look like.
+The default configuration file for CoreRAD can be found [in the `internal/config/default.toml`](https://github.com/mdlayher/corerad/blob/master/internal/config/default.toml) configuration file.
+
+Although numerous configuration parameters are available, many of them are
+unnecessary for typical use.
+
+Here is an example of a minimal configuration which:
+
+- sends router advertisements from interface `eth0` which indicate this machine
+  can be a used as an IPv6 default router
+- serves prefix information and allows stateless address autoconfiguration
+  (SLAAC) for each /64 prefix on `eth0`
+- serves CoreRAD's Prometheus metrics
 
 ```toml
 # CoreRAD vALPHA configuration file
 
-# Interfaces which may be configured to send router advertisements.
-[[interfaces.eth0]]
-# AdvSendAdvertisements: indicates whether or not this interface will send
-# periodic router advertisements and respond to router solicitations.
-#
-# Can be used to quickly toggle an individual interface on and off.
+[[interfaces]]
+name = "eth0"
 send_advertisements = true
+default_lifetime = "auto"
 
-# Individual NDP parameters may be tweaked on a per-interface basis. If not
-# specified, they will use the default values as defined in the RFC.
-max_advertise_interval = "600s"
-min_advertise_interval = "auto" # computed based on max
-
-  # Plugins are invoked in order and each is parsed using a unique name.
-  [[interfaces.plugins]]
-  name = "prefix" # This is a "prefix" plugin.
-
-  # Key/values beyond this point are specific to a given plugin.
-
-  # The "wildcard" prefix syntax is also supported, as with radvd. That means
-  # all available /64 prefixes on this interface will be served with the
-  # specified configuration in this block.
-  prefix = "::/64"
-  autonomous = true
-  on_link = true
-
-  # Specify a specific prefix on this interface to configure it explicitly with
-  # a higher precedence than the wildcard block above. Say for example, you want
-  # one prefix on this interface to be advertised for DHCPv6 use only.
   [[interfaces.plugins]]
   name = "prefix"
-  prefix = "2001:db8::ffff/64"
-  autonomous = true
-  managed = true
-  other_config = true
+  prefix = "::/64"
 
-  # More static configuration for other NDP options.
-  [[interfaces.plugins]]
-  name = "rdnss"
-  servers = ["fd00::1"]
-
-# Another serving interface with a dynamic configuration.
-[[interfaces.eth1]]
-send_advertisements = true
-
-  # A hypothetical HTTP plugin which consults an external server by passing it
-  # the request to determine what sorts of prefixes, options, etc. to serve.
-  [[interfaces.plugins]]
-  name = "http"
-  address = "https://ipam.example.com/corerad"
-  timeout = "5s"
-
-# Enable or disable the debug HTTP server for facilities such as Prometheus
-# metrics and pprof support.
-#
-# Warning: do not expose pprof on an untrusted network!
 [debug]
 address = "localhost:9430"
 prometheus = true
-pprof = false
 ```
