@@ -7,7 +7,7 @@ require (
 	github.com/google/go-cmp v0.3.1
 	github.com/mdlayher/ndp v0.0.0-20191228172402-28f2de0da526
 	github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
-	github.com/mdlayher/schedgroup v0.0.0-20200101222405-a5b3c0848281
+	github.com/mdlayher/schedgroup v0.0.0-20200101224931-82199ac8181e
 	github.com/prometheus/client_golang v1.3.0
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e

@@ -51,11 +51,13 @@ func New(ctx context.Context) *Group {
 
 // Delay schedules a function to run at or after the specified delay. Delay
 // is a convenience wrapper for Schedule which adds delay to the current time.
+// Specifying a negative delay will cause the task to be scheduled immediately.
 func (g *Group) Delay(delay time.Duration, fn func() error) {
 	g.Schedule(time.Now().Add(delay), fn)
 }
 
 // Schedule schedules a function to run at or after the specified time.
+// Specifying a past time will cause the task to be scheduled immediately.
 func (g *Group) Schedule(when time.Time, fn func() error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
