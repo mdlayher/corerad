@@ -7,9 +7,12 @@
 [[interfaces]]
 name = "eth0"
 
+# All interface parameters in this section can be removed to simplify
+# configuration with sane defaults.
+
 # AdvSendAdvertisements: indicates whether or not this interface will send
 # periodic router advertisements and respond to router solicitations.
-send_advertisements = true
+send_advertisements = false
 
 # MaxRtrAdvInterval: the maximum time between sending unsolicited multicast
 # router advertisements. Must be between 4 and 1800 seconds.
@@ -106,5 +109,5 @@ default_lifetime = "auto"
 # Warning: do not expose pprof on an untrusted network!
 [debug]
 address = "localhost:9430"
-prometheus = true
+prometheus = false
 pprof = false

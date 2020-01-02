@@ -20,8 +20,10 @@ import (
 
 // parseInterfaces parses a rawInterface into an Interface.
 func parseInterface(ifi rawInterface) (*Interface, error) {
-	// Default values in this section  come from the RFC:
-	// https://tools.ietf.org/html/rfc4861#section-6.2.1.
+	// The RFC and radvd have different defaults for some values. Where they
+	// differ, we will mimic radvd's defaults as many users will likely be
+	// migrating their configurations directly from radvd:
+	// https://linux.die.net/man/5/radvd.conf.
 
 	maxInterval := 600 * time.Second
 	if ifi.MaxInterval != "" {
@@ -68,7 +70,13 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		return nil, fmt.Errorf("retransmit timer (%d) must be between 0 and 3600 seconds", int(retrans.Seconds()))
 	}
 
-	if ifi.HopLimit < 0 || ifi.HopLimit > 255 {
+	hopLimit := 64
+	if ifi.HopLimit != nil {
+		// Override if specified.
+		hopLimit = *ifi.HopLimit
+	}
+
+	if hopLimit < 0 || hopLimit > 255 {
 		return nil, fmt.Errorf("hop limit (%d) must be between 0 and 255", ifi.HopLimit)
 	}
 
@@ -86,7 +94,7 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		OtherConfig:        ifi.OtherConfig,
 		ReachableTime:      reachable,
 		RetransmitTimer:    retrans,
-		HopLimit:           uint8(ifi.HopLimit),
+		HopLimit:           uint8(hopLimit),
 		DefaultLifetime:    lifetime,
 	}, nil
 }
@@ -121,18 +129,24 @@ func parseMinInterval(s string, max time.Duration) (time.Duration, error) {
 
 // parseDefaultLifetime parses a default_lifetime string and computes its value
 // based on user input or the relationship with max.
-func parseDefaultLifetime(s string, max time.Duration) (time.Duration, error) {
-	switch s {
+func parseDefaultLifetime(s *string, max time.Duration) (time.Duration, error) {
+	auto := 3 * max
+
+	if s == nil {
+		return auto, nil
+	}
+
+	switch *s {
 	case "":
 		// No value specified, no default lifetime.
 		return 0, nil
 	case "auto":
 		// Compute a sane default per the RFC.
-		return 3 * max, nil
+		return auto, nil
 	}
 
 	// Use the user's value, but validate it per the RFC.
-	lt, err := time.ParseDuration(s)
+	lt, err := time.ParseDuration(*s)
 	if err != nil {
 		return 0, fmt.Errorf("invalid default lifetime: %v", err)
 	}

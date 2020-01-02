@@ -96,32 +96,32 @@ func Test_parseInterfaceErrors(t *testing.T) {
 		{
 			name: "hop limit too low",
 			ifi: rawInterface{
-				HopLimit: -1,
+				HopLimit: intp(-1),
 			},
 		},
 		{
 			name: "hop limit too high",
 			ifi: rawInterface{
-				HopLimit: 256,
+				HopLimit: intp(256),
 			},
 		},
 		{
 			name: "default lifetime duration",
 			ifi: rawInterface{
-				DefaultLifetime: "foo",
+				DefaultLifetime: strp("foo"),
 			},
 		},
 		{
 			name: "default lifetime too low",
 			ifi: rawInterface{
 				MaxInterval:     "4s",
-				DefaultLifetime: "2s",
+				DefaultLifetime: strp("2s"),
 			},
 		},
 		{
 			name: "default lifetime too high",
 			ifi: rawInterface{
-				DefaultLifetime: "9001s",
+				DefaultLifetime: strp("9001s"),
 			},
 		},
 	}
@@ -137,3 +137,7 @@ func Test_parseInterfaceErrors(t *testing.T) {
 		})
 	}
 }
+
+func intp(i int) *int { return &i }
+
+func strp(s string) *string { return &s }

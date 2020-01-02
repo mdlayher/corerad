@@ -86,19 +86,19 @@ func TestParse(t *testing.T) {
 			`,
 		},
 		{
-			name: "OK no plugins",
+			name: "OK minimal defaults",
 			s: `
 			[[interfaces]]
 			name = "eth0"
-			send_advertisements = true
-			default_lifetime = "0"
 			`,
 			c: &config.Config{
 				Interfaces: []config.Interface{{
 					Name:               "eth0",
-					SendAdvertisements: true,
+					SendAdvertisements: false,
 					MinInterval:        3*time.Minute + 18*time.Second,
 					MaxInterval:        10 * time.Minute,
+					HopLimit:           64,
+					DefaultLifetime:    30 * time.Minute,
 					Plugins:            []config.Plugin{},
 				}},
 			},
@@ -138,11 +138,16 @@ func TestParse(t *testing.T) {
 			name = "eth1"
 			min_interval = "auto"
 			max_interval = "4s"
+			# default hop_limit.
 			default_lifetime = "8s"
 			managed = true
 			other_config = true
 			reachable_time = "30s"
 			retransmit_timer = "5s"
+
+			[[interfaces]]
+			name = "eth2"
+			hop_limit = 0
 
 			[debug]
 			address = "localhost:9430"
@@ -188,11 +193,21 @@ func TestParse(t *testing.T) {
 						SendAdvertisements: false,
 						MinInterval:        4 * time.Second,
 						MaxInterval:        4 * time.Second,
+						HopLimit:           64,
 						Managed:            true,
 						OtherConfig:        true,
 						ReachableTime:      30 * time.Second,
 						RetransmitTimer:    5 * time.Second,
 						DefaultLifetime:    8 * time.Second,
+						Plugins:            []config.Plugin{},
+					},
+					{
+						Name:               "eth2",
+						SendAdvertisements: false,
+						MinInterval:        3*time.Minute + 18*time.Second,
+						MaxInterval:        10 * time.Minute,
+						HopLimit:           0,
+						DefaultLifetime:    30 * time.Minute,
 						Plugins:            []config.Plugin{},
 					},
 				},
@@ -224,6 +239,35 @@ func TestParse(t *testing.T) {
 				t.Fatalf("unexpected Config (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestParseDefaults(t *testing.T) {
+	t.Parallel()
+
+	const minimal = `
+		[[interfaces]]
+		name = "eth0"
+
+		[debug]
+		address = "localhost:9430"
+	`
+
+	min, err := config.Parse(strings.NewReader(minimal))
+	if err != nil {
+		t.Fatalf("failed to parse minimal config: %v", err)
+	}
+	defaults, err := config.Parse(strings.NewReader(config.Default))
+	if err != nil {
+		t.Fatalf("failed to parse default config: %v", err)
+	}
+
+	// Omit plugins from comparison.
+	min.Interfaces[0].Plugins = nil
+	defaults.Interfaces[0].Plugins = nil
+
+	if diff := cmp.Diff(defaults, min); diff != "" {
+		t.Fatalf("unexpected default Config (-want +got):\n%s", diff)
 	}
 }
 
