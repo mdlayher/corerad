@@ -39,11 +39,13 @@ type Plugin interface {
 
 // parsePlugin parses raw plugin key/values into a Plugin.
 func parsePlugin(iface Interface, md toml.MetaData, m map[string]toml.Primitive) (Plugin, error) {
-	// Each plugin is identified by a name.
+	// Each plugin is identified by a name. Once we parse the name, clear it
+	// from the map so the plugins themselves don't have to handle it.
 	pname, ok := m["name"]
 	if !ok {
 		return nil, errors.New(`missing "name" key for plugin`)
 	}
+	delete(m, "name")
 
 	var name string
 	if err := md.PrimitiveDecode(pname, &name); err != nil {
@@ -116,8 +118,6 @@ func (d *DNSSL) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
 		}
 
 		switch k {
-		case "name":
-			// Already handled.
 		case "lifetime":
 			d.Lifetime = v.Duration()
 		case "domain_names":
@@ -184,8 +184,6 @@ func (p *Prefix) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
 		}
 
 		switch k {
-		case "name":
-			// Already handled.
 		case "autonomous":
 			p.Autonomous = v.Bool()
 		case "on_link":
@@ -256,8 +254,6 @@ func (m *MTU) Decode(md toml.MetaData, mp map[string]toml.Primitive) error {
 		}
 
 		switch k {
-		case "name":
-			// Already handled.
 		case "mtu":
 			// Loopback has an MTU of 65536 on Linux. Good enough?
 			*m = MTU(v.Int(0, 65536))
@@ -302,8 +298,6 @@ func (r *RDNSS) Decode(md toml.MetaData, m map[string]toml.Primitive) error {
 		}
 
 		switch k {
-		case "name":
-			// Already handled.
 		case "lifetime":
 			r.Lifetime = v.Duration()
 		case "servers":
