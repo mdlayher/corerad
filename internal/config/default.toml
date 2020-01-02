@@ -7,12 +7,14 @@
 [[interfaces]]
 name = "eth0"
 
-# All interface parameters in this section can be removed to simplify
-# configuration with sane defaults.
-
 # AdvSendAdvertisements: indicates whether or not this interface will send
 # periodic router advertisements and respond to router solicitations.
+#
+# Must be set to true to enable serving on this interface.
 send_advertisements = false
+
+# All other interface parameters in this section can be removed to simplify
+# configuration with sane defaults.
 
 # MaxRtrAdvInterval: the maximum time between sending unsolicited multicast
 # router advertisements. Must be between 4 and 1800 seconds.
