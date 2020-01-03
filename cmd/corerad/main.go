@@ -31,7 +31,7 @@ import (
 
 const (
 	cfgFile = "corerad.toml"
-	version = "v0.1.2 (ALPHA)"
+	version = "v0.1.3 (ALPHA)"
 )
 
 func main() {
