@@ -293,14 +293,14 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 		a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
 
 		if _, ok := m.(*ndp.RouterSolicitation); !ok {
-			a.logf("received NDP message of type %T, ignoring", m)
+			a.logf("received NDP message of type %T from %s, ignoring", m, host)
 			a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
 			continue
 		}
 
 		// Ensure this message has a valid hop limit.
 		if cm.HopLimit != ndp.HopLimit {
-			a.logf("received NDP message with IPv6 hop limit %d, ignoring", cm.HopLimit)
+			a.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
 			a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
 			continue
 		}
