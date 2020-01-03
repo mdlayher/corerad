@@ -82,27 +82,33 @@ func (s *Server) Run(ctx context.Context) error {
 	mm := NewAdvertiserMetrics(s.reg)
 
 	// Serve on each specified interface.
-	for _, ifi := range s.cfg.Interfaces {
+	for _, iface := range s.cfg.Interfaces {
 		// Prepend the interface name to all logs for this server.
 		logf := func(format string, v ...interface{}) {
-			s.ll.Println(ifi.Name + ": " + fmt.Sprintf(format, v...))
+			s.ll.Println(iface.Name + ": " + fmt.Sprintf(format, v...))
 		}
 
-		if !ifi.SendAdvertisements {
+		// Make sure the interface is valid.
+		ifi, err := net.InterfaceByName(iface.Name)
+		if err != nil {
+			return fmt.Errorf("failed to look up interface %q: %v", iface.Name, err)
+		}
+
+		if !iface.SendAdvertisements {
 			logf("send advertisements is false, skipping initialization")
 			continue
 		}
 
-		logf("initializing with %d plugins", len(ifi.Plugins))
+		logf("initializing with %d plugins", len(iface.Plugins))
 
-		for i, p := range ifi.Plugins {
+		for i, p := range iface.Plugins {
 			logf("plugin %02d: %q: %s", i, p.Name(), p)
 		}
 
 		// TODO: find a way to reasonably test this.
 
 		// Begin advertising on this interface until the context is canceled.
-		ad, err := NewAdvertiser(ifi, s.ll, mm)
+		ad, err := NewAdvertiser(ifi, iface, s.ll, mm)
 		if err != nil {
 			return fmt.Errorf("failed to create NDP advertiser: %v", err)
 		}

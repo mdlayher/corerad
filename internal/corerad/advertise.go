@@ -46,17 +46,12 @@ type Advertiser struct {
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded. If mm is nil, metrics are discarded.
-func NewAdvertiser(cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) (*Advertiser, error) {
+func NewAdvertiser(ifi *net.Interface, cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) (*Advertiser, error) {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
 	if mm == nil {
 		mm = NewAdvertiserMetrics(nil)
-	}
-
-	ifi, err := net.InterfaceByName(cfg.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to look up interface %q: %v", cfg.Name, err)
 	}
 
 	// We can now initialize any plugins that rely on dynamic information
