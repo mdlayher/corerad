@@ -68,7 +68,7 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 	}
 
 	var ra ndp.Message
-	ad, done := testAdvertiserClient(t, cfg, func(_ func(), cctx *clientContext) {
+	ad, done := testAdvertiserClient(t, cfg, nil, func(_ func(), cctx *clientContext) {
 		// Read a single advertisement and then ensure the advertiser can be halted.
 		m, _, _, err := cctx.c.ReadFrom()
 		if err != nil {
@@ -124,7 +124,7 @@ func TestAdvertiserLinuxUnsolicitedShutdown(t *testing.T) {
 	}
 
 	var got []ndp.Message
-	ad, done := testAdvertiserClient(t, cfg, func(cancel func(), cctx *clientContext) {
+	ad, done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
 		// Read the RA the advertiser sends on startup, then stop it and capture the
 		// one it sends on shutdown.
 		for i := 0; i < 2; i++ {
@@ -170,7 +170,7 @@ func TestAdvertiserLinuxUnsolicitedDelayed(t *testing.T) {
 	// Configure a variety of plugins to ensure that everything is handled
 	// appropriately over the wire.
 	var got []ndp.Message
-	ad, done := testAdvertiserClient(t, nil, func(_ func(), cctx *clientContext) {
+	ad, done := testAdvertiserClient(t, nil, nil, func(_ func(), cctx *clientContext) {
 		// Expect a significant delay between the multicast RAs.
 		start := time.Now()
 		for i := 0; i < 2; i++ {
@@ -205,7 +205,7 @@ func TestAdvertiserLinuxUnsolicitedDelayed(t *testing.T) {
 func TestAdvertiserLinuxSolicited(t *testing.T) {
 	// No configuration, bare minimum router advertisement.
 	var got []ndp.Message
-	ad, done := testAdvertiserClient(t, nil, func(cancel func(), cctx *clientContext) {
+	ad, done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
 		// Issue repeated router solicitations and expect router advertisements
 		// in response.
 		for i := 0; i < 3; i++ {
@@ -241,7 +241,7 @@ func TestAdvertiserLinuxSolicited(t *testing.T) {
 }
 
 func TestAdvertiserLinuxContextCanceled(t *testing.T) {
-	ad, _, _, done := testAdvertiser(t, nil)
+	ad, _, _, done := testAdvertiser(t, nil, nil)
 	defer done()
 
 	timer := time.AfterFunc(5*time.Second, func() {
@@ -259,7 +259,7 @@ func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 }
 
 func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
-	ad, _, _, done := testAdvertiser(t, nil)
+	ad, _, _, done := testAdvertiser(t, nil, nil)
 	defer done()
 
 	// Capture the IPv6 autoconfiguration state while the advertiser is running
@@ -305,7 +305,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 	}
 
 	var got []ndp.Message
-	ad, done := testAdvertiserClient(t, cfg, func(cancel func(), cctx *clientContext) {
+	ad, done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
 		m0, _, _, err := cctx.c.ReadFrom()
 		if err != nil {
 			t.Fatalf("failed to read RA: %v", err)
@@ -354,7 +354,13 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 	}
 }
 
-func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn, net.HardwareAddr, func()) {
+type testConfig struct {
+	// An optional hook which can be used to apply additional configuration to
+	// the test veth interfaces before they are brought up.
+	vethConfig func(t *testing.T, veth0, veth1 string)
+}
+
+func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Advertiser, *ndp.Conn, net.HardwareAddr, func()) {
 	t.Helper()
 
 	if runtime.GOOS != "linux" {
@@ -362,6 +368,10 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	}
 
 	skipUnprivileged(t)
+
+	if tcfg == nil {
+		tcfg = &testConfig{}
+	}
 
 	var (
 		r     = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -376,6 +386,11 @@ func testAdvertiser(t *testing.T, cfg *config.Interface) (*Advertiser, *ndp.Conn
 	mustSysctl(t, veth0, "accept_dad", "0")
 	mustSysctl(t, veth1, "accept_dad", "0")
 	mustSysctl(t, veth0, "forwarding", "1")
+
+	if tcfg.vethConfig != nil {
+		tcfg.vethConfig(t, veth0, veth1)
+	}
+
 	shell(t, "ip", "link", "set", "up", veth0)
 	shell(t, "ip", "link", "set", "up", veth1)
 
@@ -440,10 +455,15 @@ type clientContext struct {
 
 // testAdvertiserClient is a wrapper around testAdvertiser which focuses on
 // client interactions rather than server interactions.
-func testAdvertiserClient(t *testing.T, cfg *config.Interface, fn func(cancel func(), cctx *clientContext)) (*Advertiser, func()) {
+func testAdvertiserClient(
+	t *testing.T,
+	cfg *config.Interface,
+	tcfg *testConfig,
+	fn func(cancel func(), cctx *clientContext),
+) (*Advertiser, func()) {
 	t.Helper()
 
-	ad, c, mac, adDone := testAdvertiser(t, cfg)
+	ad, c, mac, adDone := testAdvertiser(t, cfg, tcfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -552,7 +572,11 @@ func shell(t *testing.T, name string, arg ...string) {
 func mustSysctl(t *testing.T, iface, key, value string) {
 	t.Helper()
 
-	if err := ioutil.WriteFile(sysctl(iface, key), []byte(value), 0o644); err != nil {
+	file := sysctl(iface, key)
+
+	t.Logf("sysctl %q = %q", file, value)
+
+	if err := ioutil.WriteFile(file, []byte(value), 0o644); err != nil {
 		t.Fatalf("failed to write sysctl %s/%s: %v", iface, key, err)
 	}
 }
