@@ -21,68 +21,17 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/google/go-cmp/cmp"
+	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 )
 
-func TestPluginString(t *testing.T) {
-	tests := []struct {
-		name string
-		p    Plugin
-		s    string
-	}{
-		{
-			name: "DNSSL",
-			p: &DNSSL{
-				Lifetime:    30 * time.Second,
-				DomainNames: []string{"foo.example.com", "bar.example.com"},
-			},
-			s: "domain names: [foo.example.com, bar.example.com], lifetime: 30s",
-		},
-		{
-			name: "Prefix",
-			p: &Prefix{
-				Prefix:            mustCIDR("::/64"),
-				OnLink:            true,
-				Autonomous:        true,
-				PreferredLifetime: 15 * time.Minute,
-				ValidLifetime:     ndp.Infinity,
-			},
-			s: "::/64 [on-link, autonomous], preferred: 15m0s, valid: infinite",
-		},
-		{
-			name: "MTU",
-			p:    newMTU(1500),
-			s:    "MTU: 1500",
-		},
-		{
-			name: "RDNSS",
-			p: &RDNSS{
-				Lifetime: 30 * time.Second,
-				Servers: []net.IP{
-					mustIP("2001:db8::1"),
-					mustIP("2001:db8::2"),
-				},
-			},
-			s: "servers: [2001:db8::1, 2001:db8::2], lifetime: 30s",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if diff := cmp.Diff(tt.s, tt.p.String()); diff != "" {
-				t.Fatalf("unexpected string (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestDNSSLDecode(t *testing.T) {
+func Test_parseDNSSL(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 		s    string
-		d    *DNSSL
+		d    *plugin.DNSSL
 		ok   bool
 	}{
 		{
@@ -113,7 +62,7 @@ func TestDNSSLDecode(t *testing.T) {
 			domain_names = ["foo.example.com", "bar.example.com"]
 			lifetime = "30s"
 			`,
-			d: &DNSSL{
+			d: &plugin.DNSSL{
 				Lifetime:    30 * time.Second,
 				DomainNames: []string{"foo.example.com", "bar.example.com"},
 			},
@@ -125,7 +74,7 @@ func TestDNSSLDecode(t *testing.T) {
 			name = "dnssl"
 			domain_names = ["foo.example.com"]
 			`,
-			d: &DNSSL{
+			d: &plugin.DNSSL{
 				Lifetime:    20 * time.Minute,
 				DomainNames: []string{"foo.example.com"},
 			},
@@ -138,7 +87,7 @@ func TestDNSSLDecode(t *testing.T) {
 			domain_names = ["foo.example.com"]
 			lifetime = "auto"
 			`,
-			d: &DNSSL{
+			d: &plugin.DNSSL{
 				Lifetime:    20 * time.Minute,
 				DomainNames: []string{"foo.example.com"},
 			},
@@ -153,10 +102,10 @@ func TestDNSSLDecode(t *testing.T) {
 	}
 }
 
-func TestPrefixDecode(t *testing.T) {
+func Test_parsePrefix(t *testing.T) {
 	t.Parallel()
 
-	defaults := &Prefix{
+	defaults := &plugin.Prefix{
 		Prefix:            mustCIDR("::/64"),
 		OnLink:            true,
 		Autonomous:        true,
@@ -167,7 +116,7 @@ func TestPrefixDecode(t *testing.T) {
 	tests := []struct {
 		name string
 		s    string
-		p    *Prefix
+		p    *plugin.Prefix
 		ok   bool
 	}{
 		{
@@ -245,7 +194,7 @@ func TestPrefixDecode(t *testing.T) {
 			preferred_lifetime = "infinite"
 			valid_lifetime = "infinite"
 			`,
-			p: &Prefix{
+			p: &plugin.Prefix{
 				Prefix:            mustCIDR("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
@@ -264,7 +213,7 @@ func TestPrefixDecode(t *testing.T) {
 			preferred_lifetime = "30s"
 			valid_lifetime = "60s"
 			`,
-			p: &Prefix{
+			p: &plugin.Prefix{
 				Prefix:            mustCIDR("::/64"),
 				OnLink:            true,
 				PreferredLifetime: 30 * time.Second,
@@ -281,13 +230,13 @@ func TestPrefixDecode(t *testing.T) {
 	}
 }
 
-func TestMTUDecode(t *testing.T) {
+func Test_parseMTU(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 		s    string
-		m    *MTU
+		m    *plugin.MTU
 		ok   bool
 	}{
 		{
@@ -322,13 +271,13 @@ func TestMTUDecode(t *testing.T) {
 	}
 }
 
-func TestRDNSSDecode(t *testing.T) {
+func Test_parseRDNSS(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 		s    string
-		r    *RDNSS
+		r    *plugin.RDNSS
 		ok   bool
 	}{
 		{
@@ -359,7 +308,7 @@ func TestRDNSSDecode(t *testing.T) {
 			servers = ["2001:db8::1", "2001:db8::2"]
 			lifetime = "30s"
 			`,
-			r: &RDNSS{
+			r: &plugin.RDNSS{
 				Lifetime: 30 * time.Second,
 				Servers: []net.IP{
 					mustIP("2001:db8::1"),
@@ -374,7 +323,7 @@ func TestRDNSSDecode(t *testing.T) {
 			name = "rdnss"
 			servers = ["2001:db8::1"]
 			`,
-			r: &RDNSS{
+			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
 				Servers:  []net.IP{mustIP("2001:db8::1")},
 			},
@@ -387,7 +336,7 @@ func TestRDNSSDecode(t *testing.T) {
 			servers = ["2001:db8::1"]
 			lifetime = "auto"
 			`,
-			r: &RDNSS{
+			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
 				Servers:  []net.IP{mustIP("2001:db8::1")},
 			},
@@ -402,7 +351,7 @@ func TestRDNSSDecode(t *testing.T) {
 	}
 }
 
-func pluginDecode(t *testing.T, s string, ok bool, want Plugin) {
+func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 	t.Helper()
 
 	var m map[string]toml.Primitive
@@ -428,11 +377,11 @@ func pluginDecode(t *testing.T, s string, ok bool, want Plugin) {
 	}
 
 	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("unexpected Prefix (-want +got):\n%s", diff)
+		t.Fatalf("unexpected Plugin (-want +got):\n%s", diff)
 	}
 }
 
-func newMTU(i int) *MTU {
-	m := MTU(i)
+func newMTU(i int) *plugin.MTU {
+	m := plugin.MTU(i)
 	return &m
 }

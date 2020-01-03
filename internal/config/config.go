@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/mdlayher/corerad/internal/plugin"
 )
 
 //go:generate embed file -var Default --source default.toml
@@ -64,7 +65,7 @@ type Interface struct {
 	ReachableTime, RetransmitTimer time.Duration
 	HopLimit                       uint8
 	DefaultLifetime                time.Duration
-	Plugins                        []Plugin
+	Plugins                        []plugin.Plugin
 }
 
 // Debug provides configuration for debugging and observability.
@@ -116,7 +117,7 @@ func Parse(r io.Reader) (*Config, error) {
 			return nil, fmt.Errorf("interface %d/%q: %v", i, ifi.Name, err)
 		}
 
-		iface.Plugins = make([]Plugin, 0, len(ifi.Plugins))
+		iface.Plugins = make([]plugin.Plugin, 0, len(ifi.Plugins))
 		for j, p := range ifi.Plugins {
 			// Pass along the current interface configuration so auto values
 			// can be computed.

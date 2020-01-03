@@ -39,7 +39,6 @@ type Advertiser struct {
 	autoPrev bool
 
 	cfg config.Interface
-	b   *builder
 
 	ll *log.Logger
 	mm *AdvertiserMetrics
@@ -58,6 +57,14 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) 
 	ifi, err := net.InterfaceByName(cfg.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to look up interface %q: %v", cfg.Name, err)
+	}
+
+	// We can now initialize any plugins that rely on dynamic information
+	// about the network interface.
+	for _, p := range cfg.Plugins {
+		if err := p.Prepare(ifi); err != nil {
+			return nil, fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
+		}
 	}
 
 	// If possible, disable IPv6 autoconfiguration on this interface so that
@@ -100,11 +107,6 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) 
 		autoPrev: autoPrev,
 
 		cfg: cfg,
-		// Set up a builder to construct RAs from configuration.
-		b: &builder{
-			// Fetch the configured interface's addresses.
-			Addrs: ifi.Addrs,
-		},
 
 		ll: ll,
 		mm: mm,
@@ -382,17 +384,10 @@ func (a *Advertiser) sendWorker(ip net.IP) {
 func (a *Advertiser) send(dst net.IP) error {
 	// Build a router advertisement from configuration and always append
 	// the source address option.
-	ra, err := a.b.Build(a.cfg)
+	ra, err := a.buildRA(a.cfg)
 	if err != nil {
 		return fmt.Errorf("failed to build router advertisement: %v", err)
 	}
-
-	// TODO: apparently it is also valid to omit this, but we can think
-	// about that later.
-	ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
-		Direction: ndp.Source,
-		Addr:      a.ifi.HardwareAddr,
-	})
 
 	// If the interface is not forwarding packets, we must set the router
 	// lifetime field to zero, per:
@@ -410,6 +405,37 @@ func (a *Advertiser) send(dst net.IP) error {
 	}
 
 	return nil
+}
+
+// buildRA builds a router advertisement from configuration and applies any
+// necessary plugins.
+func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, error) {
+	ra := &ndp.RouterAdvertisement{
+		CurrentHopLimit:      ifi.HopLimit,
+		ManagedConfiguration: ifi.Managed,
+		OtherConfiguration:   ifi.OtherConfig,
+		RouterLifetime:       ifi.DefaultLifetime,
+		ReachableTime:        ifi.ReachableTime,
+		RetransmitTimer:      ifi.RetransmitTimer,
+	}
+
+	// TODO plugin cancelation.
+	var err error
+	for _, p := range ifi.Plugins {
+		ra, err = p.Apply(ra)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// TODO: apparently it is also valid to omit this, but we can think
+	// about that later.
+	ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
+		Direction: ndp.Source,
+		Addr:      a.ifi.HardwareAddr,
+	})
+
+	return ra, nil
 }
 
 // logf prints a formatted log with the Advertiser's interface name.

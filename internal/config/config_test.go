@@ -22,12 +22,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/plugin"
 )
 
 func TestParse(t *testing.T) {
 	t.Parallel()
-
-	defaultPrefix := config.NewPrefix()
 
 	tests := []struct {
 		name string
@@ -99,7 +98,7 @@ func TestParse(t *testing.T) {
 					MaxInterval:        10 * time.Minute,
 					HopLimit:           64,
 					DefaultLifetime:    30 * time.Minute,
-					Plugins:            []config.Plugin{},
+					Plugins:            []plugin.Plugin{},
 				}},
 			},
 			ok: true,
@@ -163,26 +162,26 @@ func TestParse(t *testing.T) {
 						MaxInterval:        10 * time.Minute,
 						HopLimit:           64,
 						DefaultLifetime:    30 * time.Minute,
-						Plugins: []config.Plugin{
-							&config.Prefix{
+						Plugins: []plugin.Plugin{
+							&plugin.Prefix{
 								Prefix:            mustCIDR("::/64"),
-								OnLink:            defaultPrefix.OnLink,
-								Autonomous:        defaultPrefix.Autonomous,
-								ValidLifetime:     defaultPrefix.ValidLifetime,
-								PreferredLifetime: defaultPrefix.PreferredLifetime,
+								OnLink:            true,
+								Autonomous:        true,
+								ValidLifetime:     24 * time.Hour,
+								PreferredLifetime: 4 * time.Hour,
 							},
-							&config.Prefix{
+							&plugin.Prefix{
 								Prefix:            mustCIDR("2001:db8::/64"),
-								OnLink:            defaultPrefix.OnLink,
+								OnLink:            true,
 								Autonomous:        false,
-								ValidLifetime:     defaultPrefix.ValidLifetime,
-								PreferredLifetime: defaultPrefix.PreferredLifetime,
+								ValidLifetime:     24 * time.Hour,
+								PreferredLifetime: 4 * time.Hour,
 							},
-							&config.RDNSS{
+							&plugin.RDNSS{
 								Lifetime: 20 * time.Minute,
 								Servers:  []net.IP{mustIP("2001:db8::1")},
 							},
-							&config.DNSSL{
+							&plugin.DNSSL{
 								Lifetime:    20 * time.Minute,
 								DomainNames: []string{"lan.example.com"},
 							},
@@ -199,7 +198,7 @@ func TestParse(t *testing.T) {
 						ReachableTime:      30 * time.Second,
 						RetransmitTimer:    5 * time.Second,
 						DefaultLifetime:    8 * time.Second,
-						Plugins:            []config.Plugin{},
+						Plugins:            []plugin.Plugin{},
 					},
 					{
 						Name:               "eth2",
@@ -208,7 +207,7 @@ func TestParse(t *testing.T) {
 						MaxInterval:        10 * time.Minute,
 						HopLimit:           0,
 						DefaultLifetime:    30 * time.Minute,
-						Plugins:            []config.Plugin{},
+						Plugins:            []plugin.Plugin{},
 					},
 				},
 				Debug: config.Debug{

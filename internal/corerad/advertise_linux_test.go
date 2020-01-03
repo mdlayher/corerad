@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
@@ -39,8 +40,8 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 	// appropriately over the wire.
 	cfg := &config.Interface{
 		OtherConfig: true,
-		Plugins: []config.Plugin{
-			&config.DNSSL{
+		Plugins: []plugin.Plugin{
+			&plugin.DNSSL{
 				Lifetime: 10 * time.Second,
 				DomainNames: []string{
 					"foo.example.com",
@@ -50,13 +51,13 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 				},
 			},
 			newMTU(1500),
-			&config.Prefix{
+			&plugin.Prefix{
 				Prefix:            mustCIDR("2001:db8::/32"),
 				OnLink:            true,
 				PreferredLifetime: 10 * time.Second,
 				ValidLifetime:     20 * time.Second,
 			},
-			&config.RDNSS{
+			&plugin.RDNSS{
 				Lifetime: 10 * time.Second,
 				Servers: []net.IP{
 					mustIP("2001:db8::1"),
@@ -554,4 +555,31 @@ func mustSysctl(t *testing.T, iface, key, value string) {
 	if err := ioutil.WriteFile(sysctl(iface, key), []byte(value), 0o644); err != nil {
 		t.Fatalf("failed to write sysctl %s/%s: %v", iface, key, err)
 	}
+}
+
+func mustIP(s string) net.IP {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		panicf("failed to parse %q as IP address", s)
+	}
+
+	return ip
+}
+
+func mustCIDR(s string) *net.IPNet {
+	_, ipn, err := net.ParseCIDR(s)
+	if err != nil {
+		panicf("failed to parse CIDR: %v", err)
+	}
+
+	return ipn
+}
+
+func newMTU(i int) *plugin.MTU {
+	m := plugin.MTU(i)
+	return &m
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }
