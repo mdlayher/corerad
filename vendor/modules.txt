@@ -14,7 +14,7 @@ github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/mdlayher/ndp v0.0.0-20191228172402-28f2de0da526
+# github.com/mdlayher/ndp v0.0.0-20200103174253-4f8c213af111
 github.com/mdlayher/ndp
 # github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
 github.com/mdlayher/promtest
@@ -47,6 +47,6 @@ golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20191228213918-04cbcbbfeed8
+# golang.org/x/sys v0.0.0-20200103143344-a1369afcdac7
 golang.org/x/sys/unix
 golang.org/x/sys/windows

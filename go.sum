@@ -36,6 +36,8 @@ github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0j
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/mdlayher/ndp v0.0.0-20191228172402-28f2de0da526 h1:Mzowkr4QTEqijFRiLVmqgFBtLqDdgnQjrTyEEv9270I=
 github.com/mdlayher/ndp v0.0.0-20191228172402-28f2de0da526/go.mod h1:RA3SuKRKhMBigwJnFonlsRE0H9FuhUBsfhIOXtojQig=
+github.com/mdlayher/ndp v0.0.0-20200103174253-4f8c213af111 h1:F+GmwO8tajpnTmCpQOxMwMFPkGGCD1Zcw+vIZOT6sss=
+github.com/mdlayher/ndp v0.0.0-20200103174253-4f8c213af111/go.mod h1:RA3SuKRKhMBigwJnFonlsRE0H9FuhUBsfhIOXtojQig=
 github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3 h1:M/HpEFh7AFSyOVYDiXfQHtukLE1YB0IXIRsSUh5+AF0=
 github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3/go.mod h1:mou3PlTVe2DTu6A2lSzFYgN0LTDipz/0AkujMDxA8ew=
 github.com/mdlayher/schedgroup v0.0.0-20200101222405-a5b3c0848281 h1:zGKnhZS7SaBIDmSVGuortha97R+5L25LJHmmyNzdMwo=
@@ -105,6 +107,8 @@ golang.org/x/sys v0.0.0-20191224085550-c709ea063b76 h1:Dho5nD6R3PcW2SH1or8vS0dsz
 golang.org/x/sys v0.0.0-20191224085550-c709ea063b76/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191228213918-04cbcbbfeed8 h1:JA8d3MPx/IToSyXZG/RhwYEtfrKO1Fxrqe8KrkiLXKM=
 golang.org/x/sys v0.0.0-20191228213918-04cbcbbfeed8/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200103143344-a1369afcdac7 h1:/W9OPMnnpmFXHYkcp2rQsbFUbRlRzfECQjmAFiOyHE8=
+golang.org/x/sys v0.0.0-20200103143344-a1369afcdac7/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
