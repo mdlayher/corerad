@@ -133,6 +133,7 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 	return nil
 }
 
+// Apply implements Plugin.
 func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) (*ndp.RouterAdvertisement, error) {
 	length, _ := p.Prefix.Mask.Size()
 
