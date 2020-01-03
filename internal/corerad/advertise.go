@@ -174,8 +174,13 @@ func (a *Advertiser) shutdown() error {
 	// Send a final router advertisement (TODO: more than one) with a router
 	// lifetime of 0 to indicate that hosts should not use this router as a
 	// default router, and then leave the all-routers group.
-	a.cfg.DefaultLifetime = 0
-	if err := a.send(net.IPv6linklocalallnodes); err != nil {
+	//
+	// a.cfg is copied in case any delayed send workers are outstanding and
+	// the server's context is canceled.
+	cfg := a.cfg
+	cfg.DefaultLifetime = 0
+
+	if err := a.send(net.IPv6linklocalallnodes, cfg); err != nil {
 		a.logf("failed to send final multicast router advertisement: %v", err)
 	}
 
@@ -364,7 +369,7 @@ func (a *Advertiser) sendWorker(ip net.IP) {
 	busy.Inc()
 	defer busy.Dec()
 
-	if err := a.send(ip); err != nil {
+	if err := a.send(ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
 		a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
 
@@ -381,12 +386,12 @@ func (a *Advertiser) sendWorker(ip net.IP) {
 	a.mm.RouterAdvertisementsTotal.WithLabelValues(a.cfg.Name, typ).Add(1)
 }
 
-// send sends a single router advertisement to the destination IP address,
-// which may be a unicast or multicast address.
-func (a *Advertiser) send(dst net.IP) error {
+// send sends a single router advertisement built from cfg to the destination IP
+// address, which may be a unicast or multicast address.
+func (a *Advertiser) send(dst net.IP, cfg config.Interface) error {
 	// Build a router advertisement from configuration and always append
 	// the source address option.
-	ra, err := a.buildRA(a.cfg)
+	ra, err := a.buildRA(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to build router advertisement: %v", err)
 	}
