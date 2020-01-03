@@ -240,8 +240,35 @@ func TestAdvertiserLinuxSolicited(t *testing.T) {
 	}
 }
 
+func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
+	_, done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
+		// Consume the initial multicast.
+		if _, _, _, err := cctx.c.ReadFrom(); err != nil {
+			t.Fatalf("failed to read multicast RA: %v", err)
+		}
+
+		// Expect a timeout due to bad hop limit.
+		if err := cctx.c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
+			t.Fatalf("failed to set client deadline: %v", err)
+		}
+
+		// Bad hop limit.
+		cm := &ipv6.ControlMessage{HopLimit: ndp.HopLimit - 1}
+		if err := cctx.c.WriteTo(cctx.rs, cm, net.IPv6linklocalallrouters); err != nil {
+			t.Fatalf("failed to send RS: %v", err)
+		}
+
+		// Read a single advertisement and then ensure the advertiser can be halted.
+		_, _, _, err := cctx.c.ReadFrom()
+		if nerr, ok := err.(net.Error); !ok || !nerr.Timeout() {
+			t.Fatalf("expected timeout error, but got: %#v", err)
+		}
+	})
+	defer done()
+}
+
 func TestAdvertiserLinuxContextCanceled(t *testing.T) {
-	ad, _, _, done := testAdvertiser(t, nil, nil)
+	ad, _, done := testAdvertiser(t, nil, nil)
 	defer done()
 
 	timer := time.AfterFunc(5*time.Second, func() {
@@ -259,7 +286,7 @@ func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 }
 
 func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
-	ad, _, _, done := testAdvertiser(t, nil, nil)
+	ad, _, done := testAdvertiser(t, nil, nil)
 	defer done()
 
 	// Capture the IPv6 autoconfiguration state while the advertiser is running
@@ -312,7 +339,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 		}
 
 		// Forwarding is disabled after the first RA arrives.
-		if err := setIPv6Forwarding(cctx.routerIface, false); err != nil {
+		if err := setIPv6Forwarding(cctx.router.Name, false); err != nil {
 			t.Fatalf("failed to disable IPv6 forwarding: %v", err)
 		}
 
@@ -360,7 +387,7 @@ type testConfig struct {
 	vethConfig func(t *testing.T, veth0, veth1 string)
 }
 
-func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Advertiser, *ndp.Conn, net.HardwareAddr, func()) {
+func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Advertiser, *clientContext, func()) {
 	t.Helper()
 
 	if runtime.GOOS != "linux" {
@@ -412,12 +439,17 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to create advertiser: %v", err)
 	}
 
-	ifi, err := net.InterfaceByName(veth1)
+	router, err := net.InterfaceByName(veth0)
 	if err != nil {
-		t.Skipf("skipping, failed to look up second veth: %v", err)
+		t.Fatalf("failed to look up router veth: %v", err)
 	}
 
-	c, _, err := ndp.Dial(ifi, ndp.LinkLocal)
+	client, err := net.InterfaceByName(veth1)
+	if err != nil {
+		t.Fatalf("failed to look up client veth: %v", err)
+	}
+
+	c, _, err := ndp.Dial(client, ndp.LinkLocal)
 	if err != nil {
 		t.Fatalf("failed to create NDP client connection: %v", err)
 	}
@@ -435,6 +467,18 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to set client read deadline: %v", err)
 	}
 
+	cctx := &clientContext{
+		c: c,
+		rs: &ndp.RouterSolicitation{
+			Options: []ndp.Option{&ndp.LinkLayerAddress{
+				Direction: ndp.Source,
+				Addr:      client.HardwareAddr,
+			}},
+		},
+		router: router,
+		client: client,
+	}
+
 	done := func() {
 		if err := c.Close(); err != nil {
 			t.Fatalf("failed to close NDP router solicitation connection: %v", err)
@@ -444,13 +488,13 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		shell(t, "ip", "link", "del", veth0)
 	}
 
-	return ad, c, ifi.HardwareAddr, done
+	return ad, cctx, done
 }
 
 type clientContext struct {
-	c           *ndp.Conn
-	rs          *ndp.RouterSolicitation
-	routerIface string
+	c              *ndp.Conn
+	rs             *ndp.RouterSolicitation
+	router, client *net.Interface
 }
 
 // testAdvertiserClient is a wrapper around testAdvertiser which focuses on
@@ -463,7 +507,7 @@ func testAdvertiserClient(
 ) (*Advertiser, func()) {
 	t.Helper()
 
-	ad, c, mac, adDone := testAdvertiser(t, cfg, tcfg)
+	ad, cctx, adDone := testAdvertiser(t, cfg, tcfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -479,16 +523,7 @@ func testAdvertiserClient(
 	// Run the advertiser and invoke the client's input function with some
 	// context for the test, while also allowing the client to cancel the
 	// advertiser run loop.
-	fn(cancel, &clientContext{
-		c: c,
-		rs: &ndp.RouterSolicitation{
-			Options: []ndp.Option{&ndp.LinkLayerAddress{
-				Direction: ndp.Source,
-				Addr:      mac,
-			}},
-		},
-		routerIface: ad.ifi.Name,
-	})
+	fn(cancel, cctx)
 
 	done := func() {
 		cancel()

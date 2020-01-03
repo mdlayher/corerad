@@ -95,6 +95,12 @@ func NewAdvertiser(cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) 
 		return nil, fmt.Errorf("failed to apply ICMPv6 filter: %v", err)
 	}
 
+	// Enable inspection of IPv6 control messages.
+	flags := ipv6.FlagHopLimit
+	if err := c.SetControlMessage(flags, true); err != nil {
+		return nil, fmt.Errorf("failed to apply IPv6 control message flags: %v", err)
+	}
+
 	// We are now a router.
 	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
 		return nil, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
@@ -270,7 +276,7 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 		default:
 		}
 
-		m, _, host, err := a.c.ReadFrom()
+		m, cm, host, err := a.c.ReadFrom()
 		if err != nil {
 			if ctx.Err() != nil {
 				// Context canceled.
@@ -293,6 +299,14 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 
 		if _, ok := m.(*ndp.RouterSolicitation); !ok {
 			a.logf("received NDP message of type %T, ignoring", m)
+			a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+			continue
+		}
+
+		// Ensure this message has a valid hop limit.
+		if cm.HopLimit != ndp.HopLimit {
+			a.logf("received NDP message with IPv6 hop limit %d, ignoring", cm.HopLimit)
+			a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
 			continue
 		}
 
