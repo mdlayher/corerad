@@ -291,7 +291,15 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 			continue
 		}
 
-		// Issue a unicast RA.
+		// Issue a unicast RA for clients with valid addresses, or a multicast
+		// RA for any client contacting us via the IPv6 unspecified address,
+		// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
+		// TODO: see if it's possible to make Linux send from an unspecified
+		// address so we can test this fully.
+		if host.Equal(net.IPv6unspecified) {
+			host = net.IPv6linklocalallnodes
+		}
+
 		// TODO: consider checking for numerous RS in succession and issuing
 		// a multicast RA in response.
 		reqC <- request{IP: host}
