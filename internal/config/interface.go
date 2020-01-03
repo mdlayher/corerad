@@ -77,7 +77,7 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 	}
 
 	if hopLimit < 0 || hopLimit > 255 {
-		return nil, fmt.Errorf("hop limit (%d) must be between 0 and 255", ifi.HopLimit)
+		return nil, fmt.Errorf("hop limit (%d) must be between 0 and 255", hopLimit)
 	}
 
 	lifetime, err := parseDefaultLifetime(ifi.DefaultLifetime, maxInterval)
