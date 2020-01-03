@@ -343,16 +343,10 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 			continue
 		}
 
+		// Ensure that we space out multicast RAs as required by the RFC.
 		var delay time.Duration
-		if lastMulticast.IsZero() {
-			// We have not sent any multicast RAs; no delay.
-			delay = 0
-		} else {
-			// Ensure that we space out multicast RAs as required by the RFC.
-			delay = time.Since(lastMulticast)
-			if delay < minDelayBetweenRAs {
-				delay = minDelayBetweenRAs
-			}
+		if !lastMulticast.IsZero() && time.Since(lastMulticast) < minDelayBetweenRAs {
+			delay = minDelayBetweenRAs
 		}
 
 		// Ready to send this multicast RA.
