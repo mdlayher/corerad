@@ -4,14 +4,24 @@ import (
 	"container/heap"
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 )
 
+// Although unnecessary, explicit break labels should be used in all select
+// statements in this package so that test coverage tools are able to identify
+// which cases have been triggered.
+
 // A Group is a goroutine worker pool which schedules tasks to be performed
 // after a specified time. A Group must be created with the New constructor.
+// Once Wait is called, New must be called to create a new Group to schedule
+// more tasks.
 type Group struct {
+	// Atomics must come first per sync/atomic.
+	waiting *uint32
+
 	// Context/cancelation support.
 	ctx    context.Context
 	cancel func()
@@ -33,6 +43,8 @@ func New(ctx context.Context) *Group {
 	mctx, cancel := context.WithCancel(ctx)
 
 	g := &Group{
+		waiting: new(uint32),
+
 		ctx:    ctx,
 		cancel: cancel,
 
@@ -43,7 +55,10 @@ func New(ctx context.Context) *Group {
 	}
 
 	g.eg.Go(func() error {
-		return g.monitor(mctx)
+		// Monitor returns no errors because we shouldn't expose its internal
+		// state to the caller.
+		g.monitor(mctx)
+		return nil
 	})
 
 	return g
@@ -52,13 +67,21 @@ func New(ctx context.Context) *Group {
 // Delay schedules a function to run at or after the specified delay. Delay
 // is a convenience wrapper for Schedule which adds delay to the current time.
 // Specifying a negative delay will cause the task to be scheduled immediately.
+//
+// If Delay is called after a call to Wait, Delay will panic.
 func (g *Group) Delay(delay time.Duration, fn func() error) {
 	g.Schedule(time.Now().Add(delay), fn)
 }
 
 // Schedule schedules a function to run at or after the specified time.
 // Specifying a past time will cause the task to be scheduled immediately.
+//
+// If Schedule is called after a call to Wait, Schedule will panic.
 func (g *Group) Schedule(when time.Time, fn func() error) {
+	if atomic.LoadUint32(g.waiting) != 0 {
+		panic("schedgroup: attempted to schedule task after Group.Wait was called")
+	}
+
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -70,15 +93,24 @@ func (g *Group) Schedule(when time.Time, fn func() error) {
 	// Notify monitor that a new task has been pushed on to the heap.
 	select {
 	case g.addC <- struct{}{}:
+		break
 	default:
+		break
 	}
 }
 
 // Wait waits for the completion of all scheduled tasks, or for cancelation of
 // the context passed to New.
+//
+// Once Wait is called, any further calls to Delay or Schedule will panic. If
+// Wait is called more than once, Wait will panic.
 func (g *Group) Wait() error {
-	// Tick and wait repeatedly to see if the monitor goroutine has consumed
-	// and processed all of the available work.
+	if v := atomic.SwapUint32(g.waiting, 1); v != 0 {
+		panic("schedgroup: multiple calls to Group.Wait")
+	}
+
+	// Wait on context cancelation or for the number of items in the heap
+	// to reach 0.
 	var n int
 	for {
 		select {
@@ -102,25 +134,25 @@ func (g *Group) Wait() error {
 
 // monitor triggers tasks at the interval specified by g.Interval until ctx
 // is canceled.
-func (g *Group) monitor(ctx context.Context) error {
+func (g *Group) monitor(ctx context.Context) {
 	t := time.NewTimer(0)
 	defer t.Stop()
 
 	for {
 		if ctx.Err() != nil {
 			// Context canceled.
-			return nil
+			return
 		}
 
 		now := time.Now()
-		var tick <-chan time.Time
+		var tickC <-chan time.Time
 
 		// Start any tasks that are ready as of now.
 		next := g.trigger(now)
 		if !next.IsZero() {
 			// Wait until the next scheduled task is ready.
 			t.Reset(next.Sub(now))
-			tick = t.C
+			tickC = t.C
 		} else {
 			t.Stop()
 		}
@@ -128,11 +160,13 @@ func (g *Group) monitor(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			// Context canceled.
-			return nil
+			return
 		case <-g.addC:
 			// A new task was added, check task heap again.
-		case <-tick:
+			break
+		case <-tickC:
 			// An existing task should be ready as of now.
+			break
 		}
 	}
 }
@@ -146,7 +180,10 @@ func (g *Group) trigger(now time.Time) time.Time {
 		// appropriate.
 		select {
 		case g.lenC <- g.tasks.Len():
+			break
 		default:
+			// Wait hasn't been called.
+			break
 		}
 
 		g.mu.Unlock()

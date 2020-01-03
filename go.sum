@@ -42,6 +42,8 @@ github.com/mdlayher/schedgroup v0.0.0-20200101222405-a5b3c0848281 h1:zGKnhZS7SaB
 github.com/mdlayher/schedgroup v0.0.0-20200101222405-a5b3c0848281/go.mod h1:FQcKdUv7icrSRGPHekRFjUekg8ZiSIlKR1DoPqadQEA=
 github.com/mdlayher/schedgroup v0.0.0-20200101224931-82199ac8181e h1:/4lPq3+iLKNrCkvO0LANYDzuLQ95iKL53IyMzCO2DPs=
 github.com/mdlayher/schedgroup v0.0.0-20200101224931-82199ac8181e/go.mod h1:FQcKdUv7icrSRGPHekRFjUekg8ZiSIlKR1DoPqadQEA=
+github.com/mdlayher/schedgroup v0.0.0-20200103172019-b268ad58cd77 h1:/CAIu6UqM3mp1WXL9alQBZ8WWlNiXhZiB4o5PEehkMo=
+github.com/mdlayher/schedgroup v0.0.0-20200103172019-b268ad58cd77/go.mod h1:FQcKdUv7icrSRGPHekRFjUekg8ZiSIlKR1DoPqadQEA=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
