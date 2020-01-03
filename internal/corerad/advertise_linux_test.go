@@ -252,13 +252,11 @@ func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 			t.Fatalf("failed to set client deadline: %v", err)
 		}
 
-		// Bad hop limit.
 		cm := &ipv6.ControlMessage{HopLimit: ndp.HopLimit - 1}
 		if err := cctx.c.WriteTo(cctx.rs, cm, net.IPv6linklocalallrouters); err != nil {
 			t.Fatalf("failed to send RS: %v", err)
 		}
 
-		// Read a single advertisement and then ensure the advertiser can be halted.
 		_, _, _, err := cctx.c.ReadFrom()
 		if nerr, ok := err.(net.Error); !ok || !nerr.Timeout() {
 			t.Fatalf("expected timeout error, but got: %#v", err)
