@@ -52,6 +52,11 @@ hop_limit = 64
 # or the value "auto" will compute a sane default.
 default_lifetime = "auto"
 
+# AdvLinkMTU: attaches a NDP MTU option to the router advertisement, so clients
+# can set their link MTU as recommended by the router. 0 means this value is
+# unspecified by this router.
+mtu = 0
+
   # Zero or more plugins may be specified to modify the behavior of the router
   # advertisements produced by CoreRAD.
 
@@ -99,11 +104,6 @@ default_lifetime = "auto"
   # should be used forever.
   lifetime = "auto"
   domain_names = ["foo.example.com"]
-
-  # "mtu" plugin: attaches a NDP MTU option to the router advertisement.
-  [[interfaces.plugins]]
-  name = "mtu"
-  mtu = 1500
 
 # Enable or disable the debug HTTP server for facilities such as Prometheus
 # metrics and pprof support.

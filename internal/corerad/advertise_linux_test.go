@@ -40,6 +40,7 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 	// appropriately over the wire.
 	cfg := &config.Interface{
 		OtherConfig: true,
+		MTU:         1500,
 		Plugins: []plugin.Plugin{
 			&plugin.DNSSL{
 				Lifetime: 10 * time.Second,
@@ -50,7 +51,6 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 					"🔥.example.com",
 				},
 			},
-			newMTU(1500),
 			&plugin.Prefix{
 				Prefix:            mustCIDR("2001:db8::/32"),
 				OnLink:            true,
@@ -89,7 +89,6 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 					"🔥.example.com",
 				},
 			},
-			ndp.NewMTU(1500),
 			&ndp.PrefixInformation{
 				PrefixLength:      32,
 				OnLink:            true,
@@ -104,6 +103,7 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 					mustIP("2001:db8::2"),
 				},
 			},
+			ndp.NewMTU(1500),
 			&ndp.LinkLayerAddress{
 				Direction: ndp.Source,
 				Addr:      ad.ifi.HardwareAddr,
@@ -630,11 +630,6 @@ func mustCIDR(s string) *net.IPNet {
 	}
 
 	return ipn
-}
-
-func newMTU(i int) *plugin.MTU {
-	m := plugin.MTU(i)
-	return &m
 }
 
 func panicf(format string, a ...interface{}) {

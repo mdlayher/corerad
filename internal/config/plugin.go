@@ -46,8 +46,6 @@ func parsePlugin(iface Interface, md toml.MetaData, m map[string]toml.Primitive)
 	switch name {
 	case "dnssl":
 		p, err = parseDNSSL(iface, md, m)
-	case "mtu":
-		p, err = parseMTU(md, m)
 	case "prefix":
 		p, err = parsePrefix(md, m)
 	case "rdnss":
@@ -157,31 +155,6 @@ func validatePrefix(p *plugin.Prefix) error {
 	}
 
 	return nil
-}
-
-// parseMTU parses a MTU plugin.
-func parseMTU(md toml.MetaData, mp map[string]toml.Primitive) (*plugin.MTU, error) {
-	var m plugin.MTU
-	for k := range mp {
-		var v value
-		if err := md.PrimitiveDecode(mp[k], &v.v); err != nil {
-			return nil, err
-		}
-
-		switch k {
-		case "mtu":
-			// Loopback has an MTU of 65536 on Linux. Good enough?
-			m = plugin.MTU(v.Int(0, 65536))
-		default:
-			return nil, fmt.Errorf("invalid key %q", k)
-		}
-
-		if err := v.Err(); err != nil {
-			return nil, fmt.Errorf("parsing key %q: %v", k, err)
-		}
-	}
-
-	return &m, nil
 }
 
 // parseRDNSS parses a RDNSS plugin.

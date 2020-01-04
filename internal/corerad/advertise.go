@@ -435,13 +435,15 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 		RetransmitTimer:      ifi.RetransmitTimer,
 	}
 
-	// TODO plugin cancelation.
-	var err error
 	for _, p := range ifi.Plugins {
-		ra, err = p.Apply(ra)
-		if err != nil {
-			return nil, err
+		if err := p.Apply(ra); err != nil {
+			return nil, fmt.Errorf("failed to apply plugin %q: %v", p.Name(), err)
 		}
+	}
+
+	// Apply MTU option if set.
+	if ifi.MTU != 0 {
+		ra.Options = append(ra.Options, ndp.NewMTU(uint32(ifi.MTU)))
 	}
 
 	// TODO: apparently it is also valid to omit this, but we can think

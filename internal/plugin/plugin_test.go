@@ -49,11 +49,6 @@ func TestPluginString(t *testing.T) {
 			s: "::/64 [on-link, autonomous], preferred: 15m0s, valid: infinite",
 		},
 		{
-			name: "MTU",
-			p:    newMTU(1500),
-			s:    "MTU: 1500",
-		},
-		{
 			name: "RDNSS",
 			p: &RDNSS{
 				Lifetime: 30 * time.Second,
@@ -176,17 +171,6 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "MTU",
-			plugins: []Plugin{
-				newMTU(1500),
-			},
-			ra: &ndp.RouterAdvertisement{
-				Options: []ndp.Option{
-					ndp.NewMTU(1500),
-				},
-			},
-		},
-		{
 			name: "RDNSS",
 			plugins: []Plugin{
 				&RDNSS{
@@ -213,17 +197,14 @@ func TestBuild(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := new(ndp.RouterAdvertisement)
-
-			var err error
+			ra := new(ndp.RouterAdvertisement)
 			for _, p := range tt.plugins {
-				got, err = p.Apply(got)
-				if err != nil {
+				if err := p.Apply(ra); err != nil {
 					t.Fatalf("failed to apply %q: %v", p.Name(), err)
 				}
 			}
 
-			if diff := cmp.Diff(tt.ra, got); diff != "" {
+			if diff := cmp.Diff(tt.ra, ra); diff != "" {
 				t.Fatalf("unexpected RA (-want +got):\n%s", diff)
 			}
 
@@ -247,11 +228,6 @@ func mustCIDR(s string) *net.IPNet {
 	}
 
 	return ipn
-}
-
-func newMTU(i int) *MTU {
-	m := MTU(i)
-	return &m
 }
 
 func panicf(format string, a ...interface{}) {

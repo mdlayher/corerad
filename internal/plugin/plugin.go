@@ -33,9 +33,8 @@ type Plugin interface {
 	// Prepare prepares a Plugin for use with the specified network interface.
 	Prepare(ifi *net.Interface) error
 
-	// Apply applies Plugin data to the input RA, producing either a modified
-	// RA or a nil response, which means to terminate the request.
-	Apply(ra *ndp.RouterAdvertisement) (*ndp.RouterAdvertisement, error)
+	// Apply applies Plugin data to the input RA.
+	Apply(ra *ndp.RouterAdvertisement) error
 }
 
 // DNSSL configures a NDP DNS Search List option.
@@ -57,31 +56,13 @@ func (d *DNSSL) String() string {
 func (*DNSSL) Prepare(_ *net.Interface) error { return nil }
 
 // Apply implements Plugin.
-func (d *DNSSL) Apply(ra *ndp.RouterAdvertisement) (*ndp.RouterAdvertisement, error) {
+func (d *DNSSL) Apply(ra *ndp.RouterAdvertisement) error {
 	ra.Options = append(ra.Options, &ndp.DNSSearchList{
 		Lifetime:    d.Lifetime,
 		DomainNames: d.DomainNames,
 	})
 
-	return ra, nil
-}
-
-// MTU configures a NDP MTU option.
-type MTU int
-
-// Name implements Plugin.
-func (m *MTU) Name() string { return "mtu" }
-
-// String implements Plugin.
-func (m *MTU) String() string { return fmt.Sprintf("MTU: %d", *m) }
-
-// Prepare implements Plugin.
-func (*MTU) Prepare(_ *net.Interface) error { return nil }
-
-// Apply implements Plugin.
-func (m *MTU) Apply(ra *ndp.RouterAdvertisement) (*ndp.RouterAdvertisement, error) {
-	ra.Options = append(ra.Options, ndp.NewMTU(uint32(*m)))
-	return ra, nil
+	return nil
 }
 
 // A Prefix configures a NDP Prefix Information option.
@@ -134,7 +115,7 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 }
 
 // Apply implements Plugin.
-func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) (*ndp.RouterAdvertisement, error) {
+func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 	length, _ := p.Prefix.Mask.Size()
 
 	var prefixes []net.IP
@@ -143,7 +124,7 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) (*ndp.RouterAdvertisement, e
 		// length on this interface.
 		addrs, err := p.Addrs()
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch IP addresses: %v", err)
+			return fmt.Errorf("failed to fetch IP addresses: %v", err)
 		}
 
 		seen := make(map[string]struct{})
@@ -189,7 +170,7 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) (*ndp.RouterAdvertisement, e
 		})
 	}
 
-	return ra, nil
+	return nil
 }
 
 // RDNSS configures a NDP Recursive DNS Servers option.
@@ -216,13 +197,13 @@ func (r *RDNSS) String() string {
 func (*RDNSS) Prepare(_ *net.Interface) error { return nil }
 
 // Apply implements Plugin.
-func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) (*ndp.RouterAdvertisement, error) {
+func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
 	ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{
 		Lifetime: r.Lifetime,
 		Servers:  r.Servers,
 	})
 
-	return ra, nil
+	return nil
 }
 
 // durString converts a time.Duration into a string while also recognizing

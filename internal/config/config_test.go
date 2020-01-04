@@ -113,6 +113,7 @@ func TestParse(t *testing.T) {
 			min_interval = "6m"
 			hop_limit = 64
 			default_lifetime = "auto"
+			mtu = 1500
 
 			  [[interfaces.plugins]]
 			  name = "prefix"
@@ -263,10 +264,6 @@ func TestParseDefaults(t *testing.T) {
 		  [[interfaces.plugins]]
 		  name = "dnssl"
 		  domain_names = ["foo.example.com"]
-
-		  [[interfaces.plugins]]
-		  name = "mtu"
-		  mtu = 1500
 
 		[debug]
 		address = "localhost:9430"

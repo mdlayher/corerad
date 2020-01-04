@@ -230,47 +230,6 @@ func Test_parsePrefix(t *testing.T) {
 	}
 }
 
-func Test_parseMTU(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		s    string
-		m    *plugin.MTU
-		ok   bool
-	}{
-		{
-			name: "unknown key",
-			s: `
-			name = "mtu"
-			bad = true
-			`,
-		},
-		{
-			name: "bad",
-			s: `
-			name = "mtu"
-			mtu = 99999999
-			`,
-		},
-		{
-			name: "OK",
-			s: `
-			name = "mtu"
-			mtu = 1500
-			`,
-			m:  newMTU(1500),
-			ok: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pluginDecode(t, tt.s, tt.ok, tt.m)
-		})
-	}
-}
-
 func Test_parseRDNSS(t *testing.T) {
 	t.Parallel()
 
@@ -379,9 +338,4 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("unexpected Plugin (-want +got):\n%s", diff)
 	}
-}
-
-func newMTU(i int) *plugin.MTU {
-	m := plugin.MTU(i)
-	return &m
 }

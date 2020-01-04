@@ -124,6 +124,18 @@ func Test_parseInterfaceErrors(t *testing.T) {
 				DefaultLifetime: strp("9001s"),
 			},
 		},
+		{
+			name: "MTU too low",
+			ifi: rawInterface{
+				MTU: -1,
+			},
+		},
+		{
+			name: "MTU too high",
+			ifi: rawInterface{
+				MTU: 65537,
+			},
+		},
 	}
 
 	for _, tt := range tests {
