@@ -109,6 +109,20 @@ func (g *Group) Wait() error {
 		panic("schedgroup: multiple calls to Group.Wait")
 	}
 
+	// Context cancelation takes priority.
+	if err := g.ctx.Err(); err != nil {
+		return err
+	}
+
+	// See if the task heap is already empty. If so, we can exit early.
+	g.mu.Lock()
+	if g.tasks.Len() == 0 {
+		defer g.mu.Unlock()
+		g.cancel()
+		return g.eg.Wait()
+	}
+	g.mu.Unlock()
+
 	// Wait on context cancelation or for the number of items in the heap
 	// to reach 0.
 	var n int
