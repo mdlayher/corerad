@@ -33,7 +33,7 @@ import (
 
 // An Advertiser sends NDP router advertisements.
 type Advertiser struct {
-	c        *ndp.Conn
+	c        conn
 	ifi      *net.Interface
 	ip       net.IP
 	autoPrev bool
@@ -42,6 +42,19 @@ type Advertiser struct {
 
 	ll *log.Logger
 	mm *AdvertiserMetrics
+
+	// Test hooks.
+	getIPv6Forwarding func(iface string) (bool, error)
+	setIPv6Autoconf   func(iface string, enable bool) (bool, error)
+}
+
+// A conn is a wrapper around *ndp.Conn which enables simulated testing.
+type conn interface {
+	Close() error
+	ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
+	LeaveGroup(group net.IP) error
+	SetReadDeadline(t time.Time) error
+	WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error
 }
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
@@ -111,6 +124,10 @@ func NewAdvertiser(ifi *net.Interface, cfg config.Interface, ll *log.Logger, mm 
 
 		ll: ll,
 		mm: mm,
+
+		// Configure actual system parameters by default.
+		getIPv6Forwarding: getIPv6Forwarding,
+		setIPv6Autoconf:   setIPv6Autoconf,
 	}, nil
 }
 
@@ -194,7 +211,7 @@ func (a *Advertiser) shutdown() error {
 	}
 
 	// If possible, restore the previous IPv6 autoconfiguration state.
-	if _, err := setIPv6Autoconf(a.ifi.Name, a.autoPrev); err != nil {
+	if _, err := a.setIPv6Autoconf(a.ifi.Name, a.autoPrev); err != nil {
 		if errors.Is(err, os.ErrPermission) {
 			// Continue anyway but provide a hint.
 			a.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
@@ -408,7 +425,7 @@ func (a *Advertiser) send(dst net.IP, cfg config.Interface) error {
 	// If the interface is not forwarding packets, we must set the router
 	// lifetime field to zero, per:
 	//  https://tools.ietf.org/html/rfc4861#section-6.2.5.
-	forwarding, err := getIPv6Forwarding(a.ifi.Name)
+	forwarding, err := a.getIPv6Forwarding(a.ifi.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get IPv6 forwarding state: %v", err)
 	}
