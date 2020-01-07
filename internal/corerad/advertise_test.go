@@ -200,11 +200,10 @@ type testConn struct {
 	ctx    context.Context
 	cancel func()
 
-	close           func() error
-	readFrom        func() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
-	leaveGroup      func(group net.IP) error
-	setReadDeadline func(t time.Time) error
-	writeTo         func(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error
+	close      func() error
+	readFrom   func() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
+	leaveGroup func(group net.IP) error
+	writeTo    func(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error
 }
 
 func (c *testConn) Close() error {
