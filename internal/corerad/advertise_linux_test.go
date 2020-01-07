@@ -379,6 +379,54 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 	}
 }
 
+func TestAdvertiserLinuxSLAAC(t *testing.T) {
+	// No configuration, bare minimum router advertisement.
+	tcfg := &testConfig{
+		vethConfig: func(t *testing.T, _, veth1 string) {
+			// Ensure SLAAC can be used on the client interface.
+			mustSysctl(t, veth1, "autoconf", "1")
+		},
+	}
+
+	prefix := mustCIDR("2001:db8:dead:beef::/64")
+
+	pfx := plugin.NewPrefix()
+	pfx.Prefix = prefix
+
+	icfg := &config.Interface{
+		Plugins: []plugin.Plugin{pfx},
+	}
+
+	_, done := testAdvertiserClient(t, icfg, tcfg, func(cancel func(), cctx *clientContext) {
+		// Consume the initial multicast router advertisement.
+		if _, _, _, err := cctx.c.ReadFrom(); err != nil {
+			t.Fatalf("failed to read RA: %v", err)
+		}
+
+		// And verify that SLAAC addresses were added to the interface.
+		addrs, err := cctx.client.Addrs()
+		if err != nil {
+			t.Fatalf("failed to get interface addresses: %v", err)
+		}
+
+		for _, a := range addrs {
+			// Skip non IP and link-local addresses.
+			a, ok := a.(*net.IPNet)
+			if !ok || a.IP.IsLinkLocalUnicast() {
+				continue
+			}
+
+			// Verify all addresses reside within prefix.
+			if !prefix.Contains(a.IP) {
+				t.Fatalf("prefix %s does not contain address %s", prefix, a.IP)
+			}
+
+			t.Logf("IP: %s", a)
+		}
+	})
+	defer done()
+}
+
 type testConfig struct {
 	// An optional hook which can be used to apply additional configuration to
 	// the test veth interfaces before they are brought up.
