@@ -679,7 +679,3 @@ func mustCIDR(s string) *net.IPNet {
 
 	return ipn
 }
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
-}

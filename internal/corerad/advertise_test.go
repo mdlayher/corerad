@@ -247,3 +247,7 @@ func (c *testConn) SetReadDeadline(t time.Time) error {
 func (c *testConn) WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error {
 	return c.writeTo(m, cm, dst)
 }
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
+}
