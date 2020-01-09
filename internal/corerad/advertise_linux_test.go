@@ -299,6 +299,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 
 	var eg errgroup.Group
 	eg.Go(func() error {
+		// TODO: hook into internal state?
 		if err := ad.Advertise(ctx); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
@@ -318,7 +319,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 
 	// Expect the advertiser to disable IPv6 autoconfiguration and re-enable
 	// it once it's done.
-	if diff := cmp.Diff([]bool{false, true}, []bool{start, end}); diff != "" {
+	if diff := cmp.Diff([]bool{true, true}, []bool{start, end}); diff != "" {
 		t.Fatalf("unexpected IPv6 autoconfiguration states (-want +got):\n%s", diff)
 	}
 }
