@@ -485,10 +485,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to look up router veth: %v", err)
 	}
 
-	ad, err := NewAdvertiser(router, *cfg, nil, nil)
-	if err != nil {
-		t.Fatalf("failed to create advertiser: %v", err)
-	}
+	ad := NewAdvertiser(router, *cfg, nil, nil)
 
 	client, err := net.InterfaceByName(veth1)
 	if err != nil {

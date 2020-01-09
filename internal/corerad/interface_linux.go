@@ -23,24 +23,9 @@ import (
 )
 
 // setIPv6Autoconf enables or disables IPv6 autoconfiguration for the
-// given interface on Linux systems, returning the previous state of the
-// interface so it can be restored at a later time.
-func setIPv6Autoconf(iface string, enable bool) (bool, error) {
-	// The calling function can provide additional insight and we need to check
-	// for permission errors, so no need to wrap these errors.
-
-	// Read the current state before setting a new one.
-	prev, err := getIPv6Autoconf(iface)
-	if err != nil {
-		return false, err
-	}
-
-	if err := sysctlEnable(iface, "autoconf", enable); err != nil {
-		return false, err
-	}
-
-	// Return the previous state so the caller can restore it later.
-	return prev, nil
+// given interface on Linux systems.
+func setIPv6Autoconf(iface string, enable bool) error {
+	return sysctlEnable(iface, "autoconf", enable)
 }
 
 // getIPv6Autoconf fetches the current IPv6 autoconfiguration state for the

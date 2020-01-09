@@ -17,7 +17,7 @@ package corerad
 
 // These functions are no-op on non-Linux platforms.
 
-func setIPv6Autoconf(_ string, _ bool) (bool, error) { return false, nil }
+func setIPv6Autoconf(_ string, _ bool) error { return nil }
 
 func getIPv6Autoconf(_ string) (bool, error) { return false, nil }
 

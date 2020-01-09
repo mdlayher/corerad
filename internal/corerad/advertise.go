@@ -33,33 +33,35 @@ import (
 
 // An Advertiser sends NDP router advertisements.
 type Advertiser struct {
-	c        conn
-	ifi      *net.Interface
-	ip       net.IP
-	autoPrev bool
+	c conn
 
+	ifi *net.Interface
 	cfg config.Interface
-
-	ll *log.Logger
-	mm *AdvertiserMetrics
+	ll  *log.Logger
+	mm  *AdvertiserMetrics
 
 	// Test hooks.
+	dial              func(ifi *net.Interface) (conn, net.IP, error)
 	getIPv6Forwarding func(iface string) (bool, error)
-	setIPv6Autoconf   func(iface string, enable bool) (bool, error)
+	getIPv6Autoconf   func(iface string) (bool, error)
+	setIPv6Autoconf   func(iface string, enable bool) error
 }
 
 // A conn is a wrapper around *ndp.Conn which enables simulated testing.
 type conn interface {
 	Close() error
-	ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
+	JoinGroup(group net.IP) error
 	LeaveGroup(group net.IP) error
+	ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
+	SetControlMessage(flags ipv6.ControlFlags, on bool) error
+	SetICMPFilter(f *ipv6.ICMPFilter) error
 	SetReadDeadline(t time.Time) error
 	WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error
 }
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded. If mm is nil, metrics are discarded.
-func NewAdvertiser(ifi *net.Interface, cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) (*Advertiser, error) {
+func NewAdvertiser(ifi *net.Interface, cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) *Advertiser {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
@@ -67,68 +69,21 @@ func NewAdvertiser(ifi *net.Interface, cfg config.Interface, ll *log.Logger, mm 
 		mm = NewAdvertiserMetrics(nil)
 	}
 
-	// We can now initialize any plugins that rely on dynamic information
-	// about the network interface.
-	for _, p := range cfg.Plugins {
-		if err := p.Prepare(ifi); err != nil {
-			return nil, fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
-		}
-	}
-
-	// If possible, disable IPv6 autoconfiguration on this interface so that
-	// our RAs don't configure more IP addresses on this interface.
-	autoPrev, err := setIPv6Autoconf(ifi.Name, false)
-	if err != nil {
-		if errors.Is(err, os.ErrPermission) {
-			// Continue anyway but provide a hint.
-			ll.Printf("%s: permission denied while disabling IPv6 autoconfiguration, continuing anyway (try setting CAP_NET_ADMIN)", ifi.Name)
-			mm.ErrorsTotal.WithLabelValues(ifi.Name, "configuration").Inc()
-		} else {
-			return nil, fmt.Errorf("failed to disable IPv6 autoconfiguration on %q: %v", ifi.Name, err)
-		}
-	}
-
-	c, ip, err := ndp.Dial(ifi, ndp.LinkLocal)
-	if err != nil {
-		// Explicitly wrap this error for caller.
-		return nil, fmt.Errorf("failed to create NDP listener: %w", err)
-	}
-
-	// We only want to accept router solicitation messages.
-	var f ipv6.ICMPFilter
-	f.SetAll(true)
-	f.Accept(ipv6.ICMPTypeRouterSolicitation)
-
-	if err := c.SetICMPFilter(&f); err != nil {
-		return nil, fmt.Errorf("failed to apply ICMPv6 filter: %v", err)
-	}
-
-	// Enable inspection of IPv6 control messages.
-	flags := ipv6.FlagHopLimit
-	if err := c.SetControlMessage(flags, true); err != nil {
-		return nil, fmt.Errorf("failed to apply IPv6 control message flags: %v", err)
-	}
-
-	// We are now a router.
-	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
-		return nil, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
-	}
-
 	return &Advertiser{
-		c:        c,
-		ifi:      ifi,
-		ip:       ip,
-		autoPrev: autoPrev,
-
+		ifi: ifi,
 		cfg: cfg,
 
 		ll: ll,
 		mm: mm,
 
 		// Configure actual system parameters by default.
+		dial: func(ifi *net.Interface) (conn, net.IP, error) {
+			return ndp.Dial(ifi, ndp.LinkLocal)
+		},
 		getIPv6Forwarding: getIPv6Forwarding,
+		getIPv6Autoconf:   getIPv6Autoconf,
 		setIPv6Autoconf:   setIPv6Autoconf,
-	}, nil
+	}
 }
 
 // A request indicates that a router advertisement should be sent to the
@@ -137,9 +92,16 @@ type request struct {
 	IP net.IP
 }
 
-// Advertise begins router solicitation and advertisement handling. Advertise
-// will block until ctx is canceled or an error occurs.
+// Advertise initializes the configured interface and begins router solicitation
+// and advertisement handling. Advertise will block until ctx is canceled or an
+// error occurs.
 func (a *Advertiser) Advertise(ctx context.Context) error {
+	// TODO: wait for readiness.
+	autoPrev, err := a.init()
+	if err != nil {
+		return fmt.Errorf("failed to wait for initialize %q advertiser: %v", a.ifi.Name, err)
+	}
+
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
@@ -174,18 +136,76 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 		return nil
 	})
 
-	a.logf("initialized, sending router advertisements from %s", a.ip)
-
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("failed to run advertiser: %v", err)
 	}
 
-	return a.shutdown()
+	return a.shutdown(autoPrev)
+}
+
+// init initializes the Advertiser in preparation for handling NDP traffic.
+func (a *Advertiser) init() (bool, error) {
+	// We can now initialize any plugins that rely on dynamic information
+	// about the network interface.
+	for _, p := range a.cfg.Plugins {
+		if err := p.Prepare(a.ifi); err != nil {
+			return false, fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
+		}
+	}
+
+	// If possible, disable IPv6 autoconfiguration on this interface so that
+	// our RAs don't configure more IP addresses on this interface.
+	autoPrev, err := a.getIPv6Autoconf(a.ifi.Name)
+	if err != nil {
+		return false, fmt.Errorf("failed to get IPv6 autoconfiguration state on %q: %v", a.ifi.Name, err)
+	}
+
+	if err := a.setIPv6Autoconf(a.ifi.Name, false); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			// Continue anyway but provide a hint.
+			a.logf("permission denied while disabling IPv6 autoconfiguration, continuing anyway (try setting CAP_NET_ADMIN)")
+			a.mm.ErrorsTotal.WithLabelValues(a.ifi.Name, "configuration").Inc()
+		} else {
+			return false, fmt.Errorf("failed to disable IPv6 autoconfiguration on %q: %v", a.ifi.Name, err)
+		}
+	}
+
+	// Initialize the NDP listener.
+	c, ip, err := a.dial(a.ifi)
+	if err != nil {
+		return false, fmt.Errorf("failed to create NDP listener: %v", err)
+	}
+
+	// We only want to accept router solicitation messages.
+	var f ipv6.ICMPFilter
+	f.SetAll(true)
+	f.Accept(ipv6.ICMPTypeRouterSolicitation)
+
+	if err := c.SetICMPFilter(&f); err != nil {
+		return false, fmt.Errorf("failed to apply ICMPv6 filter: %v", err)
+	}
+
+	// Enable inspection of IPv6 control messages.
+	flags := ipv6.FlagHopLimit
+	if err := c.SetControlMessage(flags, true); err != nil {
+		return false, fmt.Errorf("failed to apply IPv6 control message flags: %v", err)
+	}
+
+	// We are now a router.
+	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
+		return false, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
+	}
+
+	a.c = c
+
+	a.logf("initialized, advertising from %s", ip)
+
+	return autoPrev, nil
 }
 
 // shutdown indicates to hosts that this host is no longer a router and restores
 // the previous state of the interface.
-func (a *Advertiser) shutdown() error {
+func (a *Advertiser) shutdown(autoPrev bool) error {
 	// In general, many of these actions are best-effort and should not halt
 	// shutdown on failure.
 
@@ -211,7 +231,7 @@ func (a *Advertiser) shutdown() error {
 	}
 
 	// If possible, restore the previous IPv6 autoconfiguration state.
-	if _, err := a.setIPv6Autoconf(a.ifi.Name, a.autoPrev); err != nil {
+	if err := a.setIPv6Autoconf(a.ifi.Name, autoPrev); err != nil {
 		if errors.Is(err, os.ErrPermission) {
 			// Continue anyway but provide a hint.
 			a.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
