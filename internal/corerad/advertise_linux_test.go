@@ -106,7 +106,7 @@ func TestAdvertiserLinuxUnsolicited(t *testing.T) {
 			ndp.NewMTU(1500),
 			&ndp.LinkLayerAddress{
 				Direction: ndp.Source,
-				Addr:      ad.ifi.HardwareAddr,
+				Addr:      ad.mac,
 			},
 		},
 	}
@@ -141,7 +141,7 @@ func TestAdvertiserLinuxUnsolicitedShutdown(t *testing.T) {
 
 	options := []ndp.Option{&ndp.LinkLayerAddress{
 		Direction: ndp.Source,
-		Addr:      ad.ifi.HardwareAddr,
+		Addr:      ad.mac,
 	}}
 
 	// Expect only the first message to contain a RouterLifetime field as it
@@ -162,10 +162,16 @@ func TestAdvertiserLinuxUnsolicitedShutdown(t *testing.T) {
 	}
 }
 
-func TestAdvertiserLinuxUnsolicitedDelayed(t *testing.T) {
+func skipShort(t *testing.T) {
+	t.Helper()
+
 	if testing.Short() {
 		t.Skip("skipping in short mode")
 	}
+}
+
+func TestAdvertiserLinuxUnsolicitedDelayed(t *testing.T) {
+	skipShort(t)
 
 	// Configure a variety of plugins to ensure that everything is handled
 	// appropriately over the wire.
@@ -192,7 +198,7 @@ func TestAdvertiserLinuxUnsolicitedDelayed(t *testing.T) {
 		Options: []ndp.Option{
 			&ndp.LinkLayerAddress{
 				Direction: ndp.Source,
-				Addr:      ad.ifi.HardwareAddr,
+				Addr:      ad.mac,
 			},
 		},
 	}
@@ -227,7 +233,7 @@ func TestAdvertiserLinuxSolicited(t *testing.T) {
 	ra := &ndp.RouterAdvertisement{
 		Options: []ndp.Option{&ndp.LinkLayerAddress{
 			Direction: ndp.Source,
-			Addr:      ad.ifi.HardwareAddr,
+			Addr:      ad.mac,
 		}},
 	}
 
@@ -289,7 +295,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 
 	// Capture the IPv6 autoconfiguration state while the advertiser is running
 	// and immediately after it stops.
-	start, err := getIPv6Autoconf(ad.ifi.Name)
+	start, err := getIPv6Autoconf(ad.iface)
 	if err != nil {
 		t.Fatalf("failed to get start state: %v", err)
 	}
@@ -312,7 +318,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 		t.Fatalf("failed to stop advertiser: %v", err)
 	}
 
-	end, err := getIPv6Autoconf(ad.ifi.Name)
+	end, err := getIPv6Autoconf(ad.iface)
 	if err != nil {
 		t.Fatalf("failed to get end state: %v", err)
 	}
@@ -357,7 +363,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 
 	options := []ndp.Option{&ndp.LinkLayerAddress{
 		Direction: ndp.Source,
-		Addr:      ad.ifi.HardwareAddr,
+		Addr:      ad.mac,
 	}}
 
 	// Expect only the first message to contain a RouterLifetime field as it
@@ -428,6 +434,46 @@ func TestAdvertiserLinuxSLAAC(t *testing.T) {
 	defer done()
 }
 
+func TestAdvertiserLinuxReinitialize(t *testing.T) {
+	skipShort(t)
+
+	_, done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
+		if err := cctx.c.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+			t.Fatalf("failed to extend read deadline: %v", err)
+		}
+
+		// Consume the initial multicast router advertisement.
+		if _, _, _, err := cctx.c.ReadFrom(); err != nil {
+			t.Fatalf("failed to read first RA: %v", err)
+		}
+
+		// Now bring the link down so it is not ready, forcing a reinitialization.
+		shell(t, "ip", "link", "set", "down", cctx.router.Name)
+
+		// TODO: shorten timeout once link state is watched.
+		time.AfterFunc(20*time.Second, func() {
+			panic("took too long to reinitialize")
+		})
+
+		// Wait for the reinit process to begin, bring the link up, and wait
+		// for it to end.
+		<-cctx.reinitC
+		shell(t, "ip", "link", "set", "up", cctx.router.Name)
+		<-cctx.reinitC
+
+		// Consume the multicast router advertisement immediately after reinit.
+		m, _, _, err := cctx.c.ReadFrom()
+		if err != nil {
+			t.Fatalf("failed to read second RA: %v", err)
+		}
+
+		if _, ok := m.(*ndp.RouterAdvertisement); !ok {
+			t.Fatalf("expected router advertisement, but got: %#v", m)
+		}
+	})
+	defer done()
+}
+
 type testConfig struct {
 	// An optional hook which can be used to apply additional configuration to
 	// the test veth interfaces before they are brought up.
@@ -486,7 +532,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to look up router veth: %v", err)
 	}
 
-	ad := NewAdvertiser(router, *cfg, nil, nil)
+	ad := NewAdvertiser(router.Name, *cfg, nil, nil)
 
 	client, err := net.InterfaceByName(veth1)
 	if err != nil {
@@ -519,8 +565,9 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 				Addr:      client.HardwareAddr,
 			}},
 		},
-		router: router,
-		client: client,
+		router:  router,
+		client:  client,
+		reinitC: ad.reinitC,
 	}
 
 	done := func() {
@@ -539,6 +586,7 @@ type clientContext struct {
 	c              *ndp.Conn
 	rs             *ndp.RouterSolicitation
 	router, client *net.Interface
+	reinitC        <-chan struct{}
 }
 
 // testAdvertiserClient is a wrapper around testAdvertiser which focuses on

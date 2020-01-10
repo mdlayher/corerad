@@ -33,18 +33,25 @@ import (
 
 // An Advertiser sends NDP router advertisements.
 type Advertiser struct {
-	c conn
+	// Static configuration.
+	iface string
+	cfg   config.Interface
+	ll    *log.Logger
+	mm    *AdvertiserMetrics
 
-	ifi *net.Interface
-	cfg config.Interface
-	ll  *log.Logger
-	mm  *AdvertiserMetrics
+	// Dynamic configuration, set up on each (re)initialization.
+	c   conn
+	mac net.HardwareAddr
 
 	// Test hooks.
 	dial              func(ifi *net.Interface) (conn, net.IP, error)
+	checkInterface    func(iface string) (*net.Interface, error)
 	getIPv6Forwarding func(iface string) (bool, error)
 	getIPv6Autoconf   func(iface string) (bool, error)
 	setIPv6Autoconf   func(iface string, enable bool) error
+
+	// Notifications of internal state change for tests.
+	reinitC chan struct{}
 }
 
 // A conn is a wrapper around *ndp.Conn which enables simulated testing.
@@ -61,7 +68,7 @@ type conn interface {
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded. If mm is nil, metrics are discarded.
-func NewAdvertiser(ifi *net.Interface, cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) *Advertiser {
+func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) *Advertiser {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
@@ -70,19 +77,23 @@ func NewAdvertiser(ifi *net.Interface, cfg config.Interface, ll *log.Logger, mm 
 	}
 
 	return &Advertiser{
-		ifi: ifi,
-		cfg: cfg,
+		iface: iface,
+		cfg:   cfg,
+		ll:    ll,
+		mm:    mm,
 
-		ll: ll,
-		mm: mm,
+		// c and ifi are initialized in a.init.
 
 		// Configure actual system parameters by default.
 		dial: func(ifi *net.Interface) (conn, net.IP, error) {
 			return ndp.Dial(ifi, ndp.LinkLocal)
 		},
+		checkInterface:    checkInterface,
 		getIPv6Forwarding: getIPv6Forwarding,
 		getIPv6Autoconf:   getIPv6Autoconf,
 		setIPv6Autoconf:   setIPv6Autoconf,
+
+		reinitC: make(chan struct{}),
 	}
 }
 
@@ -96,12 +107,50 @@ type request struct {
 // and advertisement handling. Advertise will block until ctx is canceled or an
 // error occurs.
 func (a *Advertiser) Advertise(ctx context.Context) error {
-	// TODO: wait for readiness.
+	// Attempt immediate initialization and fall back to reinit loop if that
+	// does not succeed.
 	autoPrev, err := a.init()
 	if err != nil {
-		return fmt.Errorf("failed to wait for initialize %q advertiser: %v", a.ifi.Name, err)
+		autoPrev, err = a.reinit(ctx, err)
+		if err != nil {
+			// Don't block user shutdown.
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
+
+			return fmt.Errorf("failed to initialize %q advertiser: %w", a.iface, err)
+		}
 	}
 
+	for {
+		err := a.advertise(ctx)
+		switch {
+		case errors.Is(err, context.Canceled):
+			// Intentional shutdown.
+			return a.shutdown(autoPrev)
+		case err == nil:
+			panic("corerad: advertise must never return nil error")
+		}
+
+		// We encountered an error. Try to reinitialize the Advertiser based
+		// on whether or not the error is deemed recoverable.
+		a.logf("error advertising, attempting to reinitialize")
+
+		autoPrev, err = a.reinit(ctx, err)
+		if err != nil {
+			// Don't block user shutdown.
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
+
+			return fmt.Errorf("failed to reinitialize %q advertiser: %v", a.iface, err)
+		}
+	}
+}
+
+// advertise is the internal loop for Advertise which coordinates the various
+// Advertiser goroutines.
+func (a *Advertiser) advertise(ctx context.Context) error {
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
@@ -112,7 +161,7 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 	// at the appropriate times.
 	eg.Go(func() error {
 		if err := a.schedule(ctx, reqC); err != nil {
-			return fmt.Errorf("failed to schedule router advertisements: %v", err)
+			return fmt.Errorf("failed to schedule router advertisements: %w", err)
 		}
 
 		return nil
@@ -120,128 +169,28 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 
 	// Multicast RA generator.
 	eg.Go(func() error {
-		if err := a.multicast(ctx, reqC); err != nil {
-			return fmt.Errorf("failed to multicast: %v", err)
-		}
-
+		a.multicast(ctx, reqC)
 		return nil
 	})
 
 	// Listener which issues RAs in response to RS messages.
 	eg.Go(func() error {
 		if err := a.listen(ctx, reqC); err != nil {
-			return fmt.Errorf("failed to listen: %v", err)
+			return fmt.Errorf("failed to listen: %w", err)
 		}
 
 		return nil
 	})
 
+	// TODO: link state watcher which returns errors for any state change,
+	// forcing these goroutines to cancel and reinitialize.
+
 	if err := eg.Wait(); err != nil {
-		return fmt.Errorf("failed to run advertiser: %v", err)
+		return fmt.Errorf("failed to run advertiser: %w", err)
 	}
 
-	return a.shutdown(autoPrev)
-}
-
-// init initializes the Advertiser in preparation for handling NDP traffic.
-func (a *Advertiser) init() (bool, error) {
-	// We can now initialize any plugins that rely on dynamic information
-	// about the network interface.
-	for _, p := range a.cfg.Plugins {
-		if err := p.Prepare(a.ifi); err != nil {
-			return false, fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
-		}
-	}
-
-	// If possible, disable IPv6 autoconfiguration on this interface so that
-	// our RAs don't configure more IP addresses on this interface.
-	autoPrev, err := a.getIPv6Autoconf(a.ifi.Name)
-	if err != nil {
-		return false, fmt.Errorf("failed to get IPv6 autoconfiguration state on %q: %v", a.ifi.Name, err)
-	}
-
-	if err := a.setIPv6Autoconf(a.ifi.Name, false); err != nil {
-		if errors.Is(err, os.ErrPermission) {
-			// Continue anyway but provide a hint.
-			a.logf("permission denied while disabling IPv6 autoconfiguration, continuing anyway (try setting CAP_NET_ADMIN)")
-			a.mm.ErrorsTotal.WithLabelValues(a.ifi.Name, "configuration").Inc()
-		} else {
-			return false, fmt.Errorf("failed to disable IPv6 autoconfiguration on %q: %v", a.ifi.Name, err)
-		}
-	}
-
-	// Initialize the NDP listener.
-	c, ip, err := a.dial(a.ifi)
-	if err != nil {
-		return false, fmt.Errorf("failed to create NDP listener: %v", err)
-	}
-
-	// We only want to accept router solicitation messages.
-	var f ipv6.ICMPFilter
-	f.SetAll(true)
-	f.Accept(ipv6.ICMPTypeRouterSolicitation)
-
-	if err := c.SetICMPFilter(&f); err != nil {
-		return false, fmt.Errorf("failed to apply ICMPv6 filter: %v", err)
-	}
-
-	// Enable inspection of IPv6 control messages.
-	flags := ipv6.FlagHopLimit
-	if err := c.SetControlMessage(flags, true); err != nil {
-		return false, fmt.Errorf("failed to apply IPv6 control message flags: %v", err)
-	}
-
-	// We are now a router.
-	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
-		return false, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
-	}
-
-	a.c = c
-
-	a.logf("initialized, advertising from %s", ip)
-
-	return autoPrev, nil
-}
-
-// shutdown indicates to hosts that this host is no longer a router and restores
-// the previous state of the interface.
-func (a *Advertiser) shutdown(autoPrev bool) error {
-	// In general, many of these actions are best-effort and should not halt
-	// shutdown on failure.
-
-	// Send a final router advertisement (TODO: more than one) with a router
-	// lifetime of 0 to indicate that hosts should not use this router as a
-	// default router, and then leave the all-routers group.
-	//
-	// a.cfg is copied in case any delayed send workers are outstanding and
-	// the server's context is canceled.
-	cfg := a.cfg
-	cfg.DefaultLifetime = 0
-
-	if err := a.send(net.IPv6linklocalallnodes, cfg); err != nil {
-		a.logf("failed to send final multicast router advertisement: %v", err)
-	}
-
-	if err := a.c.LeaveGroup(net.IPv6linklocalallrouters); err != nil {
-		a.logf("failed to leave IPv6 link-local all routers multicast group: %v", err)
-	}
-
-	if err := a.c.Close(); err != nil {
-		a.logf("failed to stop NDP listener: %v", err)
-	}
-
-	// If possible, restore the previous IPv6 autoconfiguration state.
-	if err := a.setIPv6Autoconf(a.ifi.Name, autoPrev); err != nil {
-		if errors.Is(err, os.ErrPermission) {
-			// Continue anyway but provide a hint.
-			a.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
-			a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "configuration").Inc()
-		} else {
-			return fmt.Errorf("failed to restore IPv6 autoconfiguration on %q: %v", a.ifi.Name, err)
-		}
-	}
-
-	return nil
+	// Should only reach this state when context is canceled on shutdown.
+	return ctx.Err()
 }
 
 // Constants taken from https://tools.ietf.org/html/rfc4861#section-10.
@@ -253,7 +202,7 @@ const (
 )
 
 // multicast runs a multicast advertising loop until ctx is canceled.
-func (a *Advertiser) multicast(ctx context.Context, reqC chan<- request) error {
+func (a *Advertiser) multicast(ctx context.Context, reqC chan<- request) {
 	// Initialize PRNG so we can add jitter to our unsolicited multicast RA
 	// delay times.
 	var (
@@ -266,17 +215,15 @@ func (a *Advertiser) multicast(ctx context.Context, reqC chan<- request) error {
 		// Enable cancelation before sending any messages, if necessary.
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		default:
 		}
 
-		reqC <- request{
-			IP: net.IPv6linklocalallnodes,
-		}
+		reqC <- request{IP: net.IPv6linklocalallnodes}
 
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		case <-time.After(multicastDelay(prng, i, min, max)):
 		}
 	}
@@ -294,7 +241,7 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 		<-ctx.Done()
 
 		if err := a.c.SetReadDeadline(deadlineNow); err != nil {
-			return fmt.Errorf("failed to interrupt listener: %v", err)
+			return fmt.Errorf("failed to interrupt listener: %w", err)
 		}
 
 		return nil
@@ -324,7 +271,7 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 				continue
 			}
 
-			return fmt.Errorf("failed to read router solicitations: %v", err)
+			return fmt.Errorf("failed to read router solicitations: %w", err)
 		}
 
 		a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
@@ -360,8 +307,17 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 // schedule consumes RA requests and schedules them with workers so they may
 // occur at the appropriate times.
 func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
+	// Enable canceling schedule's context on send RA error.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	var (
-		sg = schedgroup.New(ctx)
+		// Schedule router advertisements and handles any errors from those
+		// advertisements. Note that sg.Wait cannot be used for that purpose
+		// because it is invalid to call Wait and schedule other work after,
+		// meaning that we can only Wait once we're exiting this function.
+		sg   = schedgroup.New(ctx)
+		errC = make(chan error)
 
 		prng          = rand.New(rand.NewSource(time.Now().UnixNano()))
 		lastMulticast time.Time
@@ -371,8 +327,14 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 		// New request for each loop iteration to prevent races.
 		var req request
 
-		// Enable cancelation before sending any messages, if necessary.
 		select {
+		case err := <-errC:
+			// We received an error and will need to determine if we can
+			// reinitialize the listener. Don't schedule any more tasks and
+			// return the error immediately.
+			cancel()
+			_ = sg.Wait()
+			return err
 		case <-ctx.Done():
 			// Context cancelation is expected.
 			if err := sg.Wait(); err != nil && err != context.Canceled {
@@ -388,7 +350,9 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 			// the RFC and then send it.
 			delay := time.Duration(prng.Int63n(maxRADelay.Nanoseconds())) * time.Nanosecond
 			sg.Delay(delay, func() error {
-				a.sendWorker(req.IP)
+				if err := a.sendWorker(req.IP); err != nil {
+					errC <- err
+				}
 				return nil
 			})
 			continue
@@ -403,14 +367,16 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 		// Ready to send this multicast RA.
 		lastMulticast = time.Now()
 		sg.Delay(delay, func() error {
-			a.sendWorker(req.IP)
+			if err := a.sendWorker(req.IP); err != nil {
+				errC <- err
+			}
 			return nil
 		})
 	}
 }
 
 // sendWorker is a goroutine worker which sends a router advertisement to ip.
-func (a *Advertiser) sendWorker(ip net.IP) {
+func (a *Advertiser) sendWorker(ip net.IP) error {
 	busy := a.mm.SchedulerWorkers.WithLabelValues(a.cfg.Name)
 	busy.Inc()
 	defer busy.Dec()
@@ -418,9 +384,7 @@ func (a *Advertiser) sendWorker(ip net.IP) {
 	if err := a.send(ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
 		a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
-
-		// TODO: figure out which errors are recoverable or not.
-		return
+		return err
 	}
 
 	typ := "unicast"
@@ -430,6 +394,7 @@ func (a *Advertiser) sendWorker(ip net.IP) {
 	}
 
 	a.mm.RouterAdvertisementsTotal.WithLabelValues(a.cfg.Name, typ).Add(1)
+	return nil
 }
 
 // send sends a single router advertisement built from cfg to the destination IP
@@ -439,22 +404,22 @@ func (a *Advertiser) send(dst net.IP, cfg config.Interface) error {
 	// the source address option.
 	ra, err := a.buildRA(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to build router advertisement: %v", err)
+		return fmt.Errorf("failed to build router advertisement: %w", err)
 	}
 
 	// If the interface is not forwarding packets, we must set the router
 	// lifetime field to zero, per:
 	//  https://tools.ietf.org/html/rfc4861#section-6.2.5.
-	forwarding, err := a.getIPv6Forwarding(a.ifi.Name)
+	forwarding, err := a.getIPv6Forwarding(a.iface)
 	if err != nil {
-		return fmt.Errorf("failed to get IPv6 forwarding state: %v", err)
+		return fmt.Errorf("failed to get IPv6 forwarding state: %w", err)
 	}
 	if !forwarding {
 		ra.RouterLifetime = 0
 	}
 
 	if err := a.c.WriteTo(ra, nil, dst); err != nil {
-		return fmt.Errorf("failed to send router advertisement to %s: %v", dst, err)
+		return fmt.Errorf("failed to send router advertisement to %s: %w", dst, err)
 	}
 
 	return nil
@@ -487,15 +452,190 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 	// about that later.
 	ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
 		Direction: ndp.Source,
-		Addr:      a.ifi.HardwareAddr,
+		Addr:      a.mac,
 	})
 
 	return ra, nil
 }
 
+// init initializes the Advertiser in preparation for handling NDP traffic.
+func (a *Advertiser) init() (bool, error) {
+	// Verify the interface is available and ready for listening.
+	ifi, err := a.checkInterface(a.iface)
+	if err != nil {
+		return false, err
+	}
+
+	// Initialize the NDP listener.
+	c, ip, err := a.dial(ifi)
+	if err != nil {
+		return false, fmt.Errorf("failed to create NDP listener: %v", err)
+	}
+
+	// We can now initialize any plugins that rely on dynamic information
+	// about the network interface.
+	for _, p := range a.cfg.Plugins {
+		if err := p.Prepare(ifi); err != nil {
+			return false, fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
+		}
+	}
+
+	// If possible, disable IPv6 autoconfiguration on this interface so that
+	// our RAs don't configure more IP addresses on this interface.
+	autoPrev, err := a.getIPv6Autoconf(a.iface)
+	if err != nil {
+		return false, fmt.Errorf("failed to get IPv6 autoconfiguration state on %q: %v", a.iface, err)
+	}
+
+	if err := a.setIPv6Autoconf(a.iface, false); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			// Continue anyway but provide a hint.
+			a.logf("permission denied while disabling IPv6 autoconfiguration, continuing anyway (try setting CAP_NET_ADMIN)")
+			a.mm.ErrorsTotal.WithLabelValues(a.iface, "configuration").Inc()
+		} else {
+			return false, fmt.Errorf("failed to disable IPv6 autoconfiguration on %q: %v", a.iface, err)
+		}
+	}
+
+	// We only want to accept router solicitation messages.
+	var f ipv6.ICMPFilter
+	f.SetAll(true)
+	f.Accept(ipv6.ICMPTypeRouterSolicitation)
+
+	if err := c.SetICMPFilter(&f); err != nil {
+		return false, fmt.Errorf("failed to apply ICMPv6 filter: %v", err)
+	}
+
+	// Enable inspection of IPv6 control messages.
+	flags := ipv6.FlagHopLimit
+	if err := c.SetControlMessage(flags, true); err != nil {
+		return false, fmt.Errorf("failed to apply IPv6 control message flags: %v", err)
+	}
+
+	// We are now a router.
+	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
+		return false, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
+	}
+
+	a.c = c
+	a.mac = ifi.HardwareAddr
+
+	a.logf("initialized, advertising from %s", ip)
+
+	return autoPrev, nil
+}
+
+// reinit attempts repeated reinitialization of the Advertiser based on whether
+// the input error is considered recoverbale.
+func (a *Advertiser) reinit(ctx context.Context, err error) (bool, error) {
+	// Notify the beginning and end of reinit logic to anyone listening.
+	notify := func() {
+		select {
+		case a.reinitC <- struct{}{}:
+		default:
+		}
+	}
+
+	notify()
+	defer notify()
+
+	// Check for conditions which are recoverable.
+	funcs := []func(err error) bool{
+		func(err error) bool {
+			// TODO: inspect syscall error numbers, but for now, treat
+			// these errors as recoverable.
+			var serr *os.SyscallError
+			return errors.As(err, &serr)
+		},
+		func(err error) bool { return errors.Is(err, errLinkNotReady) },
+	}
+
+	var canReinit bool
+	for _, fn := range funcs {
+		if fn(err) {
+			// Error is recoverable.
+			canReinit = true
+			break
+		}
+	}
+	if !canReinit {
+		// Unrecoverable error.
+		return false, err
+	}
+
+	// Recoverable error, try to initialize for delay*attempts seconds, every
+	// delay seconds.
+	const (
+		attempts = 10
+		delay    = 3 * time.Second
+	)
+
+	for i := 0; i < attempts; i++ {
+		// Don't wait on the first attempt.
+		if i != 0 {
+			select {
+			case <-ctx.Done():
+				return false, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		autoPrev, err := a.init()
+		if err != nil {
+			a.logf("retrying initialization, %d attempts remaining", attempts-(i+1))
+			continue
+		}
+
+		return autoPrev, nil
+	}
+
+	return false, fmt.Errorf("timed out trying to initialize after error: %v", err)
+}
+
+// shutdown indicates to hosts that this host is no longer a router and restores
+// the previous state of the interface.
+func (a *Advertiser) shutdown(autoPrev bool) error {
+	// In general, many of these actions are best-effort and should not halt
+	// shutdown on failure.
+
+	// Send a final router advertisement (TODO: more than one) with a router
+	// lifetime of 0 to indicate that hosts should not use this router as a
+	// default router, and then leave the all-routers group.
+	//
+	// a.cfg is copied in case any delayed send workers are outstanding and
+	// the server's context is canceled.
+	cfg := a.cfg
+	cfg.DefaultLifetime = 0
+
+	if err := a.send(net.IPv6linklocalallnodes, cfg); err != nil {
+		a.logf("failed to send final multicast router advertisement: %v", err)
+	}
+
+	if err := a.c.LeaveGroup(net.IPv6linklocalallrouters); err != nil {
+		a.logf("failed to leave IPv6 link-local all routers multicast group: %v", err)
+	}
+
+	if err := a.c.Close(); err != nil {
+		a.logf("failed to stop NDP listener: %v", err)
+	}
+
+	// If possible, restore the previous IPv6 autoconfiguration state.
+	if err := a.setIPv6Autoconf(a.iface, autoPrev); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			// Continue anyway but provide a hint.
+			a.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
+			a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "configuration").Inc()
+		} else {
+			return fmt.Errorf("failed to restore IPv6 autoconfiguration on %q: %v", a.iface, err)
+		}
+	}
+
+	return nil
+}
+
 // logf prints a formatted log with the Advertiser's interface name.
 func (a *Advertiser) logf(format string, v ...interface{}) {
-	a.ll.Println(a.ifi.Name + ": " + fmt.Sprintf(format, v...))
+	a.ll.Println(a.iface + ": " + fmt.Sprintf(format, v...))
 }
 
 // multicastDelay selects an appropriate delay duration for unsolicited
@@ -520,4 +660,54 @@ func multicastDelay(r *rand.Rand, i int, min, max int64) time.Duration {
 	}
 
 	return d
+}
+
+// errLinkNotReady is a sentinel which indicates an interface is not ready
+// for use with an Advertiser.
+var errLinkNotReady = errors.New("link not ready")
+
+// checkInterface verifies the readiness of an interface.
+func checkInterface(iface string) (*net.Interface, error) {
+	// Link must exist.
+	ifi, err := net.InterfaceByName(iface)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get interface %q: %w", ifi.Name, err)
+	}
+
+	// Link must have a MAC address (e.g. WireGuard links do not).
+	if ifi.HardwareAddr == nil {
+		return nil, fmt.Errorf("interface %q has no MAC address", iface)
+	}
+
+	// Link must be up.
+	// TODO: check point-to-point and multicast flags and configure accordingly.
+	if ifi.Flags&net.FlagUp == 0 {
+		return nil, errLinkNotReady
+	}
+
+	// Link must have an IPv6 link-local unicast address.
+	addrs, err := ifi.Addrs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get interface addresses: %w", err)
+	}
+
+	var foundLL bool
+	for _, a := range addrs {
+		// Skip non IP and link-local addresses.
+		a, ok := a.(*net.IPNet)
+		if ok && isIPv6(a.IP) && a.IP.IsLinkLocalUnicast() {
+			foundLL = true
+			break
+		}
+	}
+	if !foundLL {
+		return nil, errLinkNotReady
+	}
+
+	return ifi, nil
+}
+
+// isIPv6 determines if ip is an IPv6 address.
+func isIPv6(ip net.IP) bool {
+	return ip.To16() != nil && ip.To4() == nil
 }
