@@ -509,7 +509,7 @@ func (a *Advertiser) reinit(ctx context.Context, err error) error {
 	// Recoverable error, try to initialize for delay*attempts seconds, every
 	// delay seconds.
 	const (
-		attempts = 10
+		attempts = 20
 		delay    = 3 * time.Second
 	)
 
