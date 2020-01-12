@@ -92,38 +92,28 @@ func TestAdvertiserSimulated(t *testing.T) {
 				NewAdvertiserMetrics(nil),
 			)
 
-			ad.dial = func(_ *net.Interface) (conn, net.IP, error) {
-				c := newTestConn()
-				c.readFrom = tt.readFrom
-				c.writeTo = func(m ndp.Message, _ *ipv6.ControlMessage, dst net.IP) error {
-					mu.Lock()
-					defer mu.Unlock()
-
-					msgs = append(msgs, msg{
-						RA:          m.(*ndp.RouterAdvertisement),
-						Destination: dst,
-					})
-
-					cancel()
-					return nil
-				}
-
-				return c, nil, nil
-			}
-
-			ad.checkInterface = func(iface string) (*net.Interface, error) {
+			c := newTestConn()
+			c.dial = func(iface string) (*net.Interface, net.IP, error) {
 				return &net.Interface{
 					Name:         iface,
 					HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
-				}, nil
+				}, mustIP("fe80::1"), nil
+			}
+			c.readFrom = tt.readFrom
+			c.writeTo = func(ra *ndp.RouterAdvertisement, dst net.IP) error {
+				mu.Lock()
+				defer mu.Unlock()
+
+				msgs = append(msgs, msg{
+					RA:          ra,
+					Destination: dst,
+				})
+
+				cancel()
+				return nil
 			}
 
-			// No need to check any system parameters.
-			getNoop := func(_ string) (bool, error) { return true, nil }
-
-			ad.getIPv6Autoconf = getNoop
-			ad.getIPv6Forwarding = getNoop
-			ad.setIPv6Autoconf = func(_ string, _ bool) error { return nil }
+			ad.c = c
 
 			var eg errgroup.Group
 			eg.Go(func() error {
@@ -196,6 +186,20 @@ func Test_multicastDelay(t *testing.T) {
 	}
 }
 
+var _ conn = &testConn{}
+
+type testConn struct {
+	reads *uint32
+
+	ctx    context.Context
+	cancel func()
+
+	close    func() error
+	dial     func(iface string) (*net.Interface, net.IP, error)
+	readFrom func() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
+	writeTo  func(ra *ndp.RouterAdvertisement, dst net.IP) error
+}
+
 func newTestConn() *testConn {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -207,21 +211,6 @@ func newTestConn() *testConn {
 	}
 }
 
-type testConn struct {
-	reads *uint32
-
-	ctx    context.Context
-	cancel func()
-
-	close             func() error
-	joinGroup         func(group net.IP) error
-	leaveGroup        func(group net.IP) error
-	readFrom          func() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
-	setControlMessage func(flags ipv6.ControlFlags, on bool) error
-	setICMPFilter     func(f *ipv6.ICMPFilter) error
-	writeTo           func(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error
-}
-
 func (c *testConn) Close() error {
 	if c.close == nil {
 		return nil
@@ -230,21 +219,14 @@ func (c *testConn) Close() error {
 	return c.close()
 }
 
-func (c *testConn) JoinGroup(group net.IP) error {
-	if c.joinGroup == nil {
-		return nil
-	}
-
-	return c.joinGroup(group)
+func (c *testConn) Dial(iface string) (*net.Interface, net.IP, error) {
+	return c.dial(iface)
 }
 
-func (c *testConn) LeaveGroup(group net.IP) error {
-	if c.leaveGroup == nil {
-		return nil
-	}
+func (c *testConn) IPv6Forwarding() (bool, error) { return true, nil }
 
-	return c.leaveGroup(group)
-}
+// TODO: use a UDP socket or similar so we don't have to emulate socket semantics
+// with context and channels.
 
 func (c *testConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
 	// Don't block first read.
@@ -255,22 +237,6 @@ func (c *testConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
 	// Subsequent reads will block, simulating a network connection wait.
 	<-c.ctx.Done()
 	return nil, nil, nil, c.ctx.Err()
-}
-
-func (c *testConn) SetControlMessage(flags ipv6.ControlFlags, on bool) error {
-	if c.setControlMessage == nil {
-		return nil
-	}
-
-	return c.setControlMessage(flags, on)
-}
-
-func (c *testConn) SetICMPFilter(f *ipv6.ICMPFilter) error {
-	if c.setICMPFilter == nil {
-		return nil
-	}
-
-	return c.setICMPFilter(f)
 }
 
 func (c *testConn) SetReadDeadline(t time.Time) error {
@@ -284,8 +250,17 @@ func (c *testConn) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
-func (c *testConn) WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error {
-	return c.writeTo(m, cm, dst)
+func (c *testConn) WriteTo(ra *ndp.RouterAdvertisement, dst net.IP) error {
+	return c.writeTo(ra, dst)
+}
+
+func mustIP(s string) net.IP {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		panicf("failed to parse %q as IP address", s)
+	}
+
+	return ip
 }
 
 func panicf(format string, a ...interface{}) {

@@ -344,9 +344,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 		}
 
 		// Forwarding is disabled after the first RA arrives.
-		if err := setIPv6Forwarding(cctx.router.Name, false); err != nil {
-			t.Fatalf("failed to disable IPv6 forwarding: %v", err)
-		}
+		mustSysctl(t, cctx.router.Name, "forwarding", "0")
 
 		if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
 			t.Fatalf("failed to send RS: %v", err)
@@ -706,15 +704,6 @@ func mustSysctl(t *testing.T, iface, key, value string) {
 	if err := ioutil.WriteFile(file, []byte(value), 0o644); err != nil {
 		t.Fatalf("failed to write sysctl %s/%s: %v", iface, key, err)
 	}
-}
-
-func mustIP(s string) net.IP {
-	ip := net.ParseIP(s)
-	if ip == nil {
-		panicf("failed to parse %q as IP address", s)
-	}
-
-	return ip
 }
 
 func mustCIDR(s string) *net.IPNet {

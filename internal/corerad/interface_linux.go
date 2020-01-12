@@ -34,12 +34,6 @@ func getIPv6Autoconf(iface string) (bool, error) {
 	return sysctlBool(sysctl(iface, "autoconf"))
 }
 
-// setIpv6Forwarding enables or disables IPv6 forwarding for the given interface
-// on Linux systems.
-func setIPv6Forwarding(iface string, enable bool) error {
-	return sysctlEnable(iface, "forwarding", enable)
-}
-
 // getIPv6Forwarding fetches the current IPv6 forwarding state for the
 // given interface on Linux systems.
 func getIPv6Forwarding(iface string) (bool, error) {
