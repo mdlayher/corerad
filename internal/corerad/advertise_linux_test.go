@@ -19,8 +19,10 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net"
+	"os"
 	"os/exec"
 	"runtime"
 	"testing"
@@ -284,7 +286,7 @@ func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 	cancel()
 
 	// This should not block because the context is already canceled.
-	if err := ad.Advertise(ctx); err != nil {
+	if err := ad.Advertise(ctx, nil); err != nil {
 		t.Fatalf("failed to advertise: %v", err)
 	}
 }
@@ -306,7 +308,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 	var eg errgroup.Group
 	eg.Go(func() error {
 		// TODO: hook into internal state?
-		if err := ad.Advertise(ctx); err != nil {
+		if err := ad.Advertise(ctx, nil); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 
@@ -530,7 +532,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to look up router veth: %v", err)
 	}
 
-	ad := NewAdvertiser(router.Name, *cfg, nil, nil)
+	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), nil)
 
 	client, err := net.InterfaceByName(veth1)
 	if err != nil {
@@ -601,10 +603,22 @@ func testAdvertiserClient(
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	watchC := make(chan struct{})
+	w := NewWatcher(nil)
+	w.Register(cctx.router.Name, watchC)
+
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx); err != nil {
+		if err := ad.Advertise(ctx, watchC); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
+		}
+
+		return nil
+	})
+
+	eg.Go(func() error {
+		if err := w.Watch(ctx); err != nil {
+			return fmt.Errorf("failed to watch: %v", err)
 		}
 
 		return nil

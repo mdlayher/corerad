@@ -81,6 +81,10 @@ func (s *Server) Run(ctx context.Context) error {
 
 	mm := NewAdvertiserMetrics(s.reg)
 
+	// Watch for interface state changes. May or may not be supported depending
+	// on the OS, but functionality should gracefully degrade.
+	w := NewWatcher(s.ll)
+
 	// Serve on each specified interface.
 	for _, iface := range s.cfg.Interfaces {
 		// Capture range variable for goroutines.
@@ -104,10 +108,15 @@ func (s *Server) Run(ctx context.Context) error {
 
 		// TODO: find a way to reasonably test this.
 
+		// Register interest for state changes on this interface to this channel
+		// so this interface's Advertiser can react accordingly.
+		watchC := make(chan struct{})
+		w.Register(iface.Name, watchC)
+
 		// Begin advertising on this interface until the context is canceled.
 		s.eg.Go(func() error {
 			ad := NewAdvertiser(iface.Name, iface, s.ll, mm)
-			if err := ad.Advertise(ctx); err != nil {
+			if err := ad.Advertise(ctx, watchC); err != nil {
 				return fmt.Errorf("failed to advertise NDP: %v", err)
 			}
 
@@ -119,6 +128,14 @@ func (s *Server) Run(ctx context.Context) error {
 	if err := s.runDebug(ctx); err != nil {
 		return fmt.Errorf("failed to start debug HTTP server: %v", err)
 	}
+
+	s.eg.Go(func() error {
+		if err := w.Watch(ctx); err != nil {
+			return fmt.Errorf("failed to watch for interface state changes: %v", err)
+		}
+
+		return nil
+	})
 
 	// Indicate readiness to any waiting callers, and then wait for all
 	// goroutines to be canceled and stopped successfully.
