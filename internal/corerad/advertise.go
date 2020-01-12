@@ -289,8 +289,12 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 		sg   = schedgroup.New(ctx)
 		errC = make(chan error)
 
-		prng          = rand.New(rand.NewSource(time.Now().UnixNano()))
-		lastMulticast time.Time
+		// Jitter for RA delays.
+		prng = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+		// Assume that a.init sent the initial RA recently and space out others
+		// accordingly.
+		lastMulticast = time.Now()
 	)
 
 	for {
@@ -330,7 +334,7 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 
 		// Ensure that we space out multicast RAs as required by the RFC.
 		var delay time.Duration
-		if !lastMulticast.IsZero() && time.Since(lastMulticast) < minDelayBetweenRAs {
+		if time.Since(lastMulticast) < minDelayBetweenRAs {
 			delay = minDelayBetweenRAs
 		}
 
@@ -446,6 +450,13 @@ func (a *Advertiser) init() error {
 
 	a.mac = ifi.HardwareAddr
 
+	// Before starting any other goroutines, verify that the interface can
+	// actually be used to send an initial router advertisement, avoiding a
+	// needless start/error/restart loop.
+	if err := a.send(net.IPv6linklocalallnodes, a.cfg); err != nil {
+		return fmt.Errorf("failed to send initial multicast router advertisement: %v", err)
+	}
+
 	a.logf("initialized, advertising from %s", ip)
 
 	return nil
@@ -491,7 +502,7 @@ func (a *Advertiser) reinit(ctx context.Context, err error) error {
 		}
 
 		if err := a.init(); err != nil {
-			a.logf("retrying initialization, %d attempts remaining", attempts-(i+1))
+			a.logf("retrying initialization, %d attempt(s) remaining: %v", attempts-(i+1), err)
 			continue
 		}
 

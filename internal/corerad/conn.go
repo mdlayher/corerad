@@ -197,7 +197,12 @@ func checkInterface(iface string) (*net.Interface, error) {
 	// Link must exist.
 	ifi, err := net.InterfaceByName(iface)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get interface %q: %w", iface, err)
+		if isNoSuchInterface(err) {
+			// Allow retry if the interface may not exist yet.
+			return nil, fmt.Errorf("interface %q does not exist: %w", iface, errLinkNotReady)
+		}
+
+		return nil, fmt.Errorf("failed to get interface %q: %v", iface, err)
 	}
 
 	// Link must have a MAC address (e.g. WireGuard links do not).
@@ -208,13 +213,13 @@ func checkInterface(iface string) (*net.Interface, error) {
 	// Link must be up.
 	// TODO: check point-to-point and multicast flags and configure accordingly.
 	if ifi.Flags&net.FlagUp == 0 {
-		return nil, errLinkNotReady
+		return nil, fmt.Errorf("interface %q is not up: %w", iface, errLinkNotReady)
 	}
 
 	// Link must have an IPv6 link-local unicast address.
 	addrs, err := ifi.Addrs()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get interface addresses: %w", err)
+		return nil, fmt.Errorf("failed to get interface %q addresses: %w", iface, err)
 	}
 
 	var foundLL bool
@@ -227,10 +232,24 @@ func checkInterface(iface string) (*net.Interface, error) {
 		}
 	}
 	if !foundLL {
-		return nil, errLinkNotReady
+		return nil, fmt.Errorf("interface %q has no IPv6 link-local address: %w", iface, err)
 	}
 
 	return ifi, nil
+}
+
+// isNoSuchInterface determines if an error matches package net's "no such
+// interface" error.
+func isNoSuchInterface(err error) bool {
+	var oerr *net.OpError
+	if !errors.As(err, &oerr) {
+		return false
+	}
+
+	// Unfortunately there's no better way to check this.
+	return oerr.Op == "route" &&
+		oerr.Net == "ip+net" &&
+		oerr.Err.Error() == "no such network interface"
 }
 
 // isIPv6 determines if ip is an IPv6 address.
