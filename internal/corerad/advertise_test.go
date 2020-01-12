@@ -117,7 +117,8 @@ func TestAdvertiserSimulated(t *testing.T) {
 
 			var eg errgroup.Group
 			eg.Go(func() error {
-				if err := ad.Advertise(ctx); err != nil {
+				// TODO: hook into watcher.
+				if err := ad.Advertise(ctx, nil); err != nil {
 					return fmt.Errorf("failed to advertise: %v", err)
 				}
 
@@ -261,8 +262,4 @@ func mustIP(s string) net.IP {
 	}
 
 	return ip
-}
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
 }

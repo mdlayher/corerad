@@ -30,6 +30,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// errLinkChange is a sentinel value which indicates a link state change.
+var errLinkChange = errors.New("link state change")
+
 // An Advertiser sends NDP router advertisements.
 type Advertiser struct {
 	// Static configuration.
@@ -78,8 +81,9 @@ type request struct {
 
 // Advertise initializes the configured interface and begins router solicitation
 // and advertisement handling. Advertise will block until ctx is canceled or an
-// error occurs.
-func (a *Advertiser) Advertise(ctx context.Context) error {
+// error occurs. If watchC is not nil, it will be used to trigger the
+// reinitialization process. Typically watchC is used with the Watcher type.
+func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan struct{}) error {
 	// Attempt immediate initialization and fall back to reinit loop if that
 	// does not succeed.
 	if err := a.init(); err != nil {
@@ -94,7 +98,7 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 	}
 
 	for {
-		err := a.advertise(ctx)
+		err := a.advertise(ctx, watchC)
 		switch {
 		case errors.Is(err, context.Canceled):
 			// Intentional shutdown.
@@ -105,8 +109,6 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 
 		// We encountered an error. Try to reinitialize the Advertiser based
 		// on whether or not the error is deemed recoverable.
-		a.logf("error advertising, attempting to reinitialize")
-
 		if err := a.reinit(ctx, err); err != nil {
 			// Don't block user shutdown.
 			if errors.Is(err, context.Canceled) {
@@ -120,7 +122,7 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 
 // advertise is the internal loop for Advertise which coordinates the various
 // Advertiser goroutines.
-func (a *Advertiser) advertise(ctx context.Context) error {
+func (a *Advertiser) advertise(ctx context.Context, watchC <-chan struct{}) error {
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
@@ -152,8 +154,22 @@ func (a *Advertiser) advertise(ctx context.Context) error {
 		return nil
 	})
 
-	// TODO: link state watcher which returns errors for any state change,
-	// forcing these goroutines to cancel and reinitialize.
+	if watchC != nil {
+		eg.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return nil
+			case _, ok := <-watchC:
+				if !ok {
+					// Watcher halted.
+					return nil
+				}
+
+				// Watcher indicated a state change.
+				return errLinkChange
+			}
+		})
+	}
 
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("failed to run advertiser: %w", err)
@@ -465,7 +481,7 @@ func (a *Advertiser) init() error {
 // reinit attempts repeated reinitialization of the Advertiser based on whether
 // the input error is considered recoverbale.
 func (a *Advertiser) reinit(ctx context.Context, err error) error {
-	// Notify the beginning and end of reinit logic to anyone listening.
+	// Notify progress in reinit logic to anyone listening.
 	notify := func() {
 		select {
 		case a.reinitC <- struct{}{}:
@@ -473,13 +489,19 @@ func (a *Advertiser) reinit(ctx context.Context, err error) error {
 		}
 	}
 
-	notify()
 	defer notify()
 
 	// Check for conditions which are recoverable.
-	// TODO: check for certain syscall error numbers.
 	var serr *os.SyscallError
-	if !(errors.As(err, &serr) || errors.Is(err, errLinkNotReady)) {
+	switch {
+	case errors.As(err, &serr):
+		// TODO: check for certain syscall error numbers.
+		a.logf("error advertising, reinitializing")
+	case errors.Is(err, errLinkNotReady):
+		a.logf("interface not ready, reinitializing")
+	case errors.Is(err, errLinkChange):
+		a.logf("interface state changed, reinitializing")
+	default:
 		// Unrecoverable error
 		return err
 	}
@@ -492,6 +514,9 @@ func (a *Advertiser) reinit(ctx context.Context, err error) error {
 	)
 
 	for i := 0; i < attempts; i++ {
+		// Notify of reinit on each attempt.
+		notify()
+
 		// Don't wait on the first attempt.
 		if i != 0 {
 			select {
