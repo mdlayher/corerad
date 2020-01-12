@@ -83,15 +83,12 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Serve on each specified interface.
 	for _, iface := range s.cfg.Interfaces {
+		// Capture range variable for goroutines.
+		iface := iface
+
 		// Prepend the interface name to all logs for this server.
 		logf := func(format string, v ...interface{}) {
 			s.ll.Println(iface.Name + ": " + fmt.Sprintf(format, v...))
-		}
-
-		// Make sure the interface is valid.
-		ifi, err := net.InterfaceByName(iface.Name)
-		if err != nil {
-			return fmt.Errorf("failed to look up interface %q: %v", iface.Name, err)
 		}
 
 		if !iface.SendAdvertisements {
@@ -109,8 +106,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 		// Begin advertising on this interface until the context is canceled.
 		s.eg.Go(func() error {
-			ad := NewAdvertiser(ifi, iface, s.ll, mm)
-
+			ad := NewAdvertiser(iface.Name, iface, s.ll, mm)
 			if err := ad.Advertise(ctx); err != nil {
 				return fmt.Errorf("failed to advertise NDP: %v", err)
 			}
