@@ -15,6 +15,7 @@ package corerad
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,6 +23,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"sync"
+	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
@@ -155,49 +158,78 @@ func (s *Server) runDebug(ctx context.Context) error {
 		return nil
 	}
 
-	// Configure the HTTP debug server.
-	l, err := net.Listen("tcp", d.Address)
-	if err != nil {
-		return fmt.Errorf("failed to start debug listener: %v", err)
-	}
-
 	s.ll.Printf("starting HTTP debug listener on %q: prometheus: %v, pprof: %v",
 		d.Address, d.Prometheus, d.PProf)
 
-	// Serve requests until the context is canceled.
 	s.eg.Go(func() error {
-		<-ctx.Done()
-		return l.Close()
-	})
+		// Serve the debug server with retries in the event that the configured
+		// interface is not available on startup.
+		return s.serve(ctx, func() error {
+			l, err := net.Listen("tcp", d.Address)
+			if err != nil {
+				return err
+			}
 
-	s.eg.Go(func() error {
-		return serve(http.Serve(
-			l, newHTTPHandler(d.Prometheus, d.PProf, s.reg),
-		))
+			// Listener ready, wait for cancelation via context and serve
+			// the HTTP server.
+			var wg sync.WaitGroup
+			wg.Add(1)
+			defer wg.Wait()
+
+			go func() {
+				defer wg.Done()
+				<-ctx.Done()
+				_ = l.Close()
+			}()
+
+			return http.Serve(l, newHTTPHandler(d.Prometheus, d.PProf, s.reg))
+		})
 	})
 
 	return nil
 }
 
-// serve unpacks and handles certain network listener errors as appropriate.
-func serve(err error) error {
-	if err == nil {
-		return nil
+// serve invokes fn with retries until a listener is started, handling certain
+// network listener errors as appropriate.
+func (s *Server) serve(ctx context.Context, fn func() error) error {
+	const (
+		attempts = 10
+		delay    = 3 * time.Second
+	)
+
+	var nerr *net.OpError
+	for i := 0; i < attempts; i++ {
+		// Don't wait on the first attempt.
+		if i != 0 {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(delay):
+			}
+		}
+
+		err := fn()
+		switch {
+		case errors.As(err, &nerr):
+			// Handle outside switch.
+		case err == nil:
+			panic("corerad: serve function should never return nil")
+		default:
+			// Nothing to do.
+			return err
+		}
+
+		// Unfortunately there isn't an easier way to check for this, but
+		// we want to ignore errors related to the connection closing, since
+		// s.Close is triggered on signal.
+		if nerr.Err.Error() == "use of closed network connection" {
+			return nil
+		}
+
+		s.ll.Printf("error starting HTTP debug server, %d attempt(s) remaining: %v", attempts-(i+1), err)
 	}
 
-	nerr, ok := err.(*net.OpError)
-	if !ok {
-		return err
-	}
-
-	// Unfortunately there isn't an easier way to check for this, but
-	// we want to ignore errors related to the connection closing, since
-	// s.Close is triggered on signal.
-	if nerr.Err.Error() != "use of closed network connection" {
-		return err
-	}
-
-	return nil
+	return errors.New("timed out starting HTTP debug server")
 }
 
 // A httpHandler provides the HTTP debug API handler for CoreRAD.

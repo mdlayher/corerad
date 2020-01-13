@@ -174,17 +174,26 @@ func probeTCP(t *testing.T, addr string) bool {
 		return false
 	}
 
-	c, err := net.Dial("tcp", addr)
-	if err == nil {
-		_ = c.Close()
-		return true
-	}
+	const (
+		attempts = 4
+		delay    = 250 * time.Millisecond
+	)
 
-	// String comparison isn't great but using build tags for syscall errno
-	// seems like overkill.
-	nerr, ok := err.(*net.OpError)
-	if !ok || !strings.Contains(nerr.Err.Error(), "connection refused") {
-		t.Fatalf("failed to dial TCP: %v", err)
+	for i := 0; i < attempts; i++ {
+		c, err := net.Dial("tcp", addr)
+		if err == nil {
+			_ = c.Close()
+			return true
+		}
+
+		// String comparison isn't great but using build tags for syscall errno
+		// seems like overkill.
+		nerr, ok := err.(*net.OpError)
+		if !ok || !strings.Contains(nerr.Err.Error(), "connection refused") {
+			t.Fatalf("failed to dial TCP: %v", err)
+		}
+
+		time.Sleep(delay)
 	}
 
 	return false
