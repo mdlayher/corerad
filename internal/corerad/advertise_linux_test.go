@@ -37,217 +37,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func TestAdvertiserLinuxUnsolicited(t *testing.T) {
-	// Configure a variety of plugins to ensure that everything is handled
-	// appropriately over the wire.
-	cfg := &config.Interface{
-		OtherConfig: true,
-		MTU:         1500,
-		Plugins: []plugin.Plugin{
-			&plugin.DNSSL{
-				Lifetime: 10 * time.Second,
-				DomainNames: []string{
-					"foo.example.com",
-					// Unicode was troublesome in package ndp for a while;
-					// verify it works here too.
-					"🔥.example.com",
-				},
-			},
-			&plugin.Prefix{
-				Prefix:            mustCIDR("2001:db8::/32"),
-				OnLink:            true,
-				PreferredLifetime: 10 * time.Second,
-				ValidLifetime:     20 * time.Second,
-			},
-			&plugin.RDNSS{
-				Lifetime: 10 * time.Second,
-				Servers: []net.IP{
-					mustIP("2001:db8::1"),
-					mustIP("2001:db8::2"),
-				},
-			},
-		},
-	}
-
-	var ra ndp.Message
-	ad, done := testAdvertiserClient(t, cfg, nil, func(_ func(), cctx *clientContext) {
-		// Read a single advertisement and then ensure the advertiser can be halted.
-		m, _, _, err := cctx.c.ReadFrom()
-		if err != nil {
-			t.Fatalf("failed to read RA: %v", err)
-		}
-		ra = m
-	})
-	defer done()
-
-	// Expect a complete RA.
-	want := &ndp.RouterAdvertisement{
-		OtherConfiguration: true,
-		Options: []ndp.Option{
-			&ndp.DNSSearchList{
-				Lifetime: 10 * time.Second,
-				DomainNames: []string{
-					"foo.example.com",
-					"🔥.example.com",
-				},
-			},
-			&ndp.PrefixInformation{
-				PrefixLength:      32,
-				OnLink:            true,
-				PreferredLifetime: 10 * time.Second,
-				ValidLifetime:     20 * time.Second,
-				Prefix:            mustIP("2001:db8::"),
-			},
-			&ndp.RecursiveDNSServer{
-				Lifetime: 10 * time.Second,
-				Servers: []net.IP{
-					mustIP("2001:db8::1"),
-					mustIP("2001:db8::2"),
-				},
-			},
-			ndp.NewMTU(1500),
-			&ndp.LinkLayerAddress{
-				Direction: ndp.Source,
-				Addr:      ad.mac,
-			},
-		},
-	}
-
-	if diff := cmp.Diff(want, ra); diff != "" {
-		t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
-	}
-}
-
-func TestAdvertiserLinuxUnsolicitedShutdown(t *testing.T) {
-	// The advertiser will act as a default router until it shuts down.
-	const lifetime = 3 * time.Second
-	cfg := &config.Interface{
-		DefaultLifetime: lifetime,
-	}
-
-	var got []ndp.Message
-	ad, done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
-		// Read the RA the advertiser sends on startup, then stop it and capture the
-		// one it sends on shutdown.
-		for i := 0; i < 2; i++ {
-			m, _, _, err := cctx.c.ReadFrom()
-			if err != nil {
-				t.Fatalf("failed to read RA: %v", err)
-			}
-
-			got = append(got, m)
-			cancel()
-		}
-	})
-	defer done()
-
-	options := []ndp.Option{&ndp.LinkLayerAddress{
-		Direction: ndp.Source,
-		Addr:      ad.mac,
-	}}
-
-	// Expect only the first message to contain a RouterLifetime field as it
-	// should be cleared on shutdown.
-	want := []ndp.Message{
-		&ndp.RouterAdvertisement{
-			RouterLifetime: lifetime,
-			Options:        options,
-		},
-		&ndp.RouterAdvertisement{
-			RouterLifetime: 0,
-			Options:        options,
-		},
-	}
-
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("unexpected router advertisements (-want +got):\n%s", diff)
-	}
-}
-
-func skipShort(t *testing.T) {
-	t.Helper()
-
-	if testing.Short() {
-		t.Skip("skipping in short mode")
-	}
-}
-
-func TestAdvertiserLinuxUnsolicitedDelayed(t *testing.T) {
-	skipShort(t)
-
-	// Configure a variety of plugins to ensure that everything is handled
-	// appropriately over the wire.
-	var got []ndp.Message
-	ad, done := testAdvertiserClient(t, nil, nil, func(_ func(), cctx *clientContext) {
-		// Expect a significant delay between the multicast RAs.
-		start := time.Now()
-		for i := 0; i < 2; i++ {
-			m, _, _, err := cctx.c.ReadFrom()
-			if err != nil {
-				t.Fatalf("failed to read RA: %v", err)
-			}
-			got = append(got, m)
-		}
-
-		if d := time.Since(start); d < minDelayBetweenRAs {
-			t.Fatalf("delay too short between multicast RAs: %s", d)
-		}
-	})
-	defer done()
-
-	// Expect identical RAs.
-	ra := &ndp.RouterAdvertisement{
-		Options: []ndp.Option{
-			&ndp.LinkLayerAddress{
-				Direction: ndp.Source,
-				Addr:      ad.mac,
-			},
-		},
-	}
-
-	if diff := cmp.Diff([]ndp.Message{ra, ra}, got); diff != "" {
-		t.Fatalf("unexpected router advertisements (-want +got):\n%s", diff)
-	}
-}
-
-func TestAdvertiserLinuxSolicited(t *testing.T) {
-	// No configuration, bare minimum router advertisement.
-	var got []ndp.Message
-	ad, done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
-		// Issue repeated router solicitations and expect router advertisements
-		// in response.
-		for i := 0; i < 3; i++ {
-			if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
-				t.Fatalf("failed to send RS: %v", err)
-			}
-
-			// Read a single advertisement and then ensure the advertiser can be halted.
-			m, _, _, err := cctx.c.ReadFrom()
-			if err != nil {
-				t.Fatalf("failed to read RA: %v", err)
-			}
-
-			got = append(got, m)
-		}
-	})
-	defer done()
-
-	ra := &ndp.RouterAdvertisement{
-		Options: []ndp.Option{&ndp.LinkLayerAddress{
-			Direction: ndp.Source,
-			Addr:      ad.mac,
-		}},
-	}
-
-	want := []ndp.Message{
-		ra, ra, ra,
-	}
-
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
-	}
-}
-
 func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 	_, done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
 		// Consume the initial multicast.
@@ -484,7 +273,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	t.Helper()
 
 	if runtime.GOOS != "linux" {
-		t.Skip("skipping, advertiser tests only run on Linux")
+		t.Skip("skipping, this test only runs on Linux")
 	}
 
 	skipUnprivileged(t)
@@ -534,14 +323,10 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 
 	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), nil)
 
-	client, err := net.InterfaceByName(veth1)
+	sc := newSystemConn(nil, nil)
+	client, _, err := sc.Dial(veth1)
 	if err != nil {
-		t.Fatalf("failed to look up client veth: %v", err)
-	}
-
-	c, _, err := ndp.Dial(client, ndp.LinkLocal)
-	if err != nil {
-		t.Fatalf("failed to create NDP client connection: %v", err)
+		t.Fatalf("failed to dial client connection: %v", err)
 	}
 
 	// Only accept RAs.
@@ -549,16 +334,16 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	f.SetAll(true)
 	f.Accept(ipv6.ICMPTypeRouterAdvertisement)
 
-	if err := c.SetICMPFilter(&f); err != nil {
+	if err := sc.c.SetICMPFilter(&f); err != nil {
 		t.Fatalf("failed to apply ICMPv6 filter: %v", err)
 	}
 
-	if err := c.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+	if err := sc.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		t.Fatalf("failed to set client read deadline: %v", err)
 	}
 
 	cctx := &clientContext{
-		c: c,
+		c: sc,
 		rs: &ndp.RouterSolicitation{
 			Options: []ndp.Option{&ndp.LinkLayerAddress{
 				Direction: ndp.Source,
@@ -571,7 +356,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	}
 
 	done := func() {
-		if err := c.Close(); err != nil {
+		if err := sc.Close(); err != nil {
 			t.Fatalf("failed to close NDP router solicitation connection: %v", err)
 		}
 
@@ -583,7 +368,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 }
 
 type clientContext struct {
-	c              *ndp.Conn
+	c              conn
 	rs             *ndp.RouterSolicitation
 	router, client *net.Interface
 	reinitC        <-chan struct{}
@@ -674,7 +459,14 @@ func waitInterfacesReady(t *testing.T, ifi0, ifi1 string) {
 	}
 
 	t.Fatal("failed to wait for interface readiness")
+}
 
+func skipShort(t *testing.T) {
+	t.Helper()
+
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
 }
 
 func skipUnprivileged(t *testing.T) {

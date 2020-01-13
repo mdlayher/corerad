@@ -35,7 +35,7 @@ type conn interface {
 	IPv6Forwarding() (bool, error)
 	ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
 	SetReadDeadline(t time.Time) error
-	WriteTo(ra *ndp.RouterAdvertisement, dst net.IP) error
+	WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error
 }
 
 var _ conn = &systemConn{}
@@ -177,10 +177,8 @@ func (c *systemConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, erro
 func (c *systemConn) SetReadDeadline(t time.Time) error { return c.c.SetReadDeadline(t) }
 
 // WriteTo implements conn.
-func (c *systemConn) WriteTo(ra *ndp.RouterAdvertisement, dst net.IP) error {
-	// Only accept arguments which would be passed by Advertiser to ensure
-	// more strict message sending rules.
-	return c.c.WriteTo(ra, nil, dst)
+func (c *systemConn) WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error {
+	return c.c.WriteTo(m, cm, dst)
 }
 
 // logf prints a formatted log with the systemConn's interface name.

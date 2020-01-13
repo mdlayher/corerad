@@ -68,7 +68,6 @@ func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Adver
 		// By default, directly manipulate the system.
 		c: newSystemConn(ll, mm),
 
-		// c and ifi are initialized in a.init.
 		reinitC: make(chan struct{}),
 	}
 }
@@ -408,7 +407,7 @@ func (a *Advertiser) send(dst net.IP, cfg config.Interface) error {
 		ra.RouterLifetime = 0
 	}
 
-	if err := a.c.WriteTo(ra, dst); err != nil {
+	if err := a.c.WriteTo(ra, nil, dst); err != nil {
 		return fmt.Errorf("failed to send router advertisement to %s: %w", dst, err)
 	}
 
