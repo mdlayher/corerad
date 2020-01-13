@@ -16,10 +16,13 @@ package corerad
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -30,6 +33,7 @@ import (
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sys/unix"
 )
 
 // A testAdvertiserFunc is a function which sets up an Advertiser for testing.
@@ -39,6 +43,19 @@ type testAdvertiserFunc func(
 	tcfg *testConfig,
 	fn func(cancel func(), cctx *clientContext),
 ) (*Advertiser, func())
+
+type testConfig struct {
+	// An optional hook which can be used to apply additional configuration to
+	// the test veth interfaces before they are brought up.
+	vethConfig func(t *testing.T, veth0, veth1 string)
+}
+
+type clientContext struct {
+	c              conn
+	rs             *ndp.RouterSolicitation
+	router, client *net.Interface
+	reinitC        <-chan struct{}
+}
 
 func TestAdvertiserUnsolicited(t *testing.T) {
 	tests := []struct {
@@ -320,6 +337,55 @@ func TestAdvertiserSolicited(t *testing.T) {
 	}
 }
 
+func Test_multicastDelay(t *testing.T) {
+	// Static seed for deterministic output.
+	r := rand.New(rand.NewSource(0))
+
+	tests := []struct {
+		name            string
+		i               int
+		min, max, delay time.Duration
+	}{
+		{
+			name:  "static",
+			min:   1 * time.Second,
+			max:   1 * time.Second,
+			delay: 1 * time.Second,
+		},
+		{
+			name:  "random",
+			min:   1 * time.Second,
+			max:   10 * time.Second,
+			delay: 4 * time.Second,
+		},
+		{
+			name: "clamped",
+			// Delay too long for low i value.
+			i:     1,
+			min:   30 * time.Second,
+			max:   60 * time.Second,
+			delay: maxInitialAdvInterval,
+		},
+		{
+			name: "not clamped",
+			// Delay appropriate for high i value.
+			i:     100,
+			min:   30 * time.Second,
+			max:   60 * time.Second,
+			delay: 52 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := multicastDelay(r, tt.i, tt.min.Nanoseconds(), tt.max.Nanoseconds())
+			if diff := cmp.Diff(tt.delay, d); diff != "" {
+				t.Fatalf("unexpected delay (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func testSimulatedAdvertiserClient(
 	t *testing.T,
 	cfg *config.Interface,
@@ -385,55 +451,6 @@ func testSimulatedAdvertiserClient(
 	}
 
 	return ad, done
-}
-
-func Test_multicastDelay(t *testing.T) {
-	// Static seed for deterministic output.
-	r := rand.New(rand.NewSource(0))
-
-	tests := []struct {
-		name            string
-		i               int
-		min, max, delay time.Duration
-	}{
-		{
-			name:  "static",
-			min:   1 * time.Second,
-			max:   1 * time.Second,
-			delay: 1 * time.Second,
-		},
-		{
-			name:  "random",
-			min:   1 * time.Second,
-			max:   10 * time.Second,
-			delay: 4 * time.Second,
-		},
-		{
-			name: "clamped",
-			// Delay too long for low i value.
-			i:     1,
-			min:   30 * time.Second,
-			max:   60 * time.Second,
-			delay: maxInitialAdvInterval,
-		},
-		{
-			name: "not clamped",
-			// Delay appropriate for high i value.
-			i:     100,
-			min:   30 * time.Second,
-			max:   60 * time.Second,
-			delay: 52 * time.Second,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			d := multicastDelay(r, tt.i, tt.min.Nanoseconds(), tt.max.Nanoseconds())
-			if diff := cmp.Diff(tt.delay, d); diff != "" {
-				t.Fatalf("unexpected delay (-want +got):\n%s", diff)
-			}
-		})
-	}
 }
 
 func testConnPair(t *testing.T) (conn, conn, func()) {
@@ -570,6 +587,251 @@ func (c *udpConn) WriteTo(m ndp.Message, _ *ipv6.ControlMessage, _ net.IP) error
 
 	_, err = c.pc.WriteTo(b, c.peer)
 	return err
+}
+
+func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Advertiser, *clientContext, func()) {
+	t.Helper()
+
+	if runtime.GOOS != "linux" {
+		t.Skip("skipping, this test only runs on Linux")
+	}
+
+	skipUnprivileged(t)
+
+	if tcfg == nil {
+		tcfg = &testConfig{}
+	}
+
+	var (
+		r     = rand.New(rand.NewSource(time.Now().UnixNano()))
+		veth0 = fmt.Sprintf("cradveth%d", r.Intn(65535))
+		veth1 = fmt.Sprintf("cradveth%d", r.Intn(65535))
+	)
+
+	// Set up a temporary veth pair in the appropriate state for use with
+	// the tests.
+	// TODO: use rtnetlink.
+	shell(t, "ip", "link", "add", veth0, "type", "veth", "peer", "name", veth1)
+	mustSysctl(t, veth0, "accept_dad", "0")
+	mustSysctl(t, veth1, "accept_dad", "0")
+	mustSysctl(t, veth0, "forwarding", "1")
+
+	if tcfg.vethConfig != nil {
+		tcfg.vethConfig(t, veth0, veth1)
+	}
+
+	shell(t, "ip", "link", "set", "up", veth0)
+	shell(t, "ip", "link", "set", "up", veth1)
+
+	// Make sure the interfaces are up and ready.
+	waitInterfacesReady(t, veth0, veth1)
+
+	// Allow empty config but always populate the interface name.
+	// TODO: consider building veth pairs within the tests.
+	if cfg == nil {
+		cfg = &config.Interface{}
+	}
+	// Fixed interval for multicast advertisements.
+	cfg.MinInterval = 1 * time.Second
+	cfg.MaxInterval = 1 * time.Second
+	cfg.Name = veth0
+
+	router, err := net.InterfaceByName(veth0)
+	if err != nil {
+		t.Fatalf("failed to look up router veth: %v", err)
+	}
+
+	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), nil)
+
+	sc := newSystemConn(nil, nil)
+	client, _, err := sc.Dial(veth1)
+	if err != nil {
+		t.Fatalf("failed to dial client connection: %v", err)
+	}
+
+	// Only accept RAs.
+	var f ipv6.ICMPFilter
+	f.SetAll(true)
+	f.Accept(ipv6.ICMPTypeRouterAdvertisement)
+
+	if err := sc.c.SetICMPFilter(&f); err != nil {
+		t.Fatalf("failed to apply ICMPv6 filter: %v", err)
+	}
+
+	if err := sc.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatalf("failed to set client read deadline: %v", err)
+	}
+
+	cctx := &clientContext{
+		c: sc,
+		rs: &ndp.RouterSolicitation{
+			Options: []ndp.Option{&ndp.LinkLayerAddress{
+				Direction: ndp.Source,
+				Addr:      client.HardwareAddr,
+			}},
+		},
+		router:  router,
+		client:  client,
+		reinitC: ad.reinitC,
+	}
+
+	done := func() {
+		if err := sc.Close(); err != nil {
+			t.Fatalf("failed to close NDP router solicitation connection: %v", err)
+		}
+
+		// Clean up the veth pair.
+		shell(t, "ip", "link", "del", veth0)
+	}
+
+	return ad, cctx, done
+}
+
+// testAdvertiserClient is a wrapper around testAdvertiser which focuses on
+// client interactions rather than server interactions.
+func testAdvertiserClient(
+	t *testing.T,
+	cfg *config.Interface,
+	tcfg *testConfig,
+	fn func(cancel func(), cctx *clientContext),
+) (*Advertiser, func()) {
+	t.Helper()
+
+	ad, cctx, adDone := testAdvertiser(t, cfg, tcfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	watchC := make(chan struct{})
+	w := NewWatcher(nil)
+	w.Register(cctx.router.Name, watchC)
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		if err := ad.Advertise(ctx, watchC); err != nil {
+			return fmt.Errorf("failed to advertise: %v", err)
+		}
+
+		return nil
+	})
+
+	eg.Go(func() error {
+		if err := w.Watch(ctx); err != nil {
+			return fmt.Errorf("failed to watch: %v", err)
+		}
+
+		return nil
+	})
+
+	// Run the advertiser and invoke the client's input function with some
+	// context for the test, while also allowing the client to cancel the
+	// advertiser run loop.
+	fn(cancel, cctx)
+
+	done := func() {
+		cancel()
+		if err := eg.Wait(); err != nil {
+			t.Fatalf("failed to stop advertiser: %v", err)
+		}
+
+		adDone()
+	}
+
+	return ad, done
+}
+
+func waitInterfacesReady(t *testing.T, ifi0, ifi1 string) {
+	t.Helper()
+
+	a, err := net.InterfaceByName(ifi0)
+	if err != nil {
+		t.Fatalf("failed to get first interface: %v", err)
+	}
+
+	b, err := net.InterfaceByName(ifi1)
+	if err != nil {
+		t.Fatalf("failed to get second interface: %v", err)
+	}
+
+	for i := 0; i < 5; i++ {
+		aaddrs, err := a.Addrs()
+		if err != nil {
+			t.Fatalf("failed to get first addresses: %v", err)
+		}
+
+		baddrs, err := b.Addrs()
+		if err != nil {
+			t.Fatalf("failed to get second addresses: %v", err)
+		}
+
+		if len(aaddrs) > 0 && len(baddrs) > 0 {
+			return
+		}
+
+		time.Sleep(1 * time.Second)
+		t.Log("waiting for interface readiness...")
+	}
+
+	t.Fatal("failed to wait for interface readiness")
+}
+
+func skipShort(t *testing.T) {
+	t.Helper()
+
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+}
+
+func skipUnprivileged(t *testing.T) {
+	const ifName = "cradprobe0"
+	shell(t, "ip", "tuntap", "add", ifName, "mode", "tun")
+	shell(t, "ip", "link", "del", ifName)
+}
+
+func shell(t *testing.T, name string, arg ...string) {
+	t.Helper()
+
+	bin, err := exec.LookPath(name)
+	if err != nil {
+		t.Fatalf("failed to look up binary path: %v", err)
+	}
+
+	t.Logf("$ %s %v", bin, arg)
+
+	cmd := exec.Command(bin, arg...)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start command %q: %v", name, err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		// Shell operations in these tests require elevated privileges.
+		if cmd.ProcessState.ExitCode() == int(unix.EPERM) {
+			t.Skipf("skipping, permission denied: %v", err)
+		}
+
+		t.Fatalf("failed to wait for command %q: %v", name, err)
+	}
+}
+
+func mustSysctl(t *testing.T, iface, key, value string) {
+	t.Helper()
+
+	file := sysctl(iface, key)
+
+	t.Logf("sysctl %q = %q", file, value)
+
+	if err := ioutil.WriteFile(file, []byte(value), 0o644); err != nil {
+		t.Fatalf("failed to write sysctl %s/%s: %v", iface, key, err)
+	}
+}
+
+func mustCIDR(s string) *net.IPNet {
+	_, ipn, err := net.ParseCIDR(s)
+	if err != nil {
+		panicf("failed to parse CIDR: %v", err)
+	}
+
+	return ipn
 }
 
 func mustIP(s string) net.IP {
