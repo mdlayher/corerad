@@ -101,6 +101,8 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		RetransmitTimer:    retrans,
 		HopLimit:           uint8(hopLimit),
 		DefaultLifetime:    lifetime,
+		MTU:                ifi.MTU,
+		UnicastOnly:        ifi.UnicastOnly,
 	}, nil
 }
 

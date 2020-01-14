@@ -188,8 +188,13 @@ func TestAdvertiserLinuxSLAAC(t *testing.T) {
 
 	_, done := testAdvertiserClient(t, icfg, tcfg, func(cancel func(), cctx *clientContext) {
 		// Consume the initial multicast router advertisement.
-		if _, _, _, err := cctx.c.ReadFrom(); err != nil {
+		_, cm, _, err := cctx.c.ReadFrom()
+		if err != nil {
 			t.Fatalf("failed to read RA: %v", err)
+		}
+
+		if !cm.Dst.IsLinkLocalMulticast() {
+			t.Fatalf("initial RA address must be multicast: %v", cm.Dst)
 		}
 
 		// And verify that SLAAC addresses were added to the interface.
@@ -254,4 +259,45 @@ func TestAdvertiserLinuxReinitialize(t *testing.T) {
 		}
 	})
 	defer done()
+}
+
+func TestAdvertiserLinuxSolicitedUnicastOnly(t *testing.T) {
+	var got []ndp.Message
+	cfg := &config.Interface{UnicastOnly: true}
+	ad, done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
+		// Issue repeated router solicitations and expect router advertisements
+		// in response.
+		for i := 0; i < 3; i++ {
+			if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
+				t.Fatalf("failed to send RS: %v", err)
+			}
+
+			m, cm, _, err := cctx.c.ReadFrom()
+			if err != nil {
+				t.Fatalf("failed to read RA: %v", err)
+			}
+
+			if cm.Dst.IsLinkLocalMulticast() {
+				t.Fatalf("RA address must not be multicast: %v", cm.Dst)
+			}
+
+			got = append(got, m)
+		}
+	})
+	defer done()
+
+	ra := &ndp.RouterAdvertisement{
+		Options: []ndp.Option{&ndp.LinkLayerAddress{
+			Direction: ndp.Source,
+			Addr:      ad.mac,
+		}},
+	}
+
+	want := []ndp.Message{
+		ra, ra, ra,
+	}
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
+	}
 }

@@ -658,6 +658,12 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to apply ICMPv6 filter: %v", err)
 	}
 
+	// Enable inspection of IPv6 control messages.
+	flags := ipv6.FlagHopLimit | ipv6.FlagDst
+	if err := sc.c.SetControlMessage(flags, true); err != nil {
+		t.Fatalf("failed to apply IPv6 control message flags: %v", err)
+	}
+
 	if err := sc.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		t.Fatalf("failed to set client read deadline: %v", err)
 	}

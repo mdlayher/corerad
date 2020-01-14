@@ -98,6 +98,7 @@ func TestParse(t *testing.T) {
 					MaxInterval:        10 * time.Minute,
 					HopLimit:           64,
 					DefaultLifetime:    30 * time.Minute,
+					UnicastOnly:        false,
 					Plugins:            []plugin.Plugin{},
 				}},
 			},
@@ -148,6 +149,7 @@ func TestParse(t *testing.T) {
 			[[interfaces]]
 			name = "eth2"
 			hop_limit = 0
+			unicast_only = true
 
 			[debug]
 			address = "localhost:9430"
@@ -163,6 +165,8 @@ func TestParse(t *testing.T) {
 						MaxInterval:        10 * time.Minute,
 						HopLimit:           64,
 						DefaultLifetime:    30 * time.Minute,
+						MTU:                1500,
+						UnicastOnly:        false,
 						Plugins: []plugin.Plugin{
 							&plugin.Prefix{
 								Prefix:            mustCIDR("::/64"),
@@ -208,6 +212,7 @@ func TestParse(t *testing.T) {
 						MaxInterval:        10 * time.Minute,
 						HopLimit:           0,
 						DefaultLifetime:    30 * time.Minute,
+						UnicastOnly:        true,
 						Plugins:            []plugin.Plugin{},
 					},
 				},

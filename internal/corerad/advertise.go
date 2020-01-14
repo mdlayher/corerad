@@ -138,11 +138,13 @@ func (a *Advertiser) advertise(ctx context.Context, watchC <-chan struct{}) erro
 		return nil
 	})
 
-	// Multicast RA generator.
-	eg.Go(func() error {
-		a.multicast(ctx, reqC)
-		return nil
-	})
+	// Multicast RA generator, unless running in unicast-only mode.
+	if !a.cfg.UnicastOnly {
+		eg.Go(func() error {
+			a.multicast(ctx, reqC)
+			return nil
+		})
+	}
 
 	// Listener which issues RAs in response to RS messages.
 	eg.Go(func() error {
@@ -153,6 +155,7 @@ func (a *Advertiser) advertise(ctx context.Context, watchC <-chan struct{}) erro
 		return nil
 	})
 
+	// Link state watcher, unless no watch channel was specified.
 	if watchC != nil {
 		eg.Go(func() error {
 			select {
@@ -389,6 +392,11 @@ func (a *Advertiser) sendWorker(ip net.IP) error {
 // send sends a single router advertisement built from cfg to the destination IP
 // address, which may be a unicast or multicast address.
 func (a *Advertiser) send(dst net.IP, cfg config.Interface) error {
+	if cfg.UnicastOnly && dst.IsMulticast() {
+		// Nothing to do.
+		return nil
+	}
+
 	// Build a router advertisement from configuration and always append
 	// the source address option.
 	ra, err := a.buildRA(cfg)
@@ -472,7 +480,13 @@ func (a *Advertiser) init() error {
 		return fmt.Errorf("failed to send initial multicast router advertisement: %v", err)
 	}
 
-	a.logf("initialized, advertising from %s", ip)
+	// Note unicast-only mode in logs.
+	var method string
+	if a.cfg.UnicastOnly {
+		method = "unicast-only "
+	}
+
+	a.logf("initialized, advertising %sfrom %s", method, ip)
 
 	return nil
 }

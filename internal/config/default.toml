@@ -57,6 +57,11 @@ default_lifetime = "auto"
 # unspecified by this router.
 mtu = 0
 
+# Indicates whether or not CoreRAD will issue multicast router advertisements.
+# In this mode, machines on this interface's LAN must issue individual router
+# solicitations in order to receive router advertisements.
+unicast_only = false
+
   # Zero or more plugins may be specified to modify the behavior of the router
   # advertisements produced by CoreRAD.
 
