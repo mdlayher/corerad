@@ -117,7 +117,9 @@ func (g *Group) Wait() error {
 	// See if the task heap is already empty. If so, we can exit early.
 	g.mu.Lock()
 	if g.tasks.Len() == 0 {
-		defer g.mu.Unlock()
+		// Release the mutex immediately so that any running jobs are able to
+		// complete and send on g.lenC.
+		g.mu.Unlock()
 		g.cancel()
 		return g.eg.Wait()
 	}
@@ -177,9 +179,11 @@ func (g *Group) monitor(ctx context.Context) {
 			return
 		case <-g.addC:
 			// A new task was added, check task heap again.
+			//lint:ignore SA4011 intentional break for code coverage
 			break
 		case <-tickC:
 			// An existing task should be ready as of now.
+			//lint:ignore SA4011 intentional break for code coverage
 			break
 		}
 	}
