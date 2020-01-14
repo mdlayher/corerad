@@ -31,7 +31,7 @@ import (
 )
 
 func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
-	_, done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
 		// Consume the initial multicast.
 		if _, _, _, err := cctx.c.ReadFrom(); err != nil {
 			t.Fatalf("failed to read multicast RA: %v", err)
@@ -120,8 +120,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 		DefaultLifetime: lifetime,
 	}
 
-	var got []ndp.Message
-	ad, done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
 		m0, _, _, err := cctx.c.ReadFrom()
 		if err != nil {
 			t.Fatalf("failed to read RA: %v", err)
@@ -139,33 +138,26 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 			t.Fatalf("failed to read RA: %v", err)
 		}
 
-		got = []ndp.Message{m0, m1}
+		// Expect only the first message to contain a RouterLifetime field as it
+		// should be cleared when forwarding is disabled.
+		want := []*ndp.RouterAdvertisement{
+			{RouterLifetime: lifetime},
+			{RouterLifetime: 0},
+		}
+
+		// Don't care about options, nothing special is configured for options
+		// in the interface config.
+		ra0 := m0.(*ndp.RouterAdvertisement)
+		ra0.Options = nil
+		ra1 := m1.(*ndp.RouterAdvertisement)
+		ra1.Options = nil
+
+		got := []*ndp.RouterAdvertisement{ra0, ra1}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("unexpected router advertisements (-want +got):\n%s", diff)
+		}
 	})
 	defer done()
-
-	options := []ndp.Option{&ndp.LinkLayerAddress{
-		Direction: ndp.Source,
-		Addr:      ad.mac,
-	}}
-
-	// Expect only the first message to contain a RouterLifetime field as it
-	// should be cleared on shutdown.
-	want := []ndp.Message{
-		// Unsolicited.
-		&ndp.RouterAdvertisement{
-			RouterLifetime: lifetime,
-			Options:        options,
-		},
-		// Solicited.
-		&ndp.RouterAdvertisement{
-			RouterLifetime: 0,
-			Options:        options,
-		},
-	}
-
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("unexpected router advertisements (-want +got):\n%s", diff)
-	}
 }
 
 func TestAdvertiserLinuxSLAAC(t *testing.T) {
@@ -186,7 +178,7 @@ func TestAdvertiserLinuxSLAAC(t *testing.T) {
 		Plugins: []plugin.Plugin{pfx},
 	}
 
-	_, done := testAdvertiserClient(t, icfg, tcfg, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, icfg, tcfg, func(cancel func(), cctx *clientContext) {
 		// Consume the initial multicast router advertisement.
 		_, cm, _, err := cctx.c.ReadFrom()
 		if err != nil {
@@ -224,7 +216,7 @@ func TestAdvertiserLinuxSLAAC(t *testing.T) {
 func TestAdvertiserLinuxReinitialize(t *testing.T) {
 	skipShort(t)
 
-	_, done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
 		if err := cctx.c.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 			t.Fatalf("failed to extend read deadline: %v", err)
 		}
@@ -262,17 +254,20 @@ func TestAdvertiserLinuxReinitialize(t *testing.T) {
 }
 
 func TestAdvertiserLinuxSolicitedUnicastOnly(t *testing.T) {
-	var got []ndp.Message
 	cfg := &config.Interface{UnicastOnly: true}
-	ad, done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
 		// Issue repeated router solicitations and expect router advertisements
 		// in response.
 		for i := 0; i < 3; i++ {
+			if err := cctx.c.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+				t.Fatalf("failed to extend read deadline: %v", err)
+			}
+
 			if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
 				t.Fatalf("failed to send RS: %v", err)
 			}
 
-			m, cm, _, err := cctx.c.ReadFrom()
+			_, cm, _, err := cctx.c.ReadFrom()
 			if err != nil {
 				t.Fatalf("failed to read RA: %v", err)
 			}
@@ -280,24 +275,7 @@ func TestAdvertiserLinuxSolicitedUnicastOnly(t *testing.T) {
 			if cm.Dst.IsLinkLocalMulticast() {
 				t.Fatalf("RA address must not be multicast: %v", cm.Dst)
 			}
-
-			got = append(got, m)
 		}
 	})
 	defer done()
-
-	ra := &ndp.RouterAdvertisement{
-		Options: []ndp.Option{&ndp.LinkLayerAddress{
-			Direction: ndp.Source,
-			Addr:      ad.mac,
-		}},
-	}
-
-	want := []ndp.Message{
-		ra, ra, ra,
-	}
-
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
-	}
 }
