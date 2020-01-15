@@ -383,7 +383,7 @@ func testSimulatedAdvertiserClient(
 	cfg.MaxInterval = 1 * time.Second
 	cfg.Name = "test0"
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	ad := NewAdvertiser(
@@ -646,7 +646,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to apply IPv6 control message flags: %v", err)
 	}
 
-	if err := sc.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+	if err := sc.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 		t.Fatalf("failed to set client read deadline: %v", err)
 	}
 
