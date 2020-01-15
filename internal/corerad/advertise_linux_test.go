@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -226,19 +227,26 @@ func TestAdvertiserLinuxReinitialize(t *testing.T) {
 			t.Fatalf("failed to read first RA: %v", err)
 		}
 
-		// Now bring the link down so it is not ready, forcing a reinitialization.
-		shell(t, "ip", "link", "set", "down", cctx.router.Name)
-
 		// TODO: shorten timeout once link state is watched.
 		time.AfterFunc(20*time.Second, func() {
 			panic("took too long to reinitialize")
 		})
 
-		// Wait for the reinit process to begin, bring the link up, and wait
-		// for it to end.
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Make the link state flap, forcing a reinit by the watcher.
+			shell(t, "ip", "link", "set", "down", cctx.router.Name)
+			shell(t, "ip", "link", "set", "up", cctx.router.Name)
+		}()
+
+		// Watch for reinit events sent by the link change.
 		<-cctx.reinitC
-		shell(t, "ip", "link", "set", "up", cctx.router.Name)
 		<-cctx.reinitC
+
+		wg.Wait()
 
 		// Consume the multicast router advertisement immediately after reinit.
 		m, _, _, err := cctx.c.ReadFrom()
