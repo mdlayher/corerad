@@ -230,7 +230,7 @@ func checkInterface(iface string) (*net.Interface, error) {
 		}
 	}
 	if !foundLL {
-		return nil, fmt.Errorf("interface %q has no IPv6 link-local address: %w", iface, err)
+		return nil, fmt.Errorf("interface %q has no IPv6 link-local address: %w", iface, errLinkNotReady)
 	}
 
 	return ifi, nil
