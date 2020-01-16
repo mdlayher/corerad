@@ -193,7 +193,7 @@ func (s *Server) runDebug(ctx context.Context) error {
 // network listener errors as appropriate.
 func (s *Server) serve(ctx context.Context, fn func() error) error {
 	const (
-		attempts = 10
+		attempts = 40
 		delay    = 3 * time.Second
 	)
 
