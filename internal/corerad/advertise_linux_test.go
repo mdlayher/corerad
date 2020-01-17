@@ -232,19 +232,26 @@ func TestAdvertiserLinuxReinitialize(t *testing.T) {
 			panic("took too long to reinitialize")
 		})
 
+		// Coordinate lockstep between goroutines.
+		sigC := make(chan struct{})
+
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
 			// Make the link state flap, forcing a reinit by the watcher.
+			sigC <- struct{}{}
 			shell(t, "ip", "link", "set", "down", cctx.router.Name)
+			sigC <- struct{}{}
 			shell(t, "ip", "link", "set", "up", cctx.router.Name)
 		}()
 
-		// Watch for reinit events sent by the link change.
-		<-cctx.reinitC
-		<-cctx.reinitC
+		// Watch for reinit event sent by the link change.
+		for i := 0; i < 2; i++ {
+			<-sigC
+			<-cctx.reinitC
+		}
 
 		wg.Wait()
 
