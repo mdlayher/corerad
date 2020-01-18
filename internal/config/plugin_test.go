@@ -14,6 +14,7 @@
 package config
 
 import (
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -25,6 +26,9 @@ import (
 	"github.com/mdlayher/ndp"
 )
 
+// Tests in this file use a greatly reduced config to test plugin parsing edge
+// cases. The config as a whole is not expected to be valid.
+
 func Test_parseDNSSL(t *testing.T) {
 	t.Parallel()
 
@@ -35,32 +39,20 @@ func Test_parseDNSSL(t *testing.T) {
 		ok   bool
 	}{
 		{
-			name: "unknown key",
-			s: `
-			name = "dnssl"
-			bad = true
-			`,
-		},
-		{
 			name: "bad lifetime",
 			s: `
-			name = "dnssl"
-			lifetime = "foo"
-			`,
-		},
-		{
-			name: "bad domain names",
-			s: `
-			name = "dnssl"
-			domain_names = [1]
+			[[interfaces]]
+			  [[interfaces.dnssl]]
+			  lifetime = "foo"
 			`,
 		},
 		{
 			name: "OK explicit",
 			s: `
-			name = "dnssl"
-			domain_names = ["foo.example.com", "bar.example.com"]
-			lifetime = "30s"
+			[[interfaces]]
+			  [[interfaces.dnssl]]
+			  domain_names = ["foo.example.com", "bar.example.com"]
+			  lifetime = "30s"
 			`,
 			d: &plugin.DNSSL{
 				Lifetime:    30 * time.Second,
@@ -71,8 +63,9 @@ func Test_parseDNSSL(t *testing.T) {
 		{
 			name: "OK implicit",
 			s: `
-			name = "dnssl"
-			domain_names = ["foo.example.com"]
+			[[interfaces]]
+			  [[interfaces.dnssl]]
+			  domain_names = ["foo.example.com"]
 			`,
 			d: &plugin.DNSSL{
 				Lifetime:    20 * time.Minute,
@@ -83,9 +76,10 @@ func Test_parseDNSSL(t *testing.T) {
 		{
 			name: "OK auto",
 			s: `
-			name = "dnssl"
-			domain_names = ["foo.example.com"]
-			lifetime = "auto"
+			[[interfaces]]
+			  [[interfaces.dnssl]]
+			  domain_names = ["foo.example.com"]
+			  lifetime = "auto"
 			`,
 			d: &plugin.DNSSL{
 				Lifetime:    20 * time.Minute,
@@ -98,6 +92,47 @@ func Test_parseDNSSL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pluginDecode(t, tt.s, tt.ok, tt.d)
+		})
+	}
+}
+
+func Test_parseMTU(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		s    string
+		m    *plugin.MTU
+		ok   bool
+	}{
+		{
+			name: "too low",
+			s: `
+			[[interfaces]]
+			mtu = -1
+			`,
+		},
+		{
+			name: "too high",
+			s: `
+			[[interfaces]]
+			mtu = 999999
+			`,
+		},
+		{
+			name: "OK",
+			s: `
+			[[interfaces]]
+			mtu = 1500
+			`,
+			m:  plugin.NewMTU(1500),
+			ok: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pluginDecode(t, tt.s, tt.ok, tt.m)
 		})
 	}
 }
@@ -120,57 +155,90 @@ func Test_parsePrefix(t *testing.T) {
 		ok   bool
 	}{
 		{
-			name: "unknown key",
-			s: `
-			name = "prefix"
-			bad = true
-			`,
-		},
-		{
 			name: "no prefix",
 			s: `
-			name = "prefix"
+			[[interfaces]]
+			  [[interfaces.prefix]]
 			`,
 		},
 		{
-			name: "bad prefix",
+			name: "bad prefix string",
 			s: `
-			name = "prefix"
-			prefix = "foo"
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "foo"
 			`,
 		},
 		{
-			name: "bad valid lifetime",
+			name: "bad prefix individual IP",
 			s: `
-			name = "prefix"
-			prefix = "::/64"
-			preferred_lifetime = "2s"
-			valid_lifetime = ""
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::1/64"
 			`,
 		},
 		{
-			name: "bad preferred lifetime",
+			name: "bad prefix IPv4",
 			s: `
-			name = "prefix"
-			prefix = "::/64"
-			preferred_lifetime = ""
-			valid_lifetime = "2s"
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "192.0.2.0/24"
+			`,
+		},
+		{
+			name: "bad valid lifetime string",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  valid_lifetime = "foo"
+			`,
+		},
+		{
+			name: "bad valid lifetime zero",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  valid_lifetime = ""
+			`,
+		},
+		{
+			name: "bad preferred lifetime string",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  preferred_lifetime = "foo"
+			  valid_lifetime = "2s"
+			`,
+		},
+		{
+			name: "bad preferred lifetime zero",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  preferred_lifetime = ""
+			  valid_lifetime = "2s"
 			`,
 		},
 		{
 			name: "bad lifetimes",
 			s: `
-			name = "prefix"
-			prefix = "::/64"
-			preferred_lifetime = "2s"
-			valid_lifetime = "1s"
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  preferred_lifetime = "2s"
+			  valid_lifetime = "1s"
 			`,
 		},
 		{
 			name: "OK defaults",
 			s: `
-			name = "prefix"
-			prefix = "::/64"
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
 			`,
 			p:  defaults,
 			ok: true,
@@ -178,10 +246,11 @@ func Test_parsePrefix(t *testing.T) {
 		{
 			name: "OK auto durations",
 			s: `
-			name = "prefix"
-			prefix = "::/64"
-			preferred_lifetime = "auto"
-			valid_lifetime = "auto"
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  preferred_lifetime = "auto"
+			  valid_lifetime = "auto"
 			`,
 			p:  defaults,
 			ok: true,
@@ -189,10 +258,11 @@ func Test_parsePrefix(t *testing.T) {
 		{
 			name: "OK infinite durations",
 			s: `
-			name = "prefix"
-			prefix = "::/64"
-			preferred_lifetime = "infinite"
-			valid_lifetime = "infinite"
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  preferred_lifetime = "infinite"
+			  valid_lifetime = "infinite"
 			`,
 			p: &plugin.Prefix{
 				Prefix:            mustCIDR("::/64"),
@@ -206,12 +276,13 @@ func Test_parsePrefix(t *testing.T) {
 		{
 			name: "OK explicit",
 			s: `
-			name = "prefix"
-			prefix = "::/64"
-			autonomous = false
-			on_link = true
-			preferred_lifetime = "30s"
-			valid_lifetime = "60s"
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  autonomous = false
+			  on_link = true
+			  preferred_lifetime = "30s"
+			  valid_lifetime = "60s"
 			`,
 			p: &plugin.Prefix{
 				Prefix:            mustCIDR("::/64"),
@@ -240,32 +311,28 @@ func Test_parseRDNSS(t *testing.T) {
 		ok   bool
 	}{
 		{
-			name: "unknown key",
-			s: `
-			name = "rdnss"
-			bad = true
-			`,
-		},
-		{
 			name: "bad lifetime",
 			s: `
-			name = "rdnss"
-			lifetime = "foo"
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  lifetime = "foo"
 			`,
 		},
 		{
 			name: "bad servers",
 			s: `
-			name = "rdnss"
-			servers = ["192.0.2.1"]
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["192.0.2.1"]
 			`,
 		},
 		{
 			name: "OK explicit",
 			s: `
-			name = "rdnss"
-			servers = ["2001:db8::1", "2001:db8::2"]
-			lifetime = "30s"
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["2001:db8::1", "2001:db8::2"]
+			  lifetime = "30s"
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 30 * time.Second,
@@ -279,8 +346,9 @@ func Test_parseRDNSS(t *testing.T) {
 		{
 			name: "OK implicit",
 			s: `
-			name = "rdnss"
-			servers = ["2001:db8::1"]
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["2001:db8::1"]
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
@@ -291,9 +359,10 @@ func Test_parseRDNSS(t *testing.T) {
 		{
 			name: "OK auto",
 			s: `
-			name = "rdnss"
-			servers = ["2001:db8::1"]
-			lifetime = "auto"
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["2001:db8::1"]
+			  lifetime = "auto"
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
@@ -313,17 +382,18 @@ func Test_parseRDNSS(t *testing.T) {
 func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 	t.Helper()
 
-	var m map[string]toml.Primitive
-
-	md, err := toml.DecodeReader(strings.NewReader(s), &m)
-	if err != nil {
+	var f file
+	if _, err := toml.DecodeReader(strings.NewReader(s), &f); err != nil {
 		t.Fatalf("failed to decode TOML: %v", err)
+	}
+	if l := len(f.Interfaces); l != 1 {
+		t.Fatalf("expected one configured interface, but got: %d", l)
 	}
 
 	// Defaults used when computing automatic values.
-	iface := Interface{MaxInterval: 10 * time.Minute}
+	const maxInterval = 10 * time.Minute
 
-	got, err := parsePlugin(iface, md, m)
+	got, err := parsePlugins(f.Interfaces[0], maxInterval)
 	if ok && err != nil {
 		t.Fatalf("failed to parse Plugin: %v", err)
 	}
@@ -335,7 +405,29 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 		return
 	}
 
-	if diff := cmp.Diff(want, got); diff != "" {
+	if diff := cmp.Diff([]plugin.Plugin{want}, got); diff != "" {
 		t.Fatalf("unexpected Plugin (-want +got):\n%s", diff)
 	}
+}
+
+func mustIP(s string) net.IP {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		panicf("failed to parse %q as IP address", s)
+	}
+
+	return ip
+}
+
+func mustCIDR(s string) *net.IPNet {
+	_, ipn, err := net.ParseCIDR(s)
+	if err != nil {
+		panicf("failed to parse CIDR: %v", err)
+	}
+
+	return ipn
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }

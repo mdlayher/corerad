@@ -57,25 +57,6 @@ func TestParse(t *testing.T) {
 			`,
 		},
 		{
-			name: "bad plugin empty name",
-			s: `
-			[[interfaces]]
-			name = "eth0"
-
-			  [[interfaces.plugins]]
-			`,
-		},
-		{
-			name: "bad plugin name",
-			s: `
-			[[interfaces]]
-			name = "eth0"
-
-			  [[interfaces.plugins]]
-			  name = "bad"
-			`,
-		},
-		{
 			name: "bad debug address",
 			s: `
 			[[interfaces]]
@@ -99,7 +80,6 @@ func TestParse(t *testing.T) {
 					HopLimit:           64,
 					DefaultLifetime:    30 * time.Minute,
 					UnicastOnly:        false,
-					Plugins:            []plugin.Plugin{},
 				}},
 			},
 			ok: true,
@@ -116,22 +96,18 @@ func TestParse(t *testing.T) {
 			default_lifetime = "auto"
 			mtu = 1500
 
-			  [[interfaces.plugins]]
-			  name = "prefix"
+			  [[interfaces.prefix]]
 			  prefix = "::/64"
 
-			  [[interfaces.plugins]]
-			  name = "prefix"
+			  [[interfaces.prefix]]
 			  prefix = "2001:db8::/64"
 			  autonomous = false
 
-			  [[interfaces.plugins]]
-			  name = "rdnss"
+			  [[interfaces.rdnss]]
 			  lifetime = "auto"
 			  servers = ["2001:db8::1"]
 
-			  [[interfaces.plugins]]
-			  name = "dnssl"
+			  [[interfaces.dnssl]]
 			  lifetime = "auto"
 			  domain_names = ["lan.example.com"]
 
@@ -165,7 +141,6 @@ func TestParse(t *testing.T) {
 						MaxInterval:        10 * time.Minute,
 						HopLimit:           64,
 						DefaultLifetime:    30 * time.Minute,
-						MTU:                1500,
 						UnicastOnly:        false,
 						Plugins: []plugin.Plugin{
 							&plugin.Prefix{
@@ -190,6 +165,7 @@ func TestParse(t *testing.T) {
 								Lifetime:    20 * time.Minute,
 								DomainNames: []string{"lan.example.com"},
 							},
+							plugin.NewMTU(1500),
 						},
 					},
 					{
@@ -203,7 +179,6 @@ func TestParse(t *testing.T) {
 						ReachableTime:      30 * time.Second,
 						RetransmitTimer:    5 * time.Second,
 						DefaultLifetime:    8 * time.Second,
-						Plugins:            []plugin.Plugin{},
 					},
 					{
 						Name:               "eth2",
@@ -213,7 +188,6 @@ func TestParse(t *testing.T) {
 						HopLimit:           0,
 						DefaultLifetime:    30 * time.Minute,
 						UnicastOnly:        true,
-						Plugins:            []plugin.Plugin{},
 					},
 				},
 				Debug: config.Debug{
@@ -254,20 +228,16 @@ func TestParseDefaults(t *testing.T) {
 		[[interfaces]]
 		name = "eth0"
 
-		  [[interfaces.plugins]]
-		  name = "prefix"
+		  [[interfaces.prefix]]
 		  prefix = "::/64"
 
-		  [[interfaces.plugins]]
-		  name = "prefix"
+		  [[interfaces.prefix]]
 		  prefix = "2001:db8::/64"
 
-		  [[interfaces.plugins]]
-		  name = "rdnss"
+		  [[interfaces.rdnss]]
 		  servers = ["2001:db8::1", "2001:db8::2"]
 
-		  [[interfaces.plugins]]
-		  name = "dnssl"
+		  [[interfaces.dnssl]]
 		  domain_names = ["foo.example.com"]
 
 		[debug]

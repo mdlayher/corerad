@@ -78,7 +78,6 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 			// appropriately over the wire.
 			cfg := &config.Interface{
 				OtherConfig: true,
-				MTU:         1500,
 				Plugins: []plugin.Plugin{
 					&plugin.DNSSL{
 						Lifetime: 10 * time.Second,
@@ -102,6 +101,7 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 							mustIP("2001:db8::2"),
 						},
 					},
+					plugin.NewMTU(1500),
 				},
 			}
 
