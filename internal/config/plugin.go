@@ -62,6 +62,11 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin,
 		plugins = append(plugins, &m)
 	}
 
+	// Always set unless explicitly false.
+	if ifi.SourceLLA == nil || *ifi.SourceLLA {
+		plugins = append(plugins, &plugin.LLA{})
+	}
+
 	return plugins, nil
 }
 

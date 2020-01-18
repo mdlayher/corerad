@@ -65,6 +65,33 @@ func (d *DNSSL) Apply(ra *ndp.RouterAdvertisement) error {
 	return nil
 }
 
+// LLA configures a NDP Source Link Layer Address option.
+type LLA net.HardwareAddr
+
+// Name implements Plugin.
+func (l *LLA) Name() string { return "lla" }
+
+// String implements Plugin.
+func (l *LLA) String() string {
+	return fmt.Sprintf("source link-layer address: %s", net.HardwareAddr(*l))
+}
+
+// Prepare implements Plugin.
+func (l *LLA) Prepare(ifi *net.Interface) error {
+	*l = LLA(ifi.HardwareAddr)
+	return nil
+}
+
+// Apply implements Plugin.
+func (l *LLA) Apply(ra *ndp.RouterAdvertisement) error {
+	ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
+		Direction: ndp.Source,
+		Addr:      net.HardwareAddr(*l),
+	})
+
+	return nil
+}
+
 // MTU configures a NDP MTU option.
 type MTU int
 

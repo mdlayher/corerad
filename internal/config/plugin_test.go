@@ -390,6 +390,12 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 		t.Fatalf("expected one configured interface, but got: %d", l)
 	}
 
+	// For test purposes, only attach source LLA if explicitly true.
+	if f.Interfaces[0].SourceLLA == nil {
+		v := false
+		f.Interfaces[0].SourceLLA = &v
+	}
+
 	// Defaults used when computing automatic values.
 	const maxInterval = 10 * time.Minute
 

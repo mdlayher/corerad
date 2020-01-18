@@ -38,6 +38,16 @@ func TestPluginString(t *testing.T) {
 			s: "domain names: [foo.example.com, bar.example.com], lifetime: 30s",
 		},
 		{
+			name: "LLA",
+			p:    &LLA{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+			s:    "source link-layer address: de:ad:be:ef:de:ad",
+		},
+		{
+			name: "MTU",
+			p:    NewMTU(1500),
+			s:    "MTU: 1500",
+		},
+		{
 			name: "Prefix",
 			p: &Prefix{
 				Prefix:            mustCIDR("::/64"),
@@ -72,23 +82,18 @@ func TestPluginString(t *testing.T) {
 
 func TestBuild(t *testing.T) {
 	tests := []struct {
-		name    string
-		plugins []Plugin
-		ra      *ndp.RouterAdvertisement
+		name   string
+		plugin Plugin
+		ifi    *net.Interface
+		ra     *ndp.RouterAdvertisement
 	}{
 		{
-			name: "no config",
-			ra:   &ndp.RouterAdvertisement{},
-		},
-		{
 			name: "DNSSL",
-			plugins: []Plugin{
-				&DNSSL{
-					Lifetime: 10 * time.Second,
-					DomainNames: []string{
-						"foo.example.com",
-						"bar.example.com",
-					},
+			plugin: &DNSSL{
+				Lifetime: 10 * time.Second,
+				DomainNames: []string{
+					"foo.example.com",
+					"bar.example.com",
 				},
 			},
 			ra: &ndp.RouterAdvertisement{
@@ -104,14 +109,34 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "static prefix",
-			plugins: []Plugin{
-				&Prefix{
-					Prefix:            mustCIDR("2001:db8::/32"),
-					OnLink:            true,
-					PreferredLifetime: 10 * time.Second,
-					ValidLifetime:     20 * time.Second,
+			name:   "LLA",
+			plugin: &LLA{},
+			ifi: &net.Interface{
+				HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.LinkLayerAddress{
+						Direction: ndp.Source,
+						Addr:      net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+					},
 				},
+			},
+		},
+		{
+			name:   "MTU",
+			plugin: NewMTU(1500),
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{ndp.NewMTU(1500)},
+			},
+		},
+		{
+			name: "static prefix",
+			plugin: &Prefix{
+				Prefix:            mustCIDR("2001:db8::/32"),
+				OnLink:            true,
+				PreferredLifetime: 10 * time.Second,
+				ValidLifetime:     20 * time.Second,
 			},
 			ra: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
@@ -127,26 +152,24 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "automatic prefixes",
-			plugins: []Plugin{
-				&Prefix{
-					Prefix:            mustCIDR("::/64"),
-					OnLink:            true,
-					Autonomous:        true,
-					PreferredLifetime: 10 * time.Second,
-					ValidLifetime:     20 * time.Second,
+			plugin: &Prefix{
+				Prefix:            mustCIDR("::/64"),
+				OnLink:            true,
+				Autonomous:        true,
+				PreferredLifetime: 10 * time.Second,
+				ValidLifetime:     20 * time.Second,
 
-					Addrs: func() ([]net.Addr, error) {
-						return []net.Addr{
-							// Populate some addresses that should be ignored.
-							mustCIDR("192.0.2.1/24"),
-							&net.TCPAddr{},
-							mustCIDR("fe80::1/64"),
-							mustCIDR("fdff::1/32"),
-							mustCIDR("2001:db8::1/64"),
-							mustCIDR("2001:db8::2/64"),
-							mustCIDR("fd00::1/64"),
-						}, nil
-					},
+				Addrs: func() ([]net.Addr, error) {
+					return []net.Addr{
+						// Populate some addresses that should be ignored.
+						mustCIDR("192.0.2.1/24"),
+						&net.TCPAddr{},
+						mustCIDR("fe80::1/64"),
+						mustCIDR("fdff::1/32"),
+						mustCIDR("2001:db8::1/64"),
+						mustCIDR("2001:db8::2/64"),
+						mustCIDR("fd00::1/64"),
+					}, nil
 				},
 			},
 			ra: &ndp.RouterAdvertisement{
@@ -172,13 +195,11 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "RDNSS",
-			plugins: []Plugin{
-				&RDNSS{
-					Lifetime: 10 * time.Second,
-					Servers: []net.IP{
-						mustIP("2001:db8::1"),
-						mustIP("2001:db8::2"),
-					},
+			plugin: &RDNSS{
+				Lifetime: 10 * time.Second,
+				Servers: []net.IP{
+					mustIP("2001:db8::1"),
+					mustIP("2001:db8::2"),
 				},
 			},
 			ra: &ndp.RouterAdvertisement{
@@ -198,10 +219,15 @@ func TestBuild(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ra := new(ndp.RouterAdvertisement)
-			for _, p := range tt.plugins {
-				if err := p.Apply(ra); err != nil {
-					t.Fatalf("failed to apply %q: %v", p.Name(), err)
+
+			if tt.ifi != nil {
+				if err := tt.plugin.Prepare(tt.ifi); err != nil {
+					t.Fatalf("failed to prepare: %v", err)
 				}
+			}
+
+			if err := tt.plugin.Apply(ra); err != nil {
+				t.Fatalf("failed to apply: %v", err)
 			}
 
 			if diff := cmp.Diff(tt.ra, ra); diff != "" {

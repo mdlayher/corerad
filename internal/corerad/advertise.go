@@ -440,13 +440,6 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 		}
 	}
 
-	// TODO: apparently it is also valid to omit this, but we can think
-	// about that later.
-	ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
-		Direction: ndp.Source,
-		Addr:      a.mac,
-	})
-
 	return ra, nil
 }
 

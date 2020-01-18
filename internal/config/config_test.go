@@ -80,6 +80,7 @@ func TestParse(t *testing.T) {
 					HopLimit:           64,
 					DefaultLifetime:    30 * time.Minute,
 					UnicastOnly:        false,
+					Plugins:            []plugin.Plugin{&plugin.LLA{}},
 				}},
 			},
 			ok: true,
@@ -121,11 +122,13 @@ func TestParse(t *testing.T) {
 			other_config = true
 			reachable_time = "30s"
 			retransmit_timer = "5s"
+			source_lla = true
 
 			[[interfaces]]
 			name = "eth2"
 			hop_limit = 0
 			unicast_only = true
+			source_lla = false
 
 			[debug]
 			address = "localhost:9430"
@@ -166,6 +169,7 @@ func TestParse(t *testing.T) {
 								DomainNames: []string{"lan.example.com"},
 							},
 							plugin.NewMTU(1500),
+							&plugin.LLA{},
 						},
 					},
 					{
@@ -179,6 +183,7 @@ func TestParse(t *testing.T) {
 						ReachableTime:      30 * time.Second,
 						RetransmitTimer:    5 * time.Second,
 						DefaultLifetime:    8 * time.Second,
+						Plugins:            []plugin.Plugin{&plugin.LLA{}},
 					},
 					{
 						Name:               "eth2",

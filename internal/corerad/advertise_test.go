@@ -102,6 +102,8 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 						},
 					},
 					plugin.NewMTU(1500),
+					// Initialized by Plugin.Prepare.
+					&plugin.LLA{},
 				},
 			}
 
@@ -149,7 +151,7 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 			// compare it because we don't want to bother comparing against
 			// a specific MAC address (which is randomized by the kernel).
 			final := ra.Options[len(ra.Options)-1]
-			if lla, ok := final.(*ndp.LinkLayerAddress); !ok || lla.Direction != ndp.Source {
+			if lla, ok := final.(*ndp.LinkLayerAddress); !ok || lla.Direction != ndp.Source || len(lla.Addr) != 6 {
 				t.Fatalf("final RA option is not source link-layer address option: %#v", final)
 			}
 
@@ -199,7 +201,7 @@ func TestAdvertiserUnsolicitedShutdown(t *testing.T) {
 					// Don't care about options, nothing special is configured
 					// for options in the interface config.
 					ra := m.(*ndp.RouterAdvertisement)
-					ra.Options = nil
+					//ra.Options = nil
 
 					got = append(got, ra)
 					cancel()

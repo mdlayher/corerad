@@ -57,6 +57,10 @@ default_lifetime = "auto"
 # unspecified by this router.
 mtu = 0
 
+# AdvSourceLLAddress: attaches a NDP source link-layer address option to the
+# router advertisement. Defaults to true when omitted.
+source_lla = true
+
 # Indicates whether or not CoreRAD will issue multicast router advertisements.
 # In this mode, machines on this interface's LAN must issue individual router
 # solicitations in order to receive router advertisements.
