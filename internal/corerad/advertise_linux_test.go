@@ -172,11 +172,16 @@ func TestAdvertiserLinuxSLAAC(t *testing.T) {
 
 	prefix := mustCIDR("2001:db8:dead:beef::/64")
 
-	pfx := plugin.NewPrefix()
-	pfx.Prefix = prefix
-
 	icfg := &config.Interface{
-		Plugins: []plugin.Plugin{pfx},
+		Plugins: []plugin.Plugin{
+			&plugin.Prefix{
+				Prefix:            prefix,
+				OnLink:            true,
+				Autonomous:        true,
+				ValidLifetime:     24 * time.Hour,
+				PreferredLifetime: 4 * time.Hour,
+			},
+		},
 	}
 
 	done := testAdvertiserClient(t, icfg, tcfg, func(cancel func(), cctx *clientContext) {

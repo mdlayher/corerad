@@ -62,20 +62,17 @@ mtu = 0
 # solicitations in order to receive router advertisements.
 unicast_only = false
 
-  # Zero or more plugins may be specified to modify the behavior of the router
-  # advertisements produced by CoreRAD.
-
-  # "prefix" plugin: attaches a NDP Prefix Information option to the router
-  # advertisement.
-  [[interfaces.plugins]]
-  name = "prefix"
+  # Prefix: attaches a NDP Prefix Information option to the router advertisement.
+  [[interfaces.prefix]]
   # Serve Prefix Information options for each IPv6 prefix on this interface
   # configured with a /64 CIDR mask.
   prefix = "::/64"
+
   # Specifies on-link and autonomous address autoconfiguration (SLAAC) flags
   # for this prefix. Both default to true.
   on_link = true
   autonomous = true
+
   # Specifies the preferred and valid lifetimes for this prefix. The preferred
   # lifetime must not exceed the valid lifetime. By default, the preferred
   # lifetime is 4 hours and the valid lifetime is 24 hours. "auto" uses the
@@ -84,14 +81,11 @@ unicast_only = false
   valid_lifetime = "auto"
 
   # Alternatively, serve an explicit IPv6 prefix.
-  [[interfaces.plugins]]
-  name = "prefix"
+  [[interfaces.prefix]]
   prefix = "2001:db8::/64"
 
-  # "rdnss" plugin: attaches a NDP Recursive DNS Servers option to the router
-  # advertisement.
-  [[interfaces.plugins]]
-  name = "rdnss"
+  # RDNSS: attaches a NDP Recursive DNS Servers option to the router advertisement.
+  [[interfaces.rdnss]]
   # The maximum time these RDNSS addresses may be used for name resolution.
   # An empty string or 0 means these servers should no longer be used.
   # "auto" will compute a sane default. "infinite" means these servers should
@@ -99,10 +93,8 @@ unicast_only = false
   lifetime = "auto"
   servers = ["2001:db8::1", "2001:db8::2"]
 
-  # "dnssl" plugin: attaches a NDP DNS Search List option to the router
-  # advertisement.
-  [[interfaces.plugins]]
-  name = "dnssl"
+  # DNSSL: attaches a NDP DNS Search List option to the router advertisement.
+  [[interfaces.dnssl]]
   # The maximum time these DNSSL domain names may be used for name resolution.
   # An empty string or 0 means these search domains should no longer be used.
   # "auto" will compute a sane default. "infinite" means these search domains

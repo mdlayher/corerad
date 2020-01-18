@@ -65,6 +65,30 @@ func (d *DNSSL) Apply(ra *ndp.RouterAdvertisement) error {
 	return nil
 }
 
+// MTU configures a NDP MTU option.
+type MTU int
+
+// NewMTU creates a MTU from an integer.
+func NewMTU(mtu int) *MTU {
+	m := MTU(mtu)
+	return &m
+}
+
+// Name implements Plugin.
+func (m *MTU) Name() string { return "mtu" }
+
+// String implements Plugin.
+func (m *MTU) String() string { return fmt.Sprintf("MTU: %d", *m) }
+
+// Prepare implements Plugin.
+func (*MTU) Prepare(_ *net.Interface) error { return nil }
+
+// Apply implements Plugin.
+func (m *MTU) Apply(ra *ndp.RouterAdvertisement) error {
+	ra.Options = append(ra.Options, ndp.NewMTU(uint32(*m)))
+	return nil
+}
+
 // A Prefix configures a NDP Prefix Information option.
 type Prefix struct {
 	Prefix            *net.IPNet
@@ -73,17 +97,6 @@ type Prefix struct {
 	ValidLifetime     time.Duration
 	PreferredLifetime time.Duration
 	Addrs             func() ([]net.Addr, error)
-}
-
-// NewPrefix creates a Prefix with default values configured as specified
-// by radvd.
-func NewPrefix() *Prefix {
-	return &Prefix{
-		OnLink:            true,
-		Autonomous:        true,
-		ValidLifetime:     24 * time.Hour,
-		PreferredLifetime: 4 * time.Hour,
-	}
 }
 
 // Name implements Plugin.

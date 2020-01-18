@@ -85,9 +85,10 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		return nil, err
 	}
 
-	// Loopback has an MTU of 65536 on Linux. Good enough?
-	if ifi.MTU < 0 || ifi.MTU > 65536 {
-		return nil, fmt.Errorf("MTU (%d) must be between 0 and 65536", ifi.MTU)
+	// Parse plugins using the remaining rawInterface fields.
+	plugins, err := parsePlugins(ifi, maxInterval)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Interface{
@@ -101,8 +102,8 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		RetransmitTimer:    retrans,
 		HopLimit:           uint8(hopLimit),
 		DefaultLifetime:    lifetime,
-		MTU:                ifi.MTU,
 		UnicastOnly:        ifi.UnicastOnly,
+		Plugins:            plugins,
 	}, nil
 }
 

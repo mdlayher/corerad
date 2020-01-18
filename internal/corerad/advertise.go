@@ -440,11 +440,6 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 		}
 	}
 
-	// Apply MTU option if set.
-	if ifi.MTU != 0 {
-		ra.Options = append(ra.Options, ndp.NewMTU(uint32(ifi.MTU)))
-	}
-
 	// TODO: apparently it is also valid to omit this, but we can think
 	// about that later.
 	ra.Options = append(ra.Options, &ndp.LinkLayerAddress{

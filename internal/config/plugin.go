@@ -16,174 +16,166 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/mdlayher/corerad/internal/plugin"
 )
 
-// parsePlugin parses raw plugin key/values into a Plugin.
-func parsePlugin(iface Interface, md toml.MetaData, m map[string]toml.Primitive) (plugin.Plugin, error) {
-	// Each plugin is identified by a name. Once we parse the name, clear it
-	// from the map so the plugins themselves don't have to handle it.
-	pname, ok := m["name"]
-	if !ok {
-		return nil, errors.New(`missing "name" key for plugin`)
-	}
-	delete(m, "name")
+// parsePlugin parses raw plugin configuration into a slice of plugins.
+func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin, error) {
+	var plugins []plugin.Plugin
 
-	var name string
-	if err := md.PrimitiveDecode(pname, &name); err != nil {
-		return nil, err
+	for _, p := range ifi.Prefixes {
+		pfx, err := parsePrefix(p)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse prefix %q: %v", p.Prefix, err)
+		}
+
+		plugins = append(plugins, pfx)
 	}
 
-	// Now that we know the plugin's name, we can initialize the specific Plugin
-	// required and decode its individual configuration.
-	var (
-		p   plugin.Plugin
-		err error
-	)
-	switch name {
-	case "dnssl":
-		p, err = parseDNSSL(iface, md, m)
-	case "prefix":
-		p, err = parsePrefix(md, m)
-	case "rdnss":
-		p, err = parseRDNSS(iface, md, m)
-	default:
-		return nil, fmt.Errorf("unknown plugin %q", name)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to configure plugin %q: %v", name, err)
+	for _, r := range ifi.RDNSS {
+		rdnss, err := parseRDNSS(r, maxInterval)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse RDNSS: %v", err)
+		}
+
+		plugins = append(plugins, rdnss)
 	}
 
-	return p, nil
+	for _, d := range ifi.DNSSL {
+		dnssl, err := parseDNSSL(d, maxInterval)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse DNSSL: %v", err)
+		}
+
+		plugins = append(plugins, dnssl)
+	}
+
+	// Loopback has an MTU of 65536 on Linux. Good enough?
+	if ifi.MTU < 0 || ifi.MTU > 65536 {
+		return nil, fmt.Errorf("MTU (%d) must be between 0 and 65536", ifi.MTU)
+	}
+	if ifi.MTU != 0 {
+		m := plugin.MTU(ifi.MTU)
+		plugins = append(plugins, &m)
+	}
+
+	return plugins, nil
 }
 
 // parseDNSSL parses a DNSSL plugin.
-func parseDNSSL(iface Interface, md toml.MetaData, m map[string]toml.Primitive) (*plugin.DNSSL, error) {
-	d := &plugin.DNSSL{Lifetime: DurationAuto}
-	for k := range m {
-		var v value
-		if err := md.PrimitiveDecode(m[k], &v.v); err != nil {
-			return nil, err
-		}
-
-		switch k {
-		case "lifetime":
-			d.Lifetime = v.Duration()
-		case "domain_names":
-			d.DomainNames = v.StringSlice()
-		default:
-			return nil, fmt.Errorf("invalid key %q", k)
-		}
-
-		if err := v.Err(); err != nil {
-			return nil, fmt.Errorf("parsing key %q: %v", k, err)
-		}
+func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
+	lifetime, err := parseDuration(d.Lifetime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lifetime: %v", err)
 	}
 
 	// If auto, compute lifetime as recommended by radvd.
-	if d.Lifetime == DurationAuto {
-		d.Lifetime = 2 * iface.MaxInterval
+	if lifetime == durationAuto {
+		lifetime = 2 * maxInterval
 	}
 
-	return d, nil
+	return &plugin.DNSSL{
+		Lifetime:    lifetime,
+		DomainNames: d.DomainNames,
+	}, nil
 }
 
 // parsePrefix parses a Prefix plugin.
-func parsePrefix(md toml.MetaData, m map[string]toml.Primitive) (*plugin.Prefix, error) {
-	p := plugin.NewPrefix()
-
-	for k := range m {
-		var v value
-		if err := md.PrimitiveDecode(m[k], &v.v); err != nil {
-			return nil, err
-		}
-
-		switch k {
-		case "autonomous":
-			p.Autonomous = v.Bool()
-		case "on_link":
-			p.OnLink = v.Bool()
-		case "preferred_lifetime":
-			p.PreferredLifetime = v.Duration()
-		case "prefix":
-			p.Prefix = v.IPNet()
-		case "valid_lifetime":
-			p.ValidLifetime = v.Duration()
-		default:
-			return nil, fmt.Errorf("invalid key %q", k)
-		}
-
-		if err := v.Err(); err != nil {
-			return nil, fmt.Errorf("parsing key %q: %v", k, err)
-		}
-	}
-
-	if err := validatePrefix(p); err != nil {
+func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
+	ip, prefix, err := net.ParseCIDR(p.Prefix)
+	if err != nil {
 		return nil, err
 	}
 
-	return p, nil
-}
+	// Don't allow individual IP addresses.
+	if !prefix.IP.Equal(ip) {
+		return nil, fmt.Errorf("%q is not a CIDR prefix", ip)
+	}
 
-// validatePrefix verifies that a Prefix is valid.
-func validatePrefix(p *plugin.Prefix) error {
-	if p.Prefix == nil {
-		return errors.New("prefix must not be empty")
+	// Only allow IPv6 addresses.
+	if prefix.IP.To16() != nil && prefix.IP.To4() != nil {
+		return nil, fmt.Errorf("%q is not an IPv6 CIDR prefix", prefix.IP)
+	}
+
+	valid, err := parseDuration(p.ValidLifetime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid valid lifetime: %v", err)
 	}
 
 	// Use defaults for auto values.
-	switch p.ValidLifetime {
+	switch valid {
 	case 0:
-		return errors.New("valid lifetime must be non-zero")
-	case DurationAuto:
-		p.ValidLifetime = 24 * time.Hour
+		return nil, errors.New("valid lifetime must be non-zero")
+	case durationAuto:
+		valid = 24 * time.Hour
 	}
 
-	switch p.PreferredLifetime {
+	preferred, err := parseDuration(p.PreferredLifetime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid preferred lifetime: %v", err)
+	}
+
+	// Use defaults for auto values.
+	switch preferred {
 	case 0:
-		return errors.New("preferred lifetime must be non-zero")
-	case DurationAuto:
-		p.PreferredLifetime = 4 * time.Hour
+		return nil, errors.New("preferred lifetime must be non-zero")
+	case durationAuto:
+		preferred = 4 * time.Hour
 	}
 
 	// See: https://tools.ietf.org/html/rfc4861#section-4.6.2.
-	if p.PreferredLifetime > p.ValidLifetime {
-		return fmt.Errorf("preferred lifetime of %s exceeds valid lifetime of %s", p.PreferredLifetime, p.ValidLifetime)
+	if preferred > valid {
+		return nil, fmt.Errorf("preferred lifetime of %s exceeds valid lifetime of %s",
+			preferred, valid)
 	}
 
-	return nil
+	onLink := true
+	if p.OnLink != nil {
+		onLink = *p.OnLink
+	}
+
+	auto := true
+	if p.Autonomous != nil {
+		auto = *p.Autonomous
+	}
+
+	return &plugin.Prefix{
+		Prefix:            prefix,
+		OnLink:            onLink,
+		Autonomous:        auto,
+		ValidLifetime:     valid,
+		PreferredLifetime: preferred,
+	}, nil
 }
 
-// parseRDNSS parses a RDNSS plugin.
-func parseRDNSS(iface Interface, md toml.MetaData, m map[string]toml.Primitive) (*plugin.RDNSS, error) {
-	r := &plugin.RDNSS{Lifetime: DurationAuto}
-	for k := range m {
-		var v value
-		if err := md.PrimitiveDecode(m[k], &v.v); err != nil {
-			return nil, err
-		}
-
-		switch k {
-		case "lifetime":
-			r.Lifetime = v.Duration()
-		case "servers":
-			r.Servers = v.IPSlice()
-		default:
-			return nil, fmt.Errorf("invalid key %q", k)
-		}
-
-		if err := v.Err(); err != nil {
-			return nil, fmt.Errorf("parsing key %q: %v", k, err)
-		}
+// parseDNSSL parses a DNSSL plugin.
+func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
+	lifetime, err := parseDuration(d.Lifetime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lifetime: %v", err)
 	}
 
 	// If auto, compute lifetime as recommended by radvd.
-	if r.Lifetime == DurationAuto {
-		r.Lifetime = 2 * iface.MaxInterval
+	if lifetime == durationAuto {
+		lifetime = 2 * maxInterval
 	}
 
-	return r, nil
+	// Parse all server addresses as IPv6 addresses.
+	servers := make([]net.IP, 0, len(d.Servers))
+	for _, s := range d.Servers {
+		ip := net.ParseIP(s)
+		if ip == nil || (ip.To16() != nil && ip.To4() != nil) {
+			return nil, fmt.Errorf("string %q is not an IPv6 address", s)
+		}
+
+		servers = append(servers, ip)
+	}
+
+	return &plugin.RDNSS{
+		Lifetime: lifetime,
+		Servers:  servers,
+	}, nil
 }

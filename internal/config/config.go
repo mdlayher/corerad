@@ -22,12 +22,13 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/mdlayher/corerad/internal/plugin"
+	"github.com/mdlayher/ndp"
 )
 
 //go:generate embed file -var Default --source default.toml
 
 // Default is the toml representation of the default configuration.
-var Default = "# CoreRAD vALPHA configuration file\n\n# All duration values are specified in Go time.ParseDuration format:\n# https://golang.org/pkg/time/#ParseDuration.\n\n# Interfaces which will be used to serve IPv6 NDP router advertisements.\n[[interfaces]]\nname = \"eth0\"\n\n# AdvSendAdvertisements: indicates whether or not this interface will send\n# periodic router advertisements and respond to router solicitations.\n#\n# Must be set to true to enable serving on this interface.\nsend_advertisements = false\n\n# All other interface parameters in this section can be removed to simplify\n# configuration with sane defaults.\n\n# MaxRtrAdvInterval: the maximum time between sending unsolicited multicast\n# router advertisements. Must be between 4 and 1800 seconds.\nmax_interval = \"600s\"\n\n# MinRtrAdvInterval: the minimum time between sending unsolicited multicast\n# router advertisements. Must be between 3 and (.75 * max_interval) seconds.\n# An empty string or the value \"auto\" will compute a sane default.\nmin_interval = \"auto\"\n\n# AdvManagedFlag: indicates if hosts should request address configuration from a\n# DHCPv6 server.\nmanaged = false\n\n# AdvOtherConfigFlag: indicates if additional configuration options are\n# available from a DHCPv6 server.\nother_config = false\n\n# AdvReachableTime: indicates how long a node should treat a neighbor as\n# reachable. 0 or empty string mean this value is unspecified by this router.\nreachable_time = \"0s\"\n\n# AdvRetransTimer: indicates how long a node should wait before retransmitting\n# neighbor solicitations. 0 or empty string mean this value is unspecified by\n# this router.\nretransmit_timer = \"0s\"\n\n# AdvCurHopLimit: indicates the value that should be placed in the Hop Limit\n# field in the IPv6 header. Must be between 0 and 255. 0 means this value\n# is unspecified by this router.\nhop_limit = 64\n\n# AdvDefaultLifetime: the value sent in the router lifetime field. Must be\n# 0 or between max_interval and 9000 seconds. An empty string is treated as 0,\n# or the value \"auto\" will compute a sane default.\ndefault_lifetime = \"auto\"\n\n# AdvLinkMTU: attaches a NDP MTU option to the router advertisement, so clients\n# can set their link MTU as recommended by the router. 0 means this value is\n# unspecified by this router.\nmtu = 0\n\n# Indicates whether or not CoreRAD will issue multicast router advertisements.\n# In this mode, machines on this interface's LAN must issue individual router\n# solicitations in order to receive router advertisements.\nunicast_only = false\n\n  # Zero or more plugins may be specified to modify the behavior of the router\n  # advertisements produced by CoreRAD.\n\n  # \"prefix\" plugin: attaches a NDP Prefix Information option to the router\n  # advertisement.\n  [[interfaces.plugins]]\n  name = \"prefix\"\n  # Serve Prefix Information options for each IPv6 prefix on this interface\n  # configured with a /64 CIDR mask.\n  prefix = \"::/64\"\n  # Specifies on-link and autonomous address autoconfiguration (SLAAC) flags\n  # for this prefix. Both default to true.\n  on_link = true\n  autonomous = true\n  # Specifies the preferred and valid lifetimes for this prefix. The preferred\n  # lifetime must not exceed the valid lifetime. By default, the preferred\n  # lifetime is 4 hours and the valid lifetime is 24 hours. \"auto\" uses the\n  # defaults. \"infinite\" means this prefix should be used forever.\n  preferred_lifetime = \"auto\"\n  valid_lifetime = \"auto\"\n\n  # Alternatively, serve an explicit IPv6 prefix.\n  [[interfaces.plugins]]\n  name = \"prefix\"\n  prefix = \"2001:db8::/64\"\n\n  # \"rdnss\" plugin: attaches a NDP Recursive DNS Servers option to the router\n  # advertisement.\n  [[interfaces.plugins]]\n  name = \"rdnss\"\n  # The maximum time these RDNSS addresses may be used for name resolution.\n  # An empty string or 0 means these servers should no longer be used.\n  # \"auto\" will compute a sane default. \"infinite\" means these servers should\n  # be used forever.\n  lifetime = \"auto\"\n  servers = [\"2001:db8::1\", \"2001:db8::2\"]\n\n  # \"dnssl\" plugin: attaches a NDP DNS Search List option to the router\n  # advertisement.\n  [[interfaces.plugins]]\n  name = \"dnssl\"\n  # The maximum time these DNSSL domain names may be used for name resolution.\n  # An empty string or 0 means these search domains should no longer be used.\n  # \"auto\" will compute a sane default. \"infinite\" means these search domains\n  # should be used forever.\n  lifetime = \"auto\"\n  domain_names = [\"foo.example.com\"]\n\n# Enable or disable the debug HTTP server for facilities such as Prometheus\n# metrics and pprof support.\n#\n# Warning: do not expose pprof on an untrusted network!\n[debug]\naddress = \"localhost:9430\"\nprometheus = false\npprof = false\n"
+var Default = "# CoreRAD vALPHA configuration file\n\n# All duration values are specified in Go time.ParseDuration format:\n# https://golang.org/pkg/time/#ParseDuration.\n\n# Interfaces which will be used to serve IPv6 NDP router advertisements.\n[[interfaces]]\nname = \"eth0\"\n\n# AdvSendAdvertisements: indicates whether or not this interface will send\n# periodic router advertisements and respond to router solicitations.\n#\n# Must be set to true to enable serving on this interface.\nsend_advertisements = false\n\n# All other interface parameters in this section can be removed to simplify\n# configuration with sane defaults.\n\n# MaxRtrAdvInterval: the maximum time between sending unsolicited multicast\n# router advertisements. Must be between 4 and 1800 seconds.\nmax_interval = \"600s\"\n\n# MinRtrAdvInterval: the minimum time between sending unsolicited multicast\n# router advertisements. Must be between 3 and (.75 * max_interval) seconds.\n# An empty string or the value \"auto\" will compute a sane default.\nmin_interval = \"auto\"\n\n# AdvManagedFlag: indicates if hosts should request address configuration from a\n# DHCPv6 server.\nmanaged = false\n\n# AdvOtherConfigFlag: indicates if additional configuration options are\n# available from a DHCPv6 server.\nother_config = false\n\n# AdvReachableTime: indicates how long a node should treat a neighbor as\n# reachable. 0 or empty string mean this value is unspecified by this router.\nreachable_time = \"0s\"\n\n# AdvRetransTimer: indicates how long a node should wait before retransmitting\n# neighbor solicitations. 0 or empty string mean this value is unspecified by\n# this router.\nretransmit_timer = \"0s\"\n\n# AdvCurHopLimit: indicates the value that should be placed in the Hop Limit\n# field in the IPv6 header. Must be between 0 and 255. 0 means this value\n# is unspecified by this router.\nhop_limit = 64\n\n# AdvDefaultLifetime: the value sent in the router lifetime field. Must be\n# 0 or between max_interval and 9000 seconds. An empty string is treated as 0,\n# or the value \"auto\" will compute a sane default.\ndefault_lifetime = \"auto\"\n\n# AdvLinkMTU: attaches a NDP MTU option to the router advertisement, so clients\n# can set their link MTU as recommended by the router. 0 means this value is\n# unspecified by this router.\nmtu = 0\n\n# Indicates whether or not CoreRAD will issue multicast router advertisements.\n# In this mode, machines on this interface's LAN must issue individual router\n# solicitations in order to receive router advertisements.\nunicast_only = false\n\n  # Prefix: attaches a NDP Prefix Information option to the router advertisement.\n  [[interfaces.prefix]]\n  # Serve Prefix Information options for each IPv6 prefix on this interface\n  # configured with a /64 CIDR mask.\n  prefix = \"::/64\"\n\n  # Specifies on-link and autonomous address autoconfiguration (SLAAC) flags\n  # for this prefix. Both default to true.\n  on_link = true\n  autonomous = true\n\n  # Specifies the preferred and valid lifetimes for this prefix. The preferred\n  # lifetime must not exceed the valid lifetime. By default, the preferred\n  # lifetime is 4 hours and the valid lifetime is 24 hours. \"auto\" uses the\n  # defaults. \"infinite\" means this prefix should be used forever.\n  preferred_lifetime = \"auto\"\n  valid_lifetime = \"auto\"\n\n  # Alternatively, serve an explicit IPv6 prefix.\n  [[interfaces.prefix]]\n  prefix = \"2001:db8::/64\"\n\n  # RDNSS: attaches a NDP Recursive DNS Servers option to the router advertisement.\n  [[interfaces.rdnss]]\n  # The maximum time these RDNSS addresses may be used for name resolution.\n  # An empty string or 0 means these servers should no longer be used.\n  # \"auto\" will compute a sane default. \"infinite\" means these servers should\n  # be used forever.\n  lifetime = \"auto\"\n  servers = [\"2001:db8::1\", \"2001:db8::2\"]\n\n  # DNSSL: attaches a NDP DNS Search List option to the router advertisement.\n  [[interfaces.dnssl]]\n  # The maximum time these DNSSL domain names may be used for name resolution.\n  # An empty string or 0 means these search domains should no longer be used.\n  # \"auto\" will compute a sane default. \"infinite\" means these search domains\n  # should be used forever.\n  lifetime = \"auto\"\n  domain_names = [\"foo.example.com\"]\n\n# Enable or disable the debug HTTP server for facilities such as Prometheus\n# metrics and pprof support.\n#\n# Warning: do not expose pprof on an untrusted network!\n[debug]\naddress = \"localhost:9430\"\nprometheus = false\npprof = false\n"
 
 // A file is the raw top-level configuration file representation.
 type file struct {
@@ -37,19 +38,45 @@ type file struct {
 
 // A rawInterface is the raw configuration file representation of an Interface.
 type rawInterface struct {
-	Name               string                      `toml:"name"`
-	SendAdvertisements bool                        `toml:"send_advertisements"`
-	MaxInterval        string                      `toml:"max_interval"`
-	MinInterval        string                      `toml:"min_interval"`
-	Managed            bool                        `toml:"managed"`
-	OtherConfig        bool                        `toml:"other_config"`
-	ReachableTime      string                      `toml:"reachable_time"`
-	RetransmitTimer    string                      `toml:"retransmit_timer"`
-	HopLimit           *int                        `toml:"hop_limit"`
-	DefaultLifetime    *string                     `toml:"default_lifetime"`
-	MTU                int                         `toml:"mtu"`
-	UnicastOnly        bool                        `toml:"unicast_only"`
-	Plugins            []map[string]toml.Primitive `toml:"plugins"`
+	// Base interface configuration.
+	Name               string  `toml:"name"`
+	SendAdvertisements bool    `toml:"send_advertisements"`
+	MaxInterval        string  `toml:"max_interval"`
+	MinInterval        string  `toml:"min_interval"`
+	Managed            bool    `toml:"managed"`
+	OtherConfig        bool    `toml:"other_config"`
+	ReachableTime      string  `toml:"reachable_time"`
+	RetransmitTimer    string  `toml:"retransmit_timer"`
+	HopLimit           *int    `toml:"hop_limit"`
+	DefaultLifetime    *string `toml:"default_lifetime"`
+	UnicastOnly        bool    `toml:"unicast_only"`
+
+	// Plugins.
+	Prefixes []rawPrefix `toml:"prefix"` // TOML tag is explicitly singular.
+	RDNSS    []rawRDNSS  `toml:"rdnss"`
+	DNSSL    []rawDNSSL  `toml:"dnssl"`
+	MTU      int         `toml:"mtu"`
+}
+
+// A rawPrefix is the raw configuration file representation of a Prefix plugin.
+type rawPrefix struct {
+	Prefix            string  `toml:"prefix"`
+	OnLink            *bool   `toml:"on_link"`
+	Autonomous        *bool   `toml:"autonomous"`
+	ValidLifetime     *string `toml:"valid_lifetime"`
+	PreferredLifetime *string `toml:"preferred_lifetime"`
+}
+
+// A rawDNSSL is the raw configuration file representation of a DNSSL plugin.
+type rawDNSSL struct {
+	Lifetime    *string  `toml:"lifetime"`
+	DomainNames []string `toml:"domain_names"`
+}
+
+// A rawRDNSS is the raw configuration file representation of a RDNSS plugin.
+type rawRDNSS struct {
+	Lifetime *string  `toml:"lifetime"`
+	Servers  []string `toml:"servers"`
 }
 
 // Config specifies the configuration for CoreRAD.
@@ -67,7 +94,6 @@ type Interface struct {
 	ReachableTime, RetransmitTimer time.Duration
 	HopLimit                       uint8
 	DefaultLifetime                time.Duration
-	MTU                            int
 	UnicastOnly                    bool
 	Plugins                        []plugin.Plugin
 }
@@ -121,21 +147,31 @@ func Parse(r io.Reader) (*Config, error) {
 			return nil, fmt.Errorf("interface %d/%q: %v", i, ifi.Name, err)
 		}
 
-		iface.Plugins = make([]plugin.Plugin, 0, len(ifi.Plugins))
-		for j, p := range ifi.Plugins {
-			// Pass along the current interface configuration so auto values
-			// can be computed.
-			plug, err := parsePlugin(*iface, md, p)
-			if err != nil {
-				// Narrow down the location of a configuration error.
-				return nil, fmt.Errorf("interface %d/%q, plugin %d: %v", i, ifi.Name, j, err)
-			}
-
-			iface.Plugins = append(iface.Plugins, plug)
-		}
-
 		c.Interfaces = append(c.Interfaces, *iface)
 	}
 
 	return c, nil
+}
+
+// durationAuto implies that a value should be automatically computed.
+const durationAuto = -1 * time.Second
+
+// parseDuration parses a duration while also recognizing special values such
+// as auto and infinite.
+func parseDuration(s *string) (time.Duration, error) {
+	if s == nil {
+		return durationAuto, nil
+	}
+
+	switch *s {
+	case "infinite":
+		return ndp.Infinity, nil
+	case "auto":
+		return durationAuto, nil
+	case "":
+		return 0, nil
+	}
+
+	// Use the user's value, but validate it per the RFC.
+	return time.ParseDuration(*s)
 }
