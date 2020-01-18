@@ -105,6 +105,13 @@ func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
 		return nil, fmt.Errorf("%q is not an IPv6 CIDR prefix", prefix.IP)
 	}
 
+	// Only permit ::/64 as a special case. It isn't clear if other prefix
+	// lengths with :: would be useful, so throw an error for now.
+	length, _ := prefix.Mask.Size()
+	if prefix.IP.Equal(net.IPv6zero) && length != 64 {
+		return nil, errors.New("only ::/64 is permitted for inferring prefixes from interface addresses")
+	}
+
 	valid, err := parseDuration(p.ValidLifetime)
 	if err != nil {
 		return nil, fmt.Errorf("invalid valid lifetime: %v", err)

@@ -69,7 +69,7 @@ unicast_only = false
   # Prefix: attaches a NDP Prefix Information option to the router advertisement.
   [[interfaces.prefix]]
   # Serve Prefix Information options for each IPv6 prefix on this interface
-  # configured with a /64 CIDR mask.
+  # configured with a /64 CIDR mask. Only /64 is allowed for this special case.
   prefix = "::/64"
 
   # Specifies on-link and autonomous address autoconfiguration (SLAAC) flags

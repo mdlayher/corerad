@@ -186,6 +186,14 @@ func Test_parsePrefix(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad prefix ::/N",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/63"
+			`,
+		},
+		{
 			name: "bad valid lifetime string",
 			s: `
 			[[interfaces]]
