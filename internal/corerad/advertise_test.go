@@ -198,12 +198,7 @@ func TestAdvertiserUnsolicitedShutdown(t *testing.T) {
 						t.Fatalf("failed to read RA: %v", err)
 					}
 
-					// Don't care about options, nothing special is configured
-					// for options in the interface config.
-					ra := m.(*ndp.RouterAdvertisement)
-					//ra.Options = nil
-
-					got = append(got, ra)
+					got = append(got, m.(*ndp.RouterAdvertisement))
 					cancel()
 				}
 
@@ -302,12 +297,7 @@ func TestAdvertiserSolicited(t *testing.T) {
 						t.Fatalf("failed to read RA: %v", err)
 					}
 
-					// Don't care about options, nothing special is configured
-					// for options in the interface config.
-					ra := m.(*ndp.RouterAdvertisement)
-					ra.Options = nil
-
-					got = append(got, ra)
+					got = append(got, m.(*ndp.RouterAdvertisement))
 				}
 
 				// "Default" RAs.
