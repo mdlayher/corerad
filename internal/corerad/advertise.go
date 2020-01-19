@@ -42,8 +42,7 @@ type Advertiser struct {
 	mm    *AdvertiserMetrics
 
 	// Dynamic configuration, set up on each (re)initialization.
-	c   conn
-	mac net.HardwareAddr
+	c conn
 
 	// Notifications of internal state change for tests.
 	reinitC chan struct{}
@@ -458,8 +457,6 @@ func (a *Advertiser) init() error {
 			return fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
 		}
 	}
-
-	a.mac = ifi.HardwareAddr
 
 	// Before starting any other goroutines, verify that the interface can
 	// actually be used to send an initial router advertisement, avoiding a
