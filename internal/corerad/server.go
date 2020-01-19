@@ -103,12 +103,6 @@ func (s *Server) Run(ctx context.Context) error {
 			continue
 		}
 
-		logf("initializing with %d plugins", len(iface.Plugins))
-
-		for i, p := range iface.Plugins {
-			logf("plugin %02d: %q: %s", i, p.Name(), p)
-		}
-
 		// TODO: find a way to reasonably test this.
 
 		// Register interest for state changes on this interface to this channel

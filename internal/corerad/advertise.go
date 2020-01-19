@@ -456,6 +456,8 @@ func (a *Advertiser) init() error {
 		if err := p.Prepare(ifi); err != nil {
 			return fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
 		}
+
+		a.logf("%q: %s", p.Name(), p)
 	}
 
 	// Before starting any other goroutines, verify that the interface can
