@@ -20,19 +20,36 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/plugin"
+	"github.com/mikioh/ipaddr"
 )
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
 func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin, error) {
-	var plugins []plugin.Plugin
-
+	var prefixes []*plugin.Prefix
 	for _, p := range ifi.Prefixes {
 		pfx, err := parsePrefix(p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse prefix %q: %v", p.Prefix, err)
 		}
 
-		plugins = append(plugins, pfx)
+		prefixes = append(prefixes, pfx)
+	}
+
+	// For sanity, configured prefixes on a given interface must not overlap.
+	for _, pfx1 := range prefixes {
+		for _, pfx2 := range prefixes {
+			p1, p2 := ipaddr.NewPrefix(pfx1.Prefix), ipaddr.NewPrefix(pfx2.Prefix)
+			if !p1.Equal(p2) && p1.Overlaps(p2) {
+				return nil, fmt.Errorf("prefixes overlap: %s and %s",
+					pfx1.Prefix, pfx2.Prefix)
+			}
+		}
+	}
+
+	// Now that we've verified the prefixes, add them as plugins.
+	plugins := make([]plugin.Plugin, 0, len(prefixes))
+	for _, p := range prefixes {
+		plugins = append(plugins, p)
 	}
 
 	for _, r := range ifi.RDNSS {

@@ -26,6 +26,8 @@ github.com/mdlayher/netlink/nlenc
 github.com/mdlayher/promtest
 # github.com/mdlayher/schedgroup v0.0.0-20200112200520-294397da5c6d
 github.com/mdlayher/schedgroup
+# github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
+github.com/mikioh/ipaddr
 # github.com/prometheus/client_golang v1.3.0
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal

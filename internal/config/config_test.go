@@ -193,6 +193,7 @@ func TestParse(t *testing.T) {
 						HopLimit:           0,
 						DefaultLifetime:    30 * time.Minute,
 						UnicastOnly:        true,
+						Plugins:            []plugin.Plugin{},
 					},
 				},
 				Debug: config.Debug{

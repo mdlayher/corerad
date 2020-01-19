@@ -250,6 +250,16 @@ func Test_parsePrefix(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad prefix overlap",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "2001:db8::/64"
+			  [[interfaces.prefix]]
+			  prefix = "2001:db8::/96"
+			`,
+		},
+		{
 			name: "OK defaults",
 			s: `
 			[[interfaces]]
