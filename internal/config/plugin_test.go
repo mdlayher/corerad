@@ -47,6 +47,14 @@ func Test_parseDNSSL(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad domain names",
+			s: `
+			[[interfaces]]
+			  [[interfaces.dnssl]]
+			  domain_names = []
+			`,
+		},
+		{
 			name: "OK explicit",
 			s: `
 			[[interfaces]]
@@ -327,7 +335,15 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 		},
 		{
-			name: "bad servers",
+			name: "bad servers empty",
+			s: `
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = []
+			`,
+		},
+		{
+			name: "bad servers IPv4",
 			s: `
 			[[interfaces]]
 			  [[interfaces.rdnss]]

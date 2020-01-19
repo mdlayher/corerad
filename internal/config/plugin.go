@@ -82,6 +82,10 @@ func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
 		lifetime = 2 * maxInterval
 	}
 
+	if len(d.DomainNames) == 0 {
+		return nil, errors.New("must specify one or more DNS search domain names")
+	}
+
 	return &plugin.DNSSL{
 		Lifetime:    lifetime,
 		DomainNames: d.DomainNames,
@@ -173,6 +177,10 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	// If auto, compute lifetime as recommended by radvd.
 	if lifetime == durationAuto {
 		lifetime = 2 * maxInterval
+	}
+
+	if len(d.Servers) == 0 {
+		return nil, errors.New("must specify one or more DNS server IPv6 addresses")
 	}
 
 	// Parse all server addresses as IPv6 addresses.
