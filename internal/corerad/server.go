@@ -23,10 +23,12 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/netstate"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
@@ -86,7 +88,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Watch for interface state changes. May or may not be supported depending
 	// on the OS, but functionality should gracefully degrade.
-	w := NewWatcher(s.ll)
+	w := netstate.NewWatcher()
 
 	// Serve on each specified interface.
 	for _, iface := range s.cfg.Interfaces {
@@ -107,8 +109,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 		// Register interest for state changes on this interface to this channel
 		// so this interface's Advertiser can react accordingly.
-		watchC := make(chan struct{})
-		w.Register(iface.Name, watchC)
+		watchC := w.Subscribe(iface.Name, netstate.LinkAny)
 
 		// Begin advertising on this interface until the context is canceled.
 		s.eg.Go(func() error {
@@ -128,6 +129,12 @@ func (s *Server) Run(ctx context.Context) error {
 
 	s.eg.Go(func() error {
 		if err := w.Watch(ctx); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				// Watcher not available on this OS, nothing to do.
+				s.ll.Printf("cannot watch for network state changes, skipping: %v", err)
+				return nil
+			}
+
 			return fmt.Errorf("failed to watch for interface state changes: %v", err)
 		}
 

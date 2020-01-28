@@ -31,6 +31,7 @@ import (
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
+	"github.com/mdlayher/netstate"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
@@ -681,9 +682,8 @@ func testAdvertiserClient(
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	watchC := make(chan struct{})
-	w := NewWatcher(nil)
-	w.Register(cctx.router.Name, watchC)
+	w := netstate.NewWatcher()
+	watchC := w.Subscribe(cctx.router.Name, netstate.LinkAny)
 
 	var eg errgroup.Group
 	eg.Go(func() error {
@@ -821,4 +821,8 @@ func mustIP(s string) net.IP {
 	}
 
 	return ip
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }

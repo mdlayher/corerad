@@ -26,6 +26,7 @@ import (
 
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/ndp"
+	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
 	"golang.org/x/sync/errgroup"
 )
@@ -80,8 +81,9 @@ type request struct {
 // Advertise initializes the configured interface and begins router solicitation
 // and advertisement handling. Advertise will block until ctx is canceled or an
 // error occurs. If watchC is not nil, it will be used to trigger the
-// reinitialization process. Typically watchC is used with the Watcher type.
-func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan struct{}) error {
+// reinitialization process. Typically watchC is used with the netstate.Watcher
+// type.
+func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Change) error {
 	// Attempt immediate initialization and fall back to reinit loop if that
 	// does not succeed.
 	if err := a.init(); err != nil {
@@ -120,7 +122,7 @@ func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan struct{}) erro
 
 // advertise is the internal loop for Advertise which coordinates the various
 // Advertiser goroutines.
-func (a *Advertiser) advertise(ctx context.Context, watchC <-chan struct{}) error {
+func (a *Advertiser) advertise(ctx context.Context, watchC <-chan netstate.Change) error {
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
@@ -162,9 +164,11 @@ func (a *Advertiser) advertise(ctx context.Context, watchC <-chan struct{}) erro
 				return nil
 			case _, ok := <-watchC:
 				if !ok {
-					// Watcher halted.
+					// Watcher halted or not available on this OS.
 					return nil
 				}
+
+				// TODO: inspect for specific state changes.
 
 				// Watcher indicated a state change.
 				return errLinkChange
