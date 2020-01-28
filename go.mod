@@ -4,10 +4,9 @@ go 1.13
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/google/go-cmp v0.3.1
-	github.com/jsimonetti/rtnetlink v0.0.0-20200112170516-1282c153f2a0
+	github.com/google/go-cmp v0.4.0
 	github.com/mdlayher/ndp v0.0.0-20200103174253-4f8c213af111
-	github.com/mdlayher/netlink v1.0.0
+	github.com/mdlayher/netstate v0.0.0-20200128183539-95bdfedbb6a3
 	github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
 	github.com/mdlayher/schedgroup v0.0.0-20200112200520-294397da5c6d
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
