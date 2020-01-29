@@ -107,9 +107,13 @@ func (s *Server) Run(ctx context.Context) error {
 
 		// TODO: find a way to reasonably test this.
 
-		// Register interest for state changes on this interface to this channel
-		// so this interface's Advertiser can react accordingly.
-		watchC := w.Subscribe(iface.Name, netstate.LinkAny)
+		// Register interest for link down events so this interface's Advertiser
+		// can react accordingly.
+		//
+		// TODO: more events? It seems that rtnetlink at least generates a
+		// variety of events when a link is brought up and we don't want the
+		// Advertiser to flap.
+		watchC := w.Subscribe(iface.Name, netstate.LinkDown)
 
 		// Begin advertising on this interface until the context is canceled.
 		s.eg.Go(func() error {
