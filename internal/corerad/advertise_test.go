@@ -683,7 +683,7 @@ func testAdvertiserClient(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	w := netstate.NewWatcher()
-	watchC := w.Subscribe(cctx.router.Name, netstate.LinkAny)
+	watchC := w.Subscribe(cctx.router.Name, netstate.LinkDown)
 
 	var eg errgroup.Group
 	eg.Go(func() error {

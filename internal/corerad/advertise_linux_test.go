@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
@@ -237,28 +236,10 @@ func TestAdvertiserLinuxReinitialize(t *testing.T) {
 			panic("took too long to reinitialize")
 		})
 
-		// Coordinate lockstep between goroutines.
-		sigC := make(chan struct{})
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			// Make the link state flap, forcing a reinit by the watcher.
-			sigC <- struct{}{}
-			shell(t, "ip", "link", "set", "down", cctx.router.Name)
-			sigC <- struct{}{}
-			shell(t, "ip", "link", "set", "up", cctx.router.Name)
-		}()
-
-		// Watch for reinit event sent by the link change.
-		for i := 0; i < 2; i++ {
-			<-sigC
-			<-cctx.reinitC
-		}
-
-		wg.Wait()
+		// Make the link state flap, forcing a reinit by the watcher.
+		shell(t, "ip", "link", "set", "down", cctx.router.Name)
+		shell(t, "ip", "link", "set", "up", cctx.router.Name)
+		<-cctx.reinitC
 
 		// Consume the multicast router advertisement immediately after reinit.
 		m, _, _, err := cctx.c.ReadFrom()
