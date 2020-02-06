@@ -232,9 +232,10 @@ func TestAdvertiserLinuxReinitialize(t *testing.T) {
 		}
 
 		// TODO: shorten timeout once link state is watched.
-		time.AfterFunc(20*time.Second, func() {
+		timer := time.AfterFunc(20*time.Second, func() {
 			panic("took too long to reinitialize")
 		})
+		defer timer.Stop()
 
 		// Make the link state flap, forcing a reinit by the watcher.
 		shell(t, "ip", "link", "set", "down", cctx.router.Name)
