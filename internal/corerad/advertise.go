@@ -84,31 +84,12 @@ type request struct {
 // reinitialization process. Typically watchC is used with the netstate.Watcher
 // type.
 func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Change) error {
-	// Attempt immediate initialization and fall back to reinit loop if that
-	// does not succeed.
-	if err := a.init(); err != nil {
-		if err := a.reinit(ctx, err); err != nil {
-			// Don't block user shutdown.
-			if errors.Is(err, context.Canceled) {
-				return nil
-			}
-
-			return fmt.Errorf("failed to initialize %q advertiser: %w", a.iface, err)
-		}
-	}
-
+	// err is reused for each loop, and intentionally nil on the first pass
+	// so initialization occurs.
+	var err error
 	for {
-		err := a.advertise(ctx, watchC)
-		switch {
-		case errors.Is(err, context.Canceled):
-			// Intentional shutdown.
-			return a.shutdown()
-		case err == nil:
-			panic("corerad: advertise must never return nil error")
-		}
-
-		// We encountered an error. Try to reinitialize the Advertiser based
-		// on whether or not the error is deemed recoverable.
+		// Either initialize or reinitialize the Advertiser based on the value
+		// of err, and whether or not err is recoverable.
 		if err := a.reinit(ctx, err); err != nil {
 			// Don't block user shutdown.
 			if errors.Is(err, context.Canceled) {
@@ -116,6 +97,17 @@ func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Chang
 			}
 
 			return fmt.Errorf("failed to reinitialize %q advertiser: %v", a.iface, err)
+		}
+
+		// Advertise until an error occurs, reinitializing under certain
+		// circumstances.
+		err = a.advertise(ctx, watchC)
+		switch {
+		case errors.Is(err, context.Canceled):
+			// Intentional shutdown.
+			return a.shutdown()
+		case err == nil:
+			panic("corerad: advertise must never return nil error")
 		}
 	}
 }
@@ -505,6 +497,8 @@ func (a *Advertiser) reinit(ctx context.Context, err error) error {
 		a.logf("interface not ready, reinitializing")
 	case errors.Is(err, errLinkChange):
 		a.logf("interface state changed, reinitializing")
+	case err == nil:
+		// Initial init.
 	default:
 		// Unrecoverable error
 		return err
