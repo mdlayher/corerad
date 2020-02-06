@@ -232,10 +232,8 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 
 	for {
 		// Enable cancelation before sending any messages, if necessary.
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return eg.Wait()
-		default:
 		}
 
 		m, cm, host, err := a.c.ReadFrom()
@@ -259,12 +257,6 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 
 		a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
 
-		if _, ok := m.(*ndp.RouterSolicitation); !ok {
-			a.logf("received NDP message of type %T from %s, ignoring", m, host)
-			a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
-			continue
-		}
-
 		// Ensure this message has a valid hop limit.
 		if cm.HopLimit != ndp.HopLimit {
 			a.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
@@ -272,18 +264,22 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 			continue
 		}
 
-		// Issue a unicast RA for clients with valid addresses, or a multicast
-		// RA for any client contacting us via the IPv6 unspecified address,
-		// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
-		// TODO: see if it's possible to make Linux send from an unspecified
-		// address so we can test this fully.
-		if host.Equal(net.IPv6unspecified) {
-			host = net.IPv6linklocalallnodes
-		}
+		switch m.(type) {
+		case *ndp.RouterSolicitation:
+			// Issue a unicast RA for clients with valid addresses, or a multicast
+			// RA for any client contacting us via the IPv6 unspecified address,
+			// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
+			if host.Equal(net.IPv6unspecified) {
+				host = net.IPv6linklocalallnodes
+			}
 
-		// TODO: consider checking for numerous RS in succession and issuing
-		// a multicast RA in response.
-		reqC <- request{IP: host}
+			// TODO: consider checking for numerous RS in succession and issuing
+			// a multicast RA in response.
+			reqC <- request{IP: host}
+		default:
+			a.logf("received NDP message of type %T from %s, ignoring", m, host)
+			a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+		}
 	}
 }
 
