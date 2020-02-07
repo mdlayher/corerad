@@ -14,6 +14,7 @@
 package corerad
 
 import (
+	"net"
 	"testing"
 	"time"
 
@@ -31,6 +32,19 @@ func Test_verifyRAs(t *testing.T) {
 		},
 	}
 
+	rdnss := []ndp.Option{
+		&ndp.RecursiveDNSServer{
+			Servers: []net.IP{mustIP("2001:db8::1")},
+		},
+	}
+
+	dnssl := []ndp.Option{
+		&ndp.DNSSearchList{
+			Lifetime:    10 * time.Second,
+			DomainNames: []string{"foo.example.com"},
+		},
+	}
+
 	full := &ndp.RouterAdvertisement{
 		CurrentHopLimit:      64,
 		ManagedConfiguration: true,
@@ -38,7 +52,7 @@ func Test_verifyRAs(t *testing.T) {
 		ReachableTime:        30 * time.Minute,
 		RetransmitTimer:      60 * time.Minute,
 		Options: []ndp.Option{
-			// Use prefix from above.
+			// Use some options from above.
 			prefix[0],
 			&ndp.PrefixInformation{
 				PrefixLength:      32,
@@ -47,6 +61,8 @@ func Test_verifyRAs(t *testing.T) {
 				ValidLifetime:     20 * time.Second,
 				Prefix:            mustIP("fdff:dead:beef::"),
 			},
+			rdnss[0],
+			dnssl[0],
 			ndp.NewMTU(1500),
 		},
 	}
@@ -107,6 +123,110 @@ func Test_verifyRAs(t *testing.T) {
 			},
 		},
 		{
+			name: "RDNSS length",
+			a: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{},
+				},
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{},
+					&ndp.RecursiveDNSServer{},
+				},
+			},
+		},
+		{
+			name: "RDNSS server length",
+			a: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{},
+				},
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: rdnss,
+			},
+		},
+		{
+			name: "RDNSS server IPs",
+			a: &ndp.RouterAdvertisement{
+				Options: rdnss,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{
+						Servers: []net.IP{mustIP("2001:db8::2")},
+					},
+				},
+			},
+		},
+		{
+			name: "RDNSS lifetime",
+			a: &ndp.RouterAdvertisement{
+				Options: rdnss,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{
+						Servers:  []net.IP{mustIP("2001:db8::1")},
+						Lifetime: 2 * time.Second,
+					},
+				},
+			},
+		},
+		{
+			name: "DNSSL length",
+			a: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{},
+				},
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{},
+					&ndp.DNSSearchList{},
+				},
+			},
+		},
+		{
+			name: "DNSSL domains length",
+			a: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{},
+				},
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: dnssl,
+			},
+		},
+		{
+			name: "DNSSL domains",
+			a: &ndp.RouterAdvertisement{
+				Options: dnssl,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{
+						DomainNames: []string{"bar.example.com"},
+					},
+				},
+			},
+		},
+		{
+			name: "DNSSL lifetime",
+			a: &ndp.RouterAdvertisement{
+				Options: dnssl,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{
+						DomainNames: []string{"foo.example.com"},
+						Lifetime:    2 * time.Second,
+					},
+				},
+			},
+		},
+		{
 			name: "OK, reachable time unspecified",
 			a:    &ndp.RouterAdvertisement{},
 			b:    &ndp.RouterAdvertisement{ReachableTime: 1 * time.Second},
@@ -149,6 +269,22 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
+		},
+		{
+			name: "OK, RDNSS unspecified",
+			a: &ndp.RouterAdvertisement{
+				Options: rdnss,
+			},
+			b:  &ndp.RouterAdvertisement{},
+			ok: true,
+		},
+		{
+			name: "OK, DNSSL unspecified",
+			a: &ndp.RouterAdvertisement{
+				Options: dnssl,
+			},
+			b:  &ndp.RouterAdvertisement{},
 			ok: true,
 		},
 		{

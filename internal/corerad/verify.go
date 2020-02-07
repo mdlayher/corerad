@@ -32,7 +32,9 @@ func verifyRAs(a, b *ndp.RouterAdvertisement) bool {
 		durationsConsistent(a.ReachableTime, b.ReachableTime) &&
 		durationsConsistent(a.RetransmitTimer, b.RetransmitTimer) &&
 		mtuConsistent(a.Options, b.Options) &&
-		prefixesConsistent(a.Options, b.Options)
+		prefixesConsistent(a.Options, b.Options) &&
+		rdnssConsistent(a.Options, b.Options) &&
+		dnsslConsistent(a.Options, b.Options)
 }
 
 // durationsConsistent reports whether two time.Duration values are consistent.
@@ -90,6 +92,78 @@ func prefixesConsistent(want, got []ndp.Option) bool {
 	return true
 }
 
+// rdnssConsistent reports whether two NDP RDNSS option values exist, and if so,
+// if they are consistent.
+func rdnssConsistent(want, got []ndp.Option) bool {
+	a := pickRDNSS(want)
+	b := pickRDNSS(got)
+
+	if len(a) == 0 || len(b) == 0 {
+		// If either are advertising no RDNSS, nothing to do.
+		return true
+	}
+
+	if len(a) != len(b) {
+		// Inconsistent number of servers.
+		return false
+	}
+
+	// Assuming both are advertising RDNSS, the options must be identical.
+	for i := range a {
+		if len(a[i].Servers) != len(b[i].Servers) {
+			return false
+		}
+
+		for j := range a[i].Servers {
+			if !a[i].Servers[j].Equal(b[i].Servers[j]) {
+				return false
+			}
+		}
+
+		if a[i].Lifetime != b[i].Lifetime {
+			return false
+		}
+	}
+
+	return true
+}
+
+// dnsslConsistent reports whether two NDP DNSSL option values exist, and if so,
+// if they are consistent.
+func dnsslConsistent(want, got []ndp.Option) bool {
+	a := pickDNSSL(want)
+	b := pickDNSSL(got)
+
+	if len(a) == 0 || len(b) == 0 {
+		// If either are advertising no DNSSL, nothing to do.
+		return true
+	}
+
+	if len(a) != len(b) {
+		// Inconsistent number of domains.
+		return false
+	}
+
+	// Assuming both are advertising DNSSL, the options must be identical.
+	for i := range a {
+		if len(a[i].DomainNames) != len(b[i].DomainNames) {
+			return false
+		}
+
+		for j := range a[i].DomainNames {
+			if a[i].DomainNames[j] != b[i].DomainNames[j] {
+				return false
+			}
+		}
+
+		if a[i].Lifetime != b[i].Lifetime {
+			return false
+		}
+	}
+
+	return true
+}
+
 // pickMTU selects a ndp.MTU option from the input options, reporting whether
 // one was found.
 func pickMTU(options []ndp.Option) (ndp.MTU, bool) {
@@ -112,6 +186,30 @@ func pickPrefixes(options []ndp.Option) []*ndp.PrefixInformation {
 	}
 
 	return prefixes
+}
+
+// pickRDNSS selects all ndp.RDNSS options from the input options.
+func pickRDNSS(options []ndp.Option) []*ndp.RecursiveDNSServer {
+	var rdnss []*ndp.RecursiveDNSServer
+	for _, o := range options {
+		if r, ok := o.(*ndp.RecursiveDNSServer); ok {
+			rdnss = append(rdnss, r)
+		}
+	}
+
+	return rdnss
+}
+
+// pickDNSSL selects all ndp.DNSSL options from the input options.
+func pickDNSSL(options []ndp.Option) []*ndp.DNSSearchList {
+	var dnssl []*ndp.DNSSearchList
+	for _, o := range options {
+		if d, ok := o.(*ndp.DNSSearchList); ok {
+			dnssl = append(dnssl, d)
+		}
+	}
+
+	return dnssl
 }
 
 // sourceLLA returns either the string for a source link-layer address or "unknown".
