@@ -473,12 +473,13 @@ func (a *Advertiser) send(dst net.IP, cfg config.Interface) error {
 // necessary plugins.
 func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, error) {
 	ra := &ndp.RouterAdvertisement{
-		CurrentHopLimit:      ifi.HopLimit,
-		ManagedConfiguration: ifi.Managed,
-		OtherConfiguration:   ifi.OtherConfig,
-		RouterLifetime:       ifi.DefaultLifetime,
-		ReachableTime:        ifi.ReachableTime,
-		RetransmitTimer:      ifi.RetransmitTimer,
+		CurrentHopLimit:           ifi.HopLimit,
+		ManagedConfiguration:      ifi.Managed,
+		OtherConfiguration:        ifi.OtherConfig,
+		RouterSelectionPreference: ifi.Preference,
+		RouterLifetime:            ifi.DefaultLifetime,
+		ReachableTime:             ifi.ReachableTime,
+		RetransmitTimer:           ifi.RetransmitTimer,
 	}
 
 	for _, p := range ifi.Plugins {

@@ -80,6 +80,7 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 			// appropriately over the wire.
 			cfg := &config.Interface{
 				OtherConfig: true,
+				Preference:  ndp.High,
 				Plugins: []plugin.Plugin{
 					&plugin.DNSSL{
 						Lifetime: 10 * time.Second,
@@ -122,7 +123,8 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 
 			// Expect a complete RA.
 			want := &ndp.RouterAdvertisement{
-				OtherConfiguration: true,
+				OtherConfiguration:        true,
+				RouterSelectionPreference: ndp.High,
 				Options: []ndp.Option{
 					&ndp.DNSSearchList{
 						Lifetime: 10 * time.Second,
