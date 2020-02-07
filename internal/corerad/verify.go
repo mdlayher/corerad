@@ -25,7 +25,6 @@ func verifyRAs(a, b *ndp.RouterAdvertisement) bool {
 	// https://tools.ietf.org/html/rfc4861#section-6.2.7.
 	//
 	// TODO: more verbose error reporting? Individual fields?
-	// TODO: verification of RDNSS and DNSSL?
 	return a.CurrentHopLimit == b.CurrentHopLimit &&
 		a.ManagedConfiguration == b.ManagedConfiguration &&
 		a.OtherConfiguration == b.OtherConfiguration &&
