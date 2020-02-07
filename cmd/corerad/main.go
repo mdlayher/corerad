@@ -40,6 +40,13 @@ func main() {
 		initFlag = flag.Bool("init", false,
 			fmt.Sprintf("write out a default configuration file to %q and exit", cfgFile))
 	)
+
+	flag.Usage = func() {
+		// Indicate version in usage.
+		fmt.Printf("CoreRAD %s\nflags:\n", version)
+		flag.PrintDefaults()
+	}
+
 	flag.Parse()
 
 	ll := log.New(os.Stderr, "", log.LstdFlags)
