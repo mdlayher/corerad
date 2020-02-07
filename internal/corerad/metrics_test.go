@@ -43,7 +43,7 @@ func Test_interfaceCollector(t *testing.T) {
 			metrics: []string{
 				`corerad_interface_autoconfiguration{interface="lo"} 1`,
 				`corerad_interface_forwarding{interface="lo"} 0`,
-				`corerad_interface_send_advertisements{interface="lo"} 1`,
+				`corerad_interface_advertising{interface="lo"} 1`,
 			},
 		},
 	}
