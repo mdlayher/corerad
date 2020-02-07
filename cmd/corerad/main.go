@@ -45,7 +45,12 @@ func main() {
 	ll := log.New(os.Stderr, "", log.LstdFlags)
 
 	if *initFlag {
-		if err := ioutil.WriteFile(cfgFile, []byte(config.Default), 0644); err != nil {
+		err := ioutil.WriteFile(
+			cfgFile,
+			[]byte(fmt.Sprintf(config.Default, version)),
+			0o644,
+		)
+		if err != nil {
 			ll.Fatalf("failed to write default configuration: %v", err)
 		}
 

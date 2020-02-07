@@ -1,4 +1,4 @@
-# CoreRAD vALPHA configuration file
+# CoreRAD %s configuration file
 
 # All duration values are specified in Go time.ParseDuration format:
 # https://golang.org/pkg/time/#ParseDuration.
