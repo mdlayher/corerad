@@ -14,7 +14,7 @@ This configuration file can be written to `corerad.toml` locally by running:
 ```text
 $ corerad -init
 $ head -n 1 corerad.toml
-# CoreRAD vALPHA configuration file
+# CoreRAD v0.2.0 (BETA) configuration file
 ```
 
 Although numerous configuration parameters are available, many of them are
@@ -29,11 +29,11 @@ Here is an example of a minimal configuration which:
 - serves CoreRAD's Prometheus metrics
 
 ```toml
-# CoreRAD vALPHA configuration file
+# CoreRAD v0.2.0 (BETA) configuration file
 
 [[interfaces]]
 name = "eth0"
-send_advertisements = true
+advertise = true
 
   [[interfaces.plugins]]
   name = "prefix"
