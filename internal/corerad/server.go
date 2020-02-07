@@ -115,13 +115,21 @@ func (s *Server) Run(ctx context.Context) error {
 		// Advertiser to flap.
 		watchC := w.Subscribe(iface.Name, netstate.LinkDown)
 
+		ad := NewAdvertiser(iface.Name, iface, s.ll, mm)
+
 		// Begin advertising on this interface until the context is canceled.
 		s.eg.Go(func() error {
-			ad := NewAdvertiser(iface.Name, iface, s.ll, mm)
 			if err := ad.Advertise(ctx, watchC); err != nil {
 				return fmt.Errorf("failed to advertise NDP: %v", err)
 			}
 
+			return nil
+		})
+
+		// Drain events produced by the Advertiser; we don't need them.
+		s.eg.Go(func() error {
+			for range ad.Events() {
+			}
 			return nil
 		})
 	}

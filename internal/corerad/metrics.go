@@ -20,12 +20,13 @@ import (
 
 // AdvertiserMetrics contains metrics for an Advertiser.
 type AdvertiserMetrics struct {
-	LastMulticastTime            *prometheus.GaugeVec
-	MessagesReceivedTotal        *prometheus.CounterVec
-	MessagesReceivedInvalidTotal *prometheus.CounterVec
-	RouterAdvertisementsTotal    *prometheus.CounterVec
-	ErrorsTotal                  *prometheus.CounterVec
-	SchedulerWorkers             *prometheus.GaugeVec
+	LastMulticastTime                       *prometheus.GaugeVec
+	MessagesReceivedTotal                   *prometheus.CounterVec
+	MessagesReceivedInvalidTotal            *prometheus.CounterVec
+	RouterAdvertisementInconsistenciesTotal *prometheus.CounterVec
+	RouterAdvertisementsTotal               *prometheus.CounterVec
+	ErrorsTotal                             *prometheus.CounterVec
+	SchedulerWorkers                        *prometheus.GaugeVec
 }
 
 // NewAdvertiserMetrics creates and registers AdvertiserMetrics. If reg is nil
@@ -62,6 +63,14 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 			Help: "The total number of invalid NDP messages received on a listening interface.",
 		}, []string{"interface", "message"}),
 
+		RouterAdvertisementInconsistenciesTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "router_advertisement_inconsistencies_total",
+
+			Help: "The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration.",
+		}, []string{"interface"}),
+
 		RouterAdvertisementsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
@@ -92,6 +101,7 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 			mm.LastMulticastTime,
 			mm.MessagesReceivedTotal,
 			mm.MessagesReceivedInvalidTotal,
+			mm.RouterAdvertisementInconsistenciesTotal,
 			mm.RouterAdvertisementsTotal,
 			mm.SchedulerWorkers,
 		)

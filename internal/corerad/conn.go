@@ -142,6 +142,7 @@ func (c *systemConn) Dial(iface string) (*net.Interface, net.IP, error) {
 	var f ipv6.ICMPFilter
 	f.SetAll(true)
 	f.Accept(ipv6.ICMPTypeRouterSolicitation)
+	f.Accept(ipv6.ICMPTypeRouterAdvertisement)
 
 	if err := conn.SetICMPFilter(&f); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply ICMPv6 filter: %v", err)

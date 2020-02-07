@@ -28,6 +28,7 @@ import (
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
+	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -45,9 +46,21 @@ type Advertiser struct {
 	// Dynamic configuration, set up on each (re)initialization.
 	c conn
 
-	// Notifications of internal state change for tests.
+	// TODO: collapse reinitC into eventC.
 	reinitC chan struct{}
+
+	// Notifications of state change for tests.
+	eventC chan Event
 }
+
+// An Event indicates events of interest produced by an Advertiser.
+type Event int
+
+// Possible Event types.
+const (
+	ReceiveRA Event = iota
+	InconsistentRA
+)
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded. If mm is nil, metrics are discarded.
@@ -69,8 +82,13 @@ func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Adver
 		c: newSystemConn(ll, mm),
 
 		reinitC: make(chan struct{}),
+		eventC:  make(chan Event),
 	}
 }
+
+// Events returns a channel of Events from the Advertiser. Events must be called
+// before calling Advertise. The channel will be closed when Advertise returns.
+func (a *Advertiser) Events() <-chan Event { return a.eventC }
 
 // A request indicates that a router advertisement should be sent to the
 // specified IP address.
@@ -83,7 +101,13 @@ type request struct {
 // error occurs. If watchC is not nil, it will be used to trigger the
 // reinitialization process. Typically watchC is used with the netstate.Watcher
 // type.
+//
+// Before calling Advertise, call Events and ensure that the returned channel is
+// being drained, or Advertiser will stop processing.
 func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Change) error {
+	// No more events when Advertise returns.
+	defer close(a.eventC)
+
 	// err is reused for each loop, and intentionally nil on the first pass
 	// so initialization occurs.
 	var err error
@@ -252,35 +276,67 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 				continue
 			}
 
-			return fmt.Errorf("failed to read router solicitations: %w", err)
+			return fmt.Errorf("failed to read NDP messages: %w", err)
 		}
 
-		a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
-
-		// Ensure this message has a valid hop limit.
-		if cm.HopLimit != ndp.HopLimit {
-			a.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
-			a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
-			continue
+		// Handle the incoming message and send a response if one is needed.
+		req, err := a.handle(m, cm, host)
+		if err != nil {
+			return fmt.Errorf("failed to handle NDP message: %w", err)
 		}
-
-		switch m.(type) {
-		case *ndp.RouterSolicitation:
-			// Issue a unicast RA for clients with valid addresses, or a multicast
-			// RA for any client contacting us via the IPv6 unspecified address,
-			// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
-			if host.Equal(net.IPv6unspecified) {
-				host = net.IPv6linklocalallnodes
-			}
-
-			// TODO: consider checking for numerous RS in succession and issuing
-			// a multicast RA in response.
-			reqC <- request{IP: host}
-		default:
-			a.logf("received NDP message of type %T from %s, ignoring", m, host)
-			a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+		if req != nil {
+			reqC <- *req
 		}
 	}
+}
+
+// handle handles an incoming NDP message from a remote host.
+func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host net.IP) (*request, error) {
+	a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+
+	// Ensure this message has a valid hop limit.
+	if cm.HopLimit != ndp.HopLimit {
+		a.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
+		a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+		return nil, nil
+	}
+
+	switch m := m.(type) {
+	case *ndp.RouterSolicitation:
+		// Issue a unicast RA for clients with valid addresses, or a multicast
+		// RA for any client contacting us via the IPv6 unspecified address,
+		// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
+		if host.Equal(net.IPv6unspecified) {
+			host = net.IPv6linklocalallnodes
+		}
+
+		// TODO: consider checking for numerous RS in succession and issuing
+		// a multicast RA in response.
+		return &request{IP: host}, nil
+	case *ndp.RouterAdvertisement:
+		// Received a router advertisement from a different router on this
+		// LAN, verify its consistency with our own.
+		a.eventC <- ReceiveRA
+		want, err := a.buildRA(a.cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build router advertisement: %w", err)
+		}
+
+		// Ensure the RAs are consistent.
+		if !verifyRAs(want, m) {
+			// RAs are not consistent, report this per the RFC.
+			a.eventC <- InconsistentRA
+			a.logf("inconsistencies detected in router advertisement from router with IP %q, source link-layer address %q",
+				host, sourceLLA(m.Options))
+			a.mm.RouterAdvertisementInconsistenciesTotal.WithLabelValues(a.cfg.Name).Add(1)
+		}
+	default:
+		a.logf("received NDP message of type %T from %s, ignoring", m, host)
+		a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+	}
+
+	// No response necessary.
+	return nil, nil
 }
 
 // schedule consumes RA requests and schedules them with workers so they may

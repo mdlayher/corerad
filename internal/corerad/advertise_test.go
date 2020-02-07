@@ -56,6 +56,7 @@ type clientContext struct {
 	rs             *ndp.RouterSolicitation
 	router, client *net.Interface
 	reinitC        <-chan struct{}
+	eventC         <-chan Event
 }
 
 func TestAdvertiserUnsolicitedFull(t *testing.T) {
@@ -312,6 +313,70 @@ func TestAdvertiserSolicited(t *testing.T) {
 	}
 }
 
+func TestAdvertiserVerifyRAs(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   testAdvertiserFunc
+	}{
+		{
+			name: "simulated",
+			fn:   testSimulatedAdvertiserClient,
+		},
+		{
+			name: "real",
+			fn:   testAdvertiserClient,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			done := tt.fn(t, nil, nil, func(_ func(), cctx *clientContext) {
+				// Capture the advertiser's initial RA so that we can manipulate
+				// and reflect it to test RA verification.
+				m, _, ip, err := cctx.c.ReadFrom()
+				if err != nil {
+					t.Fatalf("failed to read initial RA: %v", err)
+				}
+				ra := m.(*ndp.RouterAdvertisement)
+
+				// Copy over our source link-layer address from the synthetic RS
+				// for reporting.
+				ra.Options = cctx.rs.Options
+
+				timer := time.AfterFunc(10*time.Second, func() {
+					panic("took too long")
+				})
+				defer timer.Stop()
+
+				// Reflect the router advertisement as-is and wait for it to
+				// be processed.
+				if err := cctx.c.WriteTo(ra, nil, ip); err != nil {
+					panicf("failed to send RA: %v", err)
+				}
+				events := []Event{<-cctx.eventC}
+
+				// Create a minor inconsistency in the router advertisement and
+				// reflect it again. This time, we'll expect to see an event
+				// indicating the inconsistency.
+				ra.ManagedConfiguration = true
+				if err := cctx.c.WriteTo(ra, nil, ip); err != nil {
+					panicf("failed to send RA: %v", err)
+				}
+				events = append(events, <-cctx.eventC)
+				events = append(events, <-cctx.eventC)
+
+				// Finally, verify the events and ensure the advertiser reported
+				// an inconsistency.
+				want := []Event{ReceiveRA, ReceiveRA, InconsistentRA}
+				if diff := cmp.Diff(want, events); diff != "" {
+					t.Fatalf("unexpected Advertiser events (-want +got):\n%s", diff)
+				}
+			})
+			defer done()
+		})
+	}
+}
+
 func Test_multicastDelay(t *testing.T) {
 	// Static seed for deterministic output.
 	r := rand.New(rand.NewSource(0))
@@ -409,6 +474,7 @@ func testSimulatedAdvertiserClient(
 			}},
 		},
 		reinitC: ad.reinitC,
+		eventC:  ad.Events(),
 	}
 
 	// Run the advertiser and invoke the client's input function with some
@@ -654,6 +720,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		router:  router,
 		client:  client,
 		reinitC: ad.reinitC,
+		eventC:  ad.Events(),
 	}
 
 	done := func() {
