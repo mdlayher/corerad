@@ -540,18 +540,29 @@ func (a *Advertiser) reinit(ctx context.Context, err error) error {
 
 	defer notify()
 
+	if err == nil {
+		// Nil input error, this must be the first initialization.
+		err = a.init()
+	}
+
 	// Check for conditions which are recoverable.
 	var serr *os.SyscallError
 	switch {
 	case errors.As(err, &serr):
-		// TODO: check for certain syscall error numbers.
+		if errors.Is(serr, os.ErrPermission) {
+			// Permission denied means this will never work, so exit immediately.
+			return err
+		}
+
+		// For other syscall errors, try again.
 		a.logf("error advertising, reinitializing")
 	case errors.Is(err, errLinkNotReady):
 		a.logf("interface not ready, reinitializing")
 	case errors.Is(err, errLinkChange):
 		a.logf("interface state changed, reinitializing")
 	case err == nil:
-		// Initial init.
+		// Successful init.
+		return nil
 	default:
 		// Unrecoverable error
 		return err
