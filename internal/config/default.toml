@@ -66,6 +66,11 @@ source_lla = true
 # solicitations in order to receive router advertisements.
 unicast_only = false
 
+# Indicates the preference of this router over other default routers. Only the
+# values "low", "medium", and "high" are allowed. An empty string is treated as
+# "medium".
+preference = "medium"
+
   # Prefix: attaches a NDP Prefix Information option to the router advertisement.
   [[interfaces.prefix]]
   # Serve Prefix Information options for each IPv6 prefix on this interface

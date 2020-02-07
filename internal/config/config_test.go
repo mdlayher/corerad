@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/plugin"
+	"github.com/mdlayher/ndp"
 )
 
 func TestParse(t *testing.T) {
@@ -80,6 +81,7 @@ func TestParse(t *testing.T) {
 					HopLimit:        64,
 					DefaultLifetime: 30 * time.Minute,
 					UnicastOnly:     false,
+					Preference:      ndp.Medium,
 					Plugins:         []plugin.Plugin{&plugin.LLA{}},
 				}},
 			},
@@ -96,6 +98,7 @@ func TestParse(t *testing.T) {
 			hop_limit = 64
 			default_lifetime = "auto"
 			mtu = 1500
+			preference = "medium"
 
 			  [[interfaces.prefix]]
 			  prefix = "::/64"
@@ -123,12 +126,14 @@ func TestParse(t *testing.T) {
 			reachable_time = "30s"
 			retransmit_timer = "5s"
 			source_lla = true
+			preference = "low"
 
 			[[interfaces]]
 			name = "eth2"
 			hop_limit = 0
 			unicast_only = true
 			source_lla = false
+			preference = "high"
 
 			[debug]
 			address = "localhost:9430"
@@ -144,6 +149,7 @@ func TestParse(t *testing.T) {
 						MaxInterval:     10 * time.Minute,
 						HopLimit:        64,
 						DefaultLifetime: 30 * time.Minute,
+						Preference:      ndp.Medium,
 						UnicastOnly:     false,
 						Plugins: []plugin.Plugin{
 							&plugin.Prefix{
@@ -183,6 +189,7 @@ func TestParse(t *testing.T) {
 						ReachableTime:   30 * time.Second,
 						RetransmitTimer: 5 * time.Second,
 						DefaultLifetime: 8 * time.Second,
+						Preference:      ndp.Low,
 						Plugins:         []plugin.Plugin{&plugin.LLA{}},
 					},
 					{
@@ -193,6 +200,7 @@ func TestParse(t *testing.T) {
 						HopLimit:        0,
 						DefaultLifetime: 30 * time.Minute,
 						UnicastOnly:     true,
+						Preference:      ndp.High,
 						Plugins:         []plugin.Plugin{},
 					},
 				},

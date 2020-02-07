@@ -16,6 +16,8 @@ package config
 import (
 	"fmt"
 	"time"
+
+	"github.com/mdlayher/ndp"
 )
 
 // parseInterfaces parses a rawInterface into an Interface.
@@ -85,6 +87,11 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		return nil, err
 	}
 
+	pref, err := parsePreference(ifi.Preference)
+	if err != nil {
+		return nil, err
+	}
+
 	// Parse plugins using the remaining rawInterface fields.
 	plugins, err := parsePlugins(ifi, maxInterval)
 	if err != nil {
@@ -103,6 +110,7 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		HopLimit:        uint8(hopLimit),
 		DefaultLifetime: lifetime,
 		UnicastOnly:     ifi.UnicastOnly,
+		Preference:      pref,
 		Plugins:         plugins,
 	}, nil
 }
@@ -164,4 +172,18 @@ func parseDefaultLifetime(s *string, max time.Duration) (time.Duration, error) {
 	}
 
 	return lt, nil
+}
+
+// parsePreference parses s as a router preference value.
+func parsePreference(s string) (ndp.RouterSelectionPreference, error) {
+	switch s {
+	case "", "medium":
+		return ndp.Medium, nil
+	case "low":
+		return ndp.Low, nil
+	case "high":
+		return ndp.High, nil
+	default:
+		return 0, fmt.Errorf("invalid preference: %q", s)
+	}
 }

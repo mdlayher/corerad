@@ -125,6 +125,12 @@ func Test_parseInterfaceErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "preference invalid",
+			ifi: rawInterface{
+				Preference: "foo",
+			},
+		},
+		{
 			name: "MTU too low",
 			ifi: rawInterface{
 				MTU: -1,
