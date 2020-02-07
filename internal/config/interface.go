@@ -92,18 +92,18 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 	}
 
 	return &Interface{
-		Name:               ifi.Name,
-		SendAdvertisements: ifi.SendAdvertisements,
-		MinInterval:        minInterval,
-		MaxInterval:        maxInterval,
-		Managed:            ifi.Managed,
-		OtherConfig:        ifi.OtherConfig,
-		ReachableTime:      reachable,
-		RetransmitTimer:    retrans,
-		HopLimit:           uint8(hopLimit),
-		DefaultLifetime:    lifetime,
-		UnicastOnly:        ifi.UnicastOnly,
-		Plugins:            plugins,
+		Name:            ifi.Name,
+		Advertise:       ifi.Advertise,
+		MinInterval:     minInterval,
+		MaxInterval:     maxInterval,
+		Managed:         ifi.Managed,
+		OtherConfig:     ifi.OtherConfig,
+		ReachableTime:   reachable,
+		RetransmitTimer: retrans,
+		HopLimit:        uint8(hopLimit),
+		DefaultLifetime: lifetime,
+		UnicastOnly:     ifi.UnicastOnly,
+		Plugins:         plugins,
 	}, nil
 }
 

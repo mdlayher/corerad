@@ -37,8 +37,8 @@ func Test_interfaceCollector(t *testing.T) {
 		{
 			name: "ok",
 			ifis: []config.Interface{{
-				Name:               loop.Name,
-				SendAdvertisements: true,
+				Name:      loop.Name,
+				Advertise: true,
 			}},
 			metrics: []string{
 				`corerad_interface_autoconfiguration{interface="lo"} 1`,

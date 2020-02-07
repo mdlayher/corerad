@@ -100,8 +100,8 @@ func (s *Server) Run(ctx context.Context) error {
 			s.ll.Println(iface.Name + ": " + fmt.Sprintf(format, v...))
 		}
 
-		if !iface.SendAdvertisements {
-			logf("send advertisements is false, skipping initialization")
+		if !iface.Advertise {
+			logf("advertise is false, skipping initialization")
 			continue
 		}
 

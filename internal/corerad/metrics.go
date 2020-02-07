@@ -112,9 +112,9 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 
 // An interfaceCollector collects Prometheus metrics for a network interface.
 type interfaceCollector struct {
-	Autoconfiguration  *prometheus.Desc
-	Forwarding         *prometheus.Desc
-	SendAdvertisements *prometheus.Desc
+	Autoconfiguration *prometheus.Desc
+	Forwarding        *prometheus.Desc
+	Advertise         *prometheus.Desc
 
 	ifis []config.Interface
 }
@@ -140,8 +140,8 @@ func newInterfaceCollector(ifis []config.Interface) prometheus.Collector {
 			nil,
 		),
 
-		SendAdvertisements: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "send_advertisements"),
+		Advertise: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystem, "advertising"),
 			"Indicates whether or not NDP router advertisements will be sent from this interface.",
 			labels,
 			nil,
@@ -156,7 +156,7 @@ func (c *interfaceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
 		c.Autoconfiguration,
 		c.Forwarding,
-		c.SendAdvertisements,
+		c.Advertise,
 	}
 
 	for _, d := range ds {
@@ -195,9 +195,9 @@ func (c *interfaceCollector) Collect(ch chan<- prometheus.Metric) {
 		)
 
 		ch <- prometheus.MustNewConstMetric(
-			c.SendAdvertisements,
+			c.Advertise,
 			prometheus.GaugeValue,
-			boolFloat(ifi.SendAdvertisements),
+			boolFloat(ifi.Advertise),
 			ifi.Name,
 		)
 

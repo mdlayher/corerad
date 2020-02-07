@@ -11,7 +11,7 @@ name = "eth0"
 # periodic router advertisements and respond to router solicitations.
 #
 # Must be set to true to enable serving on this interface.
-send_advertisements = false
+advertise = false
 
 # All other interface parameters in this section can be removed to simplify
 # configuration with sane defaults.

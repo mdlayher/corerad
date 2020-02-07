@@ -73,14 +73,14 @@ func TestParse(t *testing.T) {
 			`,
 			c: &config.Config{
 				Interfaces: []config.Interface{{
-					Name:               "eth0",
-					SendAdvertisements: false,
-					MinInterval:        3*time.Minute + 18*time.Second,
-					MaxInterval:        10 * time.Minute,
-					HopLimit:           64,
-					DefaultLifetime:    30 * time.Minute,
-					UnicastOnly:        false,
-					Plugins:            []plugin.Plugin{&plugin.LLA{}},
+					Name:            "eth0",
+					Advertise:       false,
+					MinInterval:     3*time.Minute + 18*time.Second,
+					MaxInterval:     10 * time.Minute,
+					HopLimit:        64,
+					DefaultLifetime: 30 * time.Minute,
+					UnicastOnly:     false,
+					Plugins:         []plugin.Plugin{&plugin.LLA{}},
 				}},
 			},
 			ok: true,
@@ -90,7 +90,7 @@ func TestParse(t *testing.T) {
 			s: `
 			[[interfaces]]
 			name = "eth0"
-			send_advertisements = true
+			advertise = true
 			max_interval = "10m"
 			min_interval = "6m"
 			hop_limit = 64
@@ -138,13 +138,13 @@ func TestParse(t *testing.T) {
 			c: &config.Config{
 				Interfaces: []config.Interface{
 					{
-						Name:               "eth0",
-						SendAdvertisements: true,
-						MinInterval:        6 * time.Minute,
-						MaxInterval:        10 * time.Minute,
-						HopLimit:           64,
-						DefaultLifetime:    30 * time.Minute,
-						UnicastOnly:        false,
+						Name:            "eth0",
+						Advertise:       true,
+						MinInterval:     6 * time.Minute,
+						MaxInterval:     10 * time.Minute,
+						HopLimit:        64,
+						DefaultLifetime: 30 * time.Minute,
+						UnicastOnly:     false,
 						Plugins: []plugin.Plugin{
 							&plugin.Prefix{
 								Prefix:            mustCIDR("::/64"),
@@ -173,27 +173,27 @@ func TestParse(t *testing.T) {
 						},
 					},
 					{
-						Name:               "eth1",
-						SendAdvertisements: false,
-						MinInterval:        4 * time.Second,
-						MaxInterval:        4 * time.Second,
-						HopLimit:           64,
-						Managed:            true,
-						OtherConfig:        true,
-						ReachableTime:      30 * time.Second,
-						RetransmitTimer:    5 * time.Second,
-						DefaultLifetime:    8 * time.Second,
-						Plugins:            []plugin.Plugin{&plugin.LLA{}},
+						Name:            "eth1",
+						Advertise:       false,
+						MinInterval:     4 * time.Second,
+						MaxInterval:     4 * time.Second,
+						HopLimit:        64,
+						Managed:         true,
+						OtherConfig:     true,
+						ReachableTime:   30 * time.Second,
+						RetransmitTimer: 5 * time.Second,
+						DefaultLifetime: 8 * time.Second,
+						Plugins:         []plugin.Plugin{&plugin.LLA{}},
 					},
 					{
-						Name:               "eth2",
-						SendAdvertisements: false,
-						MinInterval:        3*time.Minute + 18*time.Second,
-						MaxInterval:        10 * time.Minute,
-						HopLimit:           0,
-						DefaultLifetime:    30 * time.Minute,
-						UnicastOnly:        true,
-						Plugins:            []plugin.Plugin{},
+						Name:            "eth2",
+						Advertise:       false,
+						MinInterval:     3*time.Minute + 18*time.Second,
+						MaxInterval:     10 * time.Minute,
+						HopLimit:        0,
+						DefaultLifetime: 30 * time.Minute,
+						UnicastOnly:     true,
+						Plugins:         []plugin.Plugin{},
 					},
 				},
 				Debug: config.Debug{
