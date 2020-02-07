@@ -195,7 +195,12 @@ func (s *Server) runDebug(ctx context.Context) error {
 				_ = l.Close()
 			}()
 
-			return http.Serve(l, newHTTPHandler(d.Prometheus, d.PProf, s.reg))
+			return http.Serve(l, newHTTPHandler(
+				s.cfg.Version,
+				d.Prometheus,
+				d.PProf,
+				s.reg,
+			))
 		})
 	})
 
@@ -247,18 +252,21 @@ func (s *Server) serve(ctx context.Context, fn func() error) error {
 
 // A httpHandler provides the HTTP debug API handler for CoreRAD.
 type httpHandler struct {
-	h http.Handler
+	h       http.Handler
+	version string
 }
 
 // NewHTTPHandler creates a httpHandler with the specified configuration.
 func newHTTPHandler(
+	version string,
 	usePrometheus, usePProf bool,
 	reg *prometheus.Registry,
 ) *httpHandler {
 	mux := http.NewServeMux()
 
 	h := &httpHandler{
-		h: mux,
+		h:       mux,
+		version: version,
 	}
 
 	// Optionally enable Prometheus and pprof support.
@@ -281,7 +289,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Matching on "/" would produce an overly broad rule, so check manually
 	// here and indicate that this is the CoreRAD service.
 	if r.URL.Path == "/" {
-		_, _ = io.WriteString(w, "CoreRAD\n")
+		_, _ = io.WriteString(w, fmt.Sprintf("CoreRAD %s\n", h.version))
 		return
 	}
 

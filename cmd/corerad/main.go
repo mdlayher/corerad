@@ -73,6 +73,7 @@ func main() {
 	if err != nil {
 		ll.Fatalf("failed to parse %q: %v", f.Name(), err)
 	}
+	cfg.Version = version
 	_ = f.Close()
 
 	ll.Printf("CoreRAD %s starting with configuration file %q", version, f.Name())

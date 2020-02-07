@@ -83,6 +83,10 @@ type rawRDNSS struct {
 
 // Config specifies the configuration for CoreRAD.
 type Config struct {
+	// Populated by cmd/corerad.
+	Version string
+
+	// User-specified.
 	Interfaces []Interface
 	Debug      Debug
 }
