@@ -35,8 +35,7 @@ Here is an example of a minimal configuration which:
 name = "eth0"
 advertise = true
 
-  [[interfaces.plugins]]
-  name = "prefix"
+  [[interfaces.prefix]]
   prefix = "::/64"
 
 [debug]
