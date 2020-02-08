@@ -138,7 +138,8 @@ func (c *systemConn) Dial(iface string) (*net.Interface, net.IP, error) {
 		}
 	}
 
-	// We only want to accept router solicitation messages.
+	// Accept router solicitations to generate advertisements and other routers'
+	// advertisements to verify them against our own.
 	var f ipv6.ICMPFilter
 	f.SetAll(true)
 	f.Accept(ipv6.ICMPTypeRouterSolicitation)
