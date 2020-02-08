@@ -40,8 +40,8 @@ github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxv
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
 github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
-github.com/mdlayher/ndp v0.0.0-20200103174253-4f8c213af111 h1:F+GmwO8tajpnTmCpQOxMwMFPkGGCD1Zcw+vIZOT6sss=
-github.com/mdlayher/ndp v0.0.0-20200103174253-4f8c213af111/go.mod h1:RA3SuKRKhMBigwJnFonlsRE0H9FuhUBsfhIOXtojQig=
+github.com/mdlayher/ndp v0.0.0-20200208205613-635003cdcd86 h1:DaJJrUcFlMBXDNGTS3vtljhgzVHdjQ6VIPYFW3Dg1dM=
+github.com/mdlayher/ndp v0.0.0-20200208205613-635003cdcd86/go.mod h1:RA3SuKRKhMBigwJnFonlsRE0H9FuhUBsfhIOXtojQig=
 github.com/mdlayher/netlink v0.0.0-20190409211403-11939a169225/go.mod h1:eQB3mZE4aiYnlUsyGGCOpPETfdQq4Jhsgf1fk3cwQaA=
 github.com/mdlayher/netlink v1.0.0 h1:vySPY5Oxnn/8lxAPn2cK6kAzcZzYJl3KriSLO46OT18=
 github.com/mdlayher/netlink v1.0.0/go.mod h1:KxeJAFOFLG6AjpyDkQ/iIhxygIUKD+vcwqcnu43w/+M=

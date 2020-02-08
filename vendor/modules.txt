@@ -17,7 +17,7 @@ github.com/jsimonetti/rtnetlink
 github.com/jsimonetti/rtnetlink/internal/unix
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/mdlayher/ndp v0.0.0-20200103174253-4f8c213af111
+# github.com/mdlayher/ndp v0.0.0-20200208205613-635003cdcd86
 github.com/mdlayher/ndp
 # github.com/mdlayher/netlink v1.0.0
 github.com/mdlayher/netlink
