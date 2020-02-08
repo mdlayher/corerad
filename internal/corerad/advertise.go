@@ -90,12 +90,6 @@ func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Adver
 // before calling Advertise. The channel will be closed when Advertise returns.
 func (a *Advertiser) Events() <-chan Event { return a.eventC }
 
-// A request indicates that a router advertisement should be sent to the
-// specified IP address.
-type request struct {
-	IP net.IP
-}
-
 // Advertise initializes the configured interface and begins router solicitation
 // and advertisement handling. Advertise will block until ctx is canceled or an
 // error occurs. If watchC is not nil, it will be used to trigger the
@@ -143,12 +137,12 @@ func (a *Advertiser) advertise(ctx context.Context, watchC <-chan netstate.Chang
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
 
-	reqC := make(chan request, 16)
+	ipC := make(chan net.IP, 16)
 
 	// RA scheduler which consumes requests to send RAs and dispatches them
 	// at the appropriate times.
 	eg.Go(func() error {
-		if err := a.schedule(ctx, reqC); err != nil {
+		if err := a.schedule(ctx, ipC); err != nil {
 			return fmt.Errorf("failed to schedule router advertisements: %w", err)
 		}
 
@@ -158,14 +152,14 @@ func (a *Advertiser) advertise(ctx context.Context, watchC <-chan netstate.Chang
 	// Multicast RA generator, unless running in unicast-only mode.
 	if !a.cfg.UnicastOnly {
 		eg.Go(func() error {
-			a.multicast(ctx, reqC)
+			a.multicast(ctx, ipC)
 			return nil
 		})
 	}
 
 	// Listener which issues RAs in response to RS messages.
 	eg.Go(func() error {
-		if err := a.listen(ctx, reqC); err != nil {
+		if err := a.listen(ctx, ipC); err != nil {
 			return fmt.Errorf("failed to listen: %w", err)
 		}
 
@@ -209,7 +203,7 @@ const (
 )
 
 // multicast runs a multicast advertising loop until ctx is canceled.
-func (a *Advertiser) multicast(ctx context.Context, reqC chan<- request) {
+func (a *Advertiser) multicast(ctx context.Context, ipC chan<- net.IP) {
 	// Initialize PRNG so we can add jitter to our unsolicited multicast RA
 	// delay times.
 	var (
@@ -226,7 +220,7 @@ func (a *Advertiser) multicast(ctx context.Context, reqC chan<- request) {
 		default:
 		}
 
-		reqC <- request{IP: net.IPv6linklocalallnodes}
+		ipC <- net.IPv6linklocalallnodes
 
 		select {
 		case <-ctx.Done():
@@ -241,7 +235,7 @@ var deadlineNow = time.Unix(1, 0)
 
 // listen issues unicast router advertisements in response to router
 // solicitations, until ctx is canceled.
-func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
+func (a *Advertiser) listen(ctx context.Context, ipC chan<- net.IP) error {
 	// Wait for cancelation and then force any pending reads to time out.
 	var eg errgroup.Group
 	eg.Go(func() error {
@@ -280,18 +274,18 @@ func (a *Advertiser) listen(ctx context.Context, reqC chan<- request) error {
 		}
 
 		// Handle the incoming message and send a response if one is needed.
-		req, err := a.handle(m, cm, host)
+		ip, err := a.handle(m, cm, host)
 		if err != nil {
 			return fmt.Errorf("failed to handle NDP message: %w", err)
 		}
-		if req != nil {
-			reqC <- *req
+		if ip != nil {
+			ipC <- ip
 		}
 	}
 }
 
 // handle handles an incoming NDP message from a remote host.
-func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host net.IP) (*request, error) {
+func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host net.IP) (net.IP, error) {
 	a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
 
 	// Ensure this message has a valid hop limit.
@@ -312,7 +306,7 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host net.IP)
 
 		// TODO: consider checking for numerous RS in succession and issuing
 		// a multicast RA in response.
-		return &request{IP: host}, nil
+		return host, nil
 	case *ndp.RouterAdvertisement:
 		// Received a router advertisement from a different router on this
 		// LAN, verify its consistency with our own.
@@ -341,7 +335,7 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host net.IP)
 
 // schedule consumes RA requests and schedules them with workers so they may
 // occur at the appropriate times.
-func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
+func (a *Advertiser) schedule(ctx context.Context, ipC <-chan net.IP) error {
 	// Enable canceling schedule's context on send RA error.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -363,8 +357,8 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 	)
 
 	for {
-		// New request for each loop iteration to prevent races.
-		var req request
+		// New IP for each loop iteration to prevent races.
+		var ip net.IP
 
 		select {
 		case err := <-errC:
@@ -381,15 +375,15 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 			}
 
 			return nil
-		case req = <-reqC:
+		case ip = <-ipC:
 		}
 
-		if !req.IP.IsMulticast() {
+		if !ip.IsMulticast() {
 			// This is a unicast RA. Delay it for a short period of time per
 			// the RFC and then send it.
 			delay := time.Duration(prng.Int63n(maxRADelay.Nanoseconds())) * time.Nanosecond
 			sg.Delay(delay, func() error {
-				if err := a.sendWorker(req.IP); err != nil {
+				if err := a.sendWorker(ip); err != nil {
 					errC <- err
 				}
 				return nil
@@ -406,7 +400,7 @@ func (a *Advertiser) schedule(ctx context.Context, reqC <-chan request) error {
 		// Ready to send this multicast RA.
 		lastMulticast = time.Now()
 		sg.Delay(delay, func() error {
-			if err := a.sendWorker(req.IP); err != nil {
+			if err := a.sendWorker(ip); err != nil {
 				errC <- err
 			}
 			return nil
