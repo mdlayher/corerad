@@ -23,11 +23,13 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sys/unix"
 )
 
 func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
@@ -160,16 +162,20 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 	defer done()
 }
 
-func TestAdvertiserLinuxSLAAC(t *testing.T) {
-	// No configuration, bare minimum router advertisement.
+func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 	tcfg := &testConfig{
 		vethConfig: func(t *testing.T, _, veth1 string) {
 			// Ensure SLAAC can be used on the client interface.
 			mustSysctl(t, veth1, "autoconf", "1")
+
+			// Accept /64 routes.
+			mustSysctl(t, veth1, "accept_ra_rtr_pref", "1")
+			mustSysctl(t, veth1, "accept_ra_rt_info_max_plen", "64")
 		},
 	}
 
 	prefix := mustCIDR("2001:db8:dead:beef::/64")
+	route := mustCIDR("2001:db8:ffff:ffff::/64")
 
 	icfg := &config.Interface{
 		Plugins: []plugin.Plugin{
@@ -179,6 +185,11 @@ func TestAdvertiserLinuxSLAAC(t *testing.T) {
 				Autonomous:        true,
 				ValidLifetime:     24 * time.Hour,
 				PreferredLifetime: 4 * time.Hour,
+			},
+			&plugin.Route{
+				Prefix:     route,
+				Preference: ndp.High,
+				Lifetime:   24 * time.Hour,
 			},
 		},
 	}
@@ -194,7 +205,7 @@ func TestAdvertiserLinuxSLAAC(t *testing.T) {
 			t.Fatalf("initial RA address must be multicast: %v", cm.Dst)
 		}
 
-		// And verify that SLAAC addresses were added to the interface.
+		// Verify that SLAAC addresses were added to the interface.
 		addrs, err := cctx.client.Addrs()
 		if err != nil {
 			t.Fatalf("failed to get interface addresses: %v", err)
@@ -213,6 +224,36 @@ func TestAdvertiserLinuxSLAAC(t *testing.T) {
 			}
 
 			t.Logf("IP: %s", a)
+		}
+
+		// Verify that routes were added to the interface.
+		c, err := rtnetlink.Dial(nil)
+		if err != nil {
+			t.Fatalf("failed to dial rtnetlink: %v", err)
+		}
+		defer c.Close()
+
+		routes, err := c.Route.List()
+		if err != nil {
+			t.Fatalf("failed to list routes: %v", err)
+		}
+
+		var found int
+		for _, r := range routes {
+			// Skip non-IPv6 routes and routes for other interfaces.
+			if r.Family != unix.AF_INET6 || int(r.Attributes.OutIface) != cctx.client.Index {
+				continue
+			}
+
+			// Ensure we find routes for both our prefix and specified route.
+			if prefix.Contains(r.Attributes.Dst) || route.Contains(r.Attributes.Dst) {
+				t.Logf("route: %s/%d", r.Attributes.Dst, r.DstLength)
+				found++
+			}
+		}
+
+		if diff := cmp.Diff(2, found); diff != "" {
+			t.Fatalf("unexpected number of installed routes (-want +got):\n%s", diff)
 		}
 	})
 	defer done()
