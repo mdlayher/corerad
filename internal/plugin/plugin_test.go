@@ -59,6 +59,15 @@ func TestPluginString(t *testing.T) {
 			s: "::/64 [on-link, autonomous], preferred: 15m0s, valid: infinite",
 		},
 		{
+			name: "Route",
+			p: &Route{
+				Prefix:     mustCIDR("2001:db8::/64"),
+				Preference: ndp.High,
+				Lifetime:   15 * time.Minute,
+			},
+			s: "2001:db8::/64, preference: High, lifetime: 15m0s",
+		},
+		{
 			name: "RDNSS",
 			p: &RDNSS{
 				Lifetime: 30 * time.Second,
@@ -189,6 +198,24 @@ func TestBuild(t *testing.T) {
 						PreferredLifetime:              10 * time.Second,
 						ValidLifetime:                  20 * time.Second,
 						Prefix:                         mustIP("fd00::"),
+					},
+				},
+			},
+		},
+		{
+			name: "route",
+			plugin: &Route{
+				Prefix:     mustCIDR("2001:db8::/32"),
+				Preference: ndp.High,
+				Lifetime:   10 * time.Second,
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  32,
+						Preference:    ndp.High,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        mustIP("2001:db8::"),
 					},
 				},
 			},

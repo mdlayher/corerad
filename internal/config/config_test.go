@@ -107,6 +107,9 @@ func TestParse(t *testing.T) {
 			  prefix = "2001:db8::/64"
 			  autonomous = false
 
+			  [[interfaces.route]]
+			  prefix = "2001:db8:ffff::/64"
+
 			  [[interfaces.rdnss]]
 			  lifetime = "auto"
 			  servers = ["2001:db8::1"]
@@ -165,6 +168,11 @@ func TestParse(t *testing.T) {
 								Autonomous:        false,
 								ValidLifetime:     24 * time.Hour,
 								PreferredLifetime: 4 * time.Hour,
+							},
+							&plugin.Route{
+								Prefix:     mustCIDR("2001:db8:ffff::/64"),
+								Preference: ndp.Medium,
+								Lifetime:   24 * time.Hour,
 							},
 							&plugin.RDNSS{
 								Lifetime: 20 * time.Minute,
@@ -247,6 +255,9 @@ func TestParseDefaults(t *testing.T) {
 
 		  [[interfaces.prefix]]
 		  prefix = "2001:db8::/64"
+
+		  [[interfaces.route]]
+		  prefix = "2001:db8:ffff::/64"
 
 		  [[interfaces.rdnss]]
 		  servers = ["2001:db8::1", "2001:db8::2"]

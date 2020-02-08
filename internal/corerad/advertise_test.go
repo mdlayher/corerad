@@ -97,6 +97,11 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
 					},
+					&plugin.Route{
+						Prefix:     mustCIDR("2001:db8:ffff::/64"),
+						Preference: ndp.High,
+						Lifetime:   10 * time.Second,
+					},
 					&plugin.RDNSS{
 						Lifetime: 10 * time.Second,
 						Servers: []net.IP{
@@ -139,6 +144,12 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
 						Prefix:            mustIP("2001:db8::"),
+					},
+					&ndp.RouteInformation{
+						PrefixLength:  64,
+						Preference:    ndp.High,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        mustIP("2001:db8:ffff::"),
 					},
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,

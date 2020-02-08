@@ -174,8 +174,8 @@ func parseDefaultLifetime(s *string, max time.Duration) (time.Duration, error) {
 	return lt, nil
 }
 
-// parsePreference parses s as a router preference value.
-func parsePreference(s string) (ndp.RouterSelectionPreference, error) {
+// parsePreference parses s as a preference value.
+func parsePreference(s string) (ndp.Preference, error) {
 	switch s {
 	case "", "medium":
 		return ndp.Medium, nil

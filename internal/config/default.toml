@@ -93,6 +93,19 @@ preference = "medium"
   [[interfaces.prefix]]
   prefix = "2001:db8::/64"
 
+  # Route: attaches a NDP Route Information option to the router advertisement.
+  [[interfaces.route]]
+  prefix = "2001:db8:ffff::/64"
+
+  # Indicates the preference of this route over other routes advertised by
+  # other routers. Only the values "low", "medium", and "high" are allowed. An
+  # empty string is treated as "medium".
+  preference = "medium"
+
+  # Specifies the lifetime of this prefix. By default, the lifetime is 24 hours.
+  # "auto" uses the defaults. "infinite" means this route should be used forever.
+  lifetime = "auto"
+
   # RDNSS: attaches a NDP Recursive DNS Servers option to the router advertisement.
   [[interfaces.rdnss]]
   # The maximum time these RDNSS addresses may be used for name resolution.

@@ -213,6 +213,42 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 	return nil
 }
 
+// A Route configures a NDP Route Information option.
+type Route struct {
+	Prefix     *net.IPNet
+	Preference ndp.Preference
+	Lifetime   time.Duration
+}
+
+// Name implements Plugin.
+func (*Route) Name() string { return "route" }
+
+// String implements Plugin.
+func (r *Route) String() string {
+	return fmt.Sprintf("%s, preference: %s, lifetime: %s",
+		r.Prefix,
+		r.Preference.String(),
+		durString(r.Lifetime),
+	)
+}
+
+// Prepare implements Plugin.
+func (*Route) Prepare(_ *net.Interface) error { return nil }
+
+// Apply implements Plugin.
+func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
+	length, _ := r.Prefix.Mask.Size()
+
+	ra.Options = append(ra.Options, &ndp.RouteInformation{
+		PrefixLength:  uint8(length),
+		Preference:    r.Preference,
+		RouteLifetime: r.Lifetime,
+		Prefix:        r.Prefix.IP,
+	})
+
+	return nil
+}
+
 // RDNSS configures a NDP Recursive DNS Servers option.
 type RDNSS struct {
 	Lifetime time.Duration

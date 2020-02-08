@@ -327,6 +327,159 @@ func Test_parsePrefix(t *testing.T) {
 	}
 }
 
+func Test_parseRoute(t *testing.T) {
+	t.Parallel()
+
+	defaults := &plugin.Route{
+		Prefix:     mustCIDR("2001:db8::/64"),
+		Preference: ndp.Medium,
+		Lifetime:   24 * time.Hour,
+	}
+
+	tests := []struct {
+		name string
+		s    string
+		r    *plugin.Route
+		ok   bool
+	}{
+		{
+			name: "no prefix",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			`,
+		},
+		{
+			name: "bad prefix string",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "foo"
+			`,
+		},
+		{
+			name: "bad prefix individual IP",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "::1/64"
+			`,
+		},
+		{
+			name: "bad prefix IPv4",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "192.0.2.0/24"
+			`,
+		},
+		{
+			name: "bad preference",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  preference = "foo"
+			`,
+		},
+		{
+			name: "bad lifetime string",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  lifetime = "foo"
+			`,
+		},
+		{
+			name: "bad lifetime zero",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  lifetime = ""
+			`,
+		},
+		{
+			name: "bad lifetime string",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  lifetime = "foo"
+			`,
+		},
+		{
+			name: "bad prefix overlap",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/96"
+			`,
+		},
+		{
+			name: "OK defaults",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			`,
+			r:  defaults,
+			ok: true,
+		},
+		{
+			name: "OK auto duration",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  lifetime = "auto"
+			`,
+			r:  defaults,
+			ok: true,
+		},
+		{
+			name: "OK infinite duration",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  lifetime = "infinite"
+			`,
+			r: &plugin.Route{
+				Prefix:     mustCIDR("2001:db8::/64"),
+				Preference: ndp.Medium,
+				Lifetime:   ndp.Infinity,
+			},
+			ok: true,
+		},
+		{
+			name: "OK explicit",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  preference = "high"
+			  lifetime = "30s"
+			`,
+			r: &plugin.Route{
+				Prefix:     mustCIDR("2001:db8::/64"),
+				Preference: ndp.High,
+				Lifetime:   30 * time.Second,
+			},
+			ok: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pluginDecode(t, tt.s, tt.ok, tt.r)
+		})
+	}
+}
+
 func Test_parseRDNSS(t *testing.T) {
 	t.Parallel()
 

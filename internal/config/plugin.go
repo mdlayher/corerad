@@ -52,6 +52,31 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin,
 		plugins = append(plugins, p)
 	}
 
+	var routes []*plugin.Route
+	for _, r := range ifi.Routes {
+		rt, err := parseRoute(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse route %q: %v", r.Prefix, err)
+		}
+
+		routes = append(routes, rt)
+	}
+
+	// For sanity, configured routes on a given interface must not overlap.
+	for _, rt1 := range routes {
+		for _, rt2 := range routes {
+			p1, p2 := ipaddr.NewPrefix(rt1.Prefix), ipaddr.NewPrefix(rt2.Prefix)
+			if !p1.Equal(p2) && p1.Overlaps(p2) {
+				return nil, fmt.Errorf("routes overlap: %s and %s",
+					rt1.Prefix, rt2.Prefix)
+			}
+		}
+	}
+
+	for _, r := range routes {
+		plugins = append(plugins, r)
+	}
+
 	for _, r := range ifi.RDNSS {
 		rdnss, err := parseRDNSS(r, maxInterval)
 		if err != nil {
@@ -181,6 +206,48 @@ func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
 		Autonomous:        auto,
 		ValidLifetime:     valid,
 		PreferredLifetime: preferred,
+	}, nil
+}
+
+// parsePrefix parses a Prefix plugin.
+func parseRoute(r rawRoute) (*plugin.Route, error) {
+	ip, prefix, err := net.ParseCIDR(r.Prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	// Don't allow individual IP addresses.
+	if !prefix.IP.Equal(ip) {
+		return nil, fmt.Errorf("%q is not a CIDR prefix", ip)
+	}
+
+	// Only allow IPv6 addresses.
+	if prefix.IP.To16() != nil && prefix.IP.To4() != nil {
+		return nil, fmt.Errorf("%q is not an IPv6 CIDR prefix", prefix.IP)
+	}
+
+	pref, err := parsePreference(r.Preference)
+	if err != nil {
+		return nil, err
+	}
+
+	lt, err := parseDuration(r.Lifetime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lifetime: %v", err)
+	}
+
+	// Use defaults for auto values.
+	switch lt {
+	case 0:
+		return nil, errors.New("lifetime must be non-zero")
+	case durationAuto:
+		lt = 24 * time.Hour
+	}
+
+	return &plugin.Route{
+		Prefix:     prefix,
+		Preference: pref,
+		Lifetime:   lt,
 	}, nil
 }
 
