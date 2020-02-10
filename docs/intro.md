@@ -22,12 +22,26 @@ $ head -n 1 corerad.toml
 Although numerous configuration parameters are available, many of them are
 unnecessary for typical use. Omitting them will use sane defaults.
 
+Suppose we have a router which has several IPv6 /64 prefixes (possibly obtained
+via DHCPv6-PD or configured manually) on its LAN interface:
+
+```
+$ ip -6 addr show dev eth0
+3: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    inet6 2600:6c4a:787f:d100::1/64 scope global dynamic noprefixroute
+       valid_lft 327656sec preferred_lft 327656sec
+    inet6 fd9e:1a04:f01d::1/64 scope global
+       valid_lft forever preferred_lft forever
+    inet6 fe80::20d:b9ff:fe53:eacd/64 scope link
+       valid_lft forever preferred_lft forever
+```
+
 Here is an example of a minimal configuration which:
 
 - sends router advertisements from interface `eth0` which indicate this machine
   can be a used as an IPv6 default router
 - serves prefix information and allows stateless address autoconfiguration
-  (SLAAC) for each /64 prefix on `eth0`
+  (SLAAC) for each non-link-local IPv6 /64 prefix on `eth0`
 - serves CoreRAD's Prometheus metrics
 
 ```toml
