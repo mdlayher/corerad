@@ -1,3 +1,3 @@
 # docs
 
-Design documents for CoreRAD.
+Documentation for CoreRAD.
