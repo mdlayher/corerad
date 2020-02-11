@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"runtime"
 	"testing"
 	"time"
 
@@ -280,6 +281,9 @@ func TestAdvertiserLinuxReinitialize(t *testing.T) {
 
 		// Make the link state flap, forcing a reinit by the watcher.
 		shell(t, "ip", "link", "set", "down", cctx.router.Name)
+		// TODO: this works fine locally but flaps a lot in CI so perhaps this
+		// will help.
+		runtime.Gosched()
 		shell(t, "ip", "link", "set", "up", cctx.router.Name)
 		<-cctx.reinitC
 
