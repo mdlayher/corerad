@@ -15,3 +15,5 @@ channel!
 
 CoreRAD is inspired by the [CoreDNS](https://coredns.io/) and
 [CoreDHCP](https://coredhcp.io/) projects.
+
+To learn more about CoreRAD, check out [my introductory blog post](https://mdlayher.com/blog/corerad-a-new-ipv6-router-advertisement-daemon/).
