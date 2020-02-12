@@ -410,10 +410,6 @@ func (a *Advertiser) schedule(ctx context.Context, ipC <-chan net.IP) error {
 
 // sendWorker is a goroutine worker which sends a router advertisement to ip.
 func (a *Advertiser) sendWorker(ip net.IP) error {
-	busy := a.mm.SchedulerWorkers.WithLabelValues(a.cfg.Name)
-	busy.Inc()
-	defer busy.Dec()
-
 	if err := a.send(ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
 		a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
