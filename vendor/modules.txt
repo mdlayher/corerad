@@ -1,4 +1,5 @@
 # github.com/BurntSushi/toml v0.3.1
+## explicit
 github.com/BurntSushi/toml
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
@@ -7,36 +8,45 @@ github.com/cespare/xxhash/v2
 # github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/proto
 # github.com/google/go-cmp v0.4.0
+## explicit
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
 # github.com/jsimonetti/rtnetlink v0.0.0-20200117123717-f846d4f6c1f4
+## explicit
 github.com/jsimonetti/rtnetlink
 github.com/jsimonetti/rtnetlink/internal/unix
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mdlayher/ndp v0.0.0-20200208205613-635003cdcd86
+## explicit
 github.com/mdlayher/ndp
 # github.com/mdlayher/netlink v1.0.0
 github.com/mdlayher/netlink
 github.com/mdlayher/netlink/nlenc
 # github.com/mdlayher/netstate v0.0.0-20200128183539-95bdfedbb6a3
+## explicit
 github.com/mdlayher/netstate
 # github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
+## explicit
 github.com/mdlayher/promtest
 # github.com/mdlayher/schedgroup v0.0.0-20200112200520-294397da5c6d
+## explicit
 github.com/mdlayher/schedgroup
 # github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
+## explicit
 github.com/mikioh/ipaddr
 # github.com/prometheus/client_golang v1.3.0
+## explicit
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
 # github.com/prometheus/client_model v0.1.0
 github.com/prometheus/client_model/go
 # github.com/prometheus/common v0.8.0
+## explicit
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
@@ -49,6 +59,7 @@ github.com/prometheus/prometheus/util/promlint
 # gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f
 gitlab.com/golang-commonmark/puny
 # golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
+## explicit
 golang.org/x/net/bpf
 golang.org/x/net/icmp
 golang.org/x/net/internal/iana
@@ -56,7 +67,9 @@ golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+## explicit
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20200113162924-86b910548bc1
+## explicit
 golang.org/x/sys/unix
 golang.org/x/sys/windows
