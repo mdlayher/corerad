@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/netstate"
 	"github.com/prometheus/client_golang/prometheus"
@@ -196,7 +197,6 @@ func (s *Server) runDebug(ctx context.Context) error {
 			}()
 
 			return http.Serve(l, newHTTPHandler(
-				s.cfg.Version,
 				d.Prometheus,
 				d.PProf,
 				s.reg,
@@ -258,15 +258,13 @@ type httpHandler struct {
 
 // NewHTTPHandler creates a httpHandler with the specified configuration.
 func newHTTPHandler(
-	version string,
 	usePrometheus, usePProf bool,
 	reg *prometheus.Registry,
 ) *httpHandler {
 	mux := http.NewServeMux()
 
 	h := &httpHandler{
-		h:       mux,
-		version: version,
+		h: mux,
 	}
 
 	// Optionally enable Prometheus and pprof support.
@@ -289,7 +287,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Matching on "/" would produce an overly broad rule, so check manually
 	// here and indicate that this is the CoreRAD service.
 	if r.URL.Path == "/" {
-		_, _ = io.WriteString(w, fmt.Sprintf("CoreRAD %s\n", h.version))
+		_, _ = io.WriteString(w, build.Banner()+"\n")
 		return
 	}
 

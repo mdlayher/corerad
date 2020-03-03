@@ -1,2 +1,3 @@
-cmd/corerad/corerad
-cmd/corerad/corerad.toml
+corerad
+corerad.toml
+*.sh

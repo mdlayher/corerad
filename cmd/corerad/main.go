@@ -25,14 +25,12 @@ import (
 	"os/signal"
 	"sync"
 
+	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/corerad"
 )
 
-const (
-	cfgFile = "corerad.toml"
-	version = "v0.2.1 (BETA)"
-)
+const cfgFile = "corerad.toml"
 
 func main() {
 	var (
@@ -43,7 +41,7 @@ func main() {
 
 	flag.Usage = func() {
 		// Indicate version in usage.
-		fmt.Printf("CoreRAD %s\nflags:\n", version)
+		fmt.Printf("%s\nflags:\n", build.Banner())
 		flag.PrintDefaults()
 	}
 
@@ -54,7 +52,7 @@ func main() {
 	if *initFlag {
 		err := ioutil.WriteFile(
 			cfgFile,
-			[]byte(fmt.Sprintf(config.Default, version)),
+			[]byte(fmt.Sprintf(config.Default, build.Banner())),
 			0o644,
 		)
 		if err != nil {
@@ -63,6 +61,8 @@ func main() {
 
 		return
 	}
+
+	ll.Printf("%s starting with configuration file %q", build.Banner(), *cfgFlag)
 
 	f, err := os.Open(*cfgFlag)
 	if err != nil {
@@ -73,10 +73,7 @@ func main() {
 	if err != nil {
 		ll.Fatalf("failed to parse %q: %v", f.Name(), err)
 	}
-	cfg.Version = version
 	_ = f.Close()
-
-	ll.Printf("CoreRAD %s starting with configuration file %q", version, f.Name())
 
 	// Use a context to handle cancelation on signal.
 	ctx, cancel := context.WithCancel(context.Background())
