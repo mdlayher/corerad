@@ -12,7 +12,10 @@ channel!
 
 ## Stability
 
-This package has reached v1.0.0 and any future breaking API changes will prompt
+See the [CHANGELOG](./CHANGELOG.md) file for a description of changes between
+releases.
+
+This package has a stable v1 API and any future breaking changes will prompt
 the release of a new major version. Features and bug fixes will continue to
 occur in the v1.x.x series.
 
