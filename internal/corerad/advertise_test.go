@@ -461,7 +461,7 @@ func testSimulatedAdvertiserClient(
 		cfg.Name,
 		*cfg,
 		log.New(os.Stderr, "", 0),
-		NewAdvertiserMetrics(nil),
+		NewMetrics(nil),
 	)
 
 	// Swap out the underlying connections for a UDP socket pair.

@@ -48,7 +48,7 @@ type systemConn struct {
 	autoPrev bool
 
 	ll *log.Logger
-	mm *AdvertiserMetrics
+	mm *Metrics
 
 	dial              func(ifi *net.Interface) (*ndp.Conn, net.IP, error)
 	checkInterface    func(iface string) (*net.Interface, error)
@@ -59,12 +59,12 @@ type systemConn struct {
 
 // newSystemConn creates a systemConn which manipulates the operating system
 // directly.
-func newSystemConn(ll *log.Logger, mm *AdvertiserMetrics) *systemConn {
+func newSystemConn(ll *log.Logger, mm *Metrics) *systemConn {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
 	if mm == nil {
-		mm = NewAdvertiserMetrics(nil)
+		mm = NewMetrics(nil)
 	}
 
 	return &systemConn{

@@ -14,12 +14,18 @@
 package corerad
 
 import (
+	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// AdvertiserMetrics contains metrics for an Advertiser.
-type AdvertiserMetrics struct {
+// Metrics contains metrics for a CoreRAD instance.
+type Metrics struct {
+	// Server metrics.
+	Info *prometheus.GaugeVec
+	Time prometheus.Gauge
+
+	// Per-advertiser metrics.
 	LastMulticastTime                       *prometheus.GaugeVec
 	MessagesReceivedTotal                   *prometheus.CounterVec
 	MessagesReceivedInvalidTotal            *prometheus.CounterVec
@@ -28,27 +34,42 @@ type AdvertiserMetrics struct {
 	ErrorsTotal                             *prometheus.CounterVec
 }
 
-// NewAdvertiserMetrics creates and registers AdvertiserMetrics. If reg is nil
-// the metrics are not registered.
-func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
-	const subsystem = "advertiser"
-
-	var (
-		names = []string{"interface"}
+// NewMetrics creates and registers Metrics. If reg is nil, the metrics are
+// not registered.
+func NewMetrics(reg *prometheus.Registry) *Metrics {
+	const (
+		bld = "build"
+		adv = "advertiser"
 	)
 
-	mm := &AdvertiserMetrics{
+	mm := &Metrics{
+		Info: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: bld,
+			Name:      "info",
+
+			Help: "Metadata about this build of CoreRAD.",
+		}, []string{"version"}),
+
+		Time: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: bld,
+			Name:      "time",
+
+			Help: "The UNIX timestamp of when this build of CoreRAD was produced.",
+		}),
+
 		LastMulticastTime: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: subsystem,
+			Subsystem: adv,
 			Name:      "last_multicast_time_seconds",
 
 			Help: "The UNIX timestamp of when the last multicast router advertisement was sent.",
-		}, names),
+		}, []string{"interface"}),
 
 		MessagesReceivedTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: subsystem,
+			Subsystem: adv,
 			Name:      "messages_received_total",
 
 			Help: "The total number of valid NDP messages received on a listening interface.",
@@ -56,7 +77,7 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 
 		MessagesReceivedInvalidTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: subsystem,
+			Subsystem: adv,
 			Name:      "messages_received_invalid_total",
 
 			Help: "The total number of invalid NDP messages received on a listening interface.",
@@ -64,7 +85,7 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 
 		RouterAdvertisementInconsistenciesTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: subsystem,
+			Subsystem: adv,
 			Name:      "router_advertisement_inconsistencies_total",
 
 			Help: "The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration.",
@@ -72,7 +93,7 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 
 		RouterAdvertisementsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: subsystem,
+			Subsystem: adv,
 			Name:      "router_advertisements_total",
 
 			Help: "The total number of NDP router advertisements sent by the advertiser on an interface.",
@@ -80,15 +101,23 @@ func NewAdvertiserMetrics(reg *prometheus.Registry) *AdvertiserMetrics {
 
 		ErrorsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: subsystem,
+			Subsystem: adv,
 			Name:      "errors_total",
 
 			Help: "The total number and type of errors that occurred while advertising.",
 		}, []string{"interface", "error"}),
 	}
 
+	// Initialize any info metrics which are static throughout the lifetime of
+	// the program.
+	mm.Info.WithLabelValues(build.Version()).Set(1)
+	mm.Time.Set(float64(build.Time().Unix()))
+
 	if reg != nil {
 		reg.MustRegister(
+			mm.Info,
+			mm.Time,
+
 			mm.LastMulticastTime,
 			mm.MessagesReceivedTotal,
 			mm.MessagesReceivedInvalidTotal,

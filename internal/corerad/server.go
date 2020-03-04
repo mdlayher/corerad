@@ -85,7 +85,7 @@ func (s *Server) Run(ctx context.Context) error {
 	s.eg = eg
 	defer close(s.ready)
 
-	mm := NewAdvertiserMetrics(s.reg)
+	mm := NewMetrics(s.reg)
 
 	// Watch for interface state changes. May or may not be supported depending
 	// on the OS, but functionality should gracefully degrade.

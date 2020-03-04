@@ -44,15 +44,25 @@ var (
 // Banner produces a string banner containing metadata about the currently
 // running CoreRAD binary.
 func Banner() string {
+	// Use n/a as a placeholder if no time set.
+	tstr := "n/a"
+	if t := Time(); !t.IsZero() {
+		tstr = t.Format("2006-01-02")
+	}
+
 	return fmt.Sprintf("CoreRAD %s BETA (%s)",
-		version(),
-		timeT.Format("2006-01-02"),
+		Version(),
+		tstr,
 	)
 }
 
-// version produces a version string or "development" if none was specified
+// Time produces a time.Time value for when CoreRAD was built, or zero time if
+// none was specified at link-time.
+func Time() time.Time { return timeT }
+
+// Version produces a Version string or "development" if none was specified
 // at link-time.
-func version() string {
+func Version() string {
 	if linkVersion == "" {
 		return "development"
 	}

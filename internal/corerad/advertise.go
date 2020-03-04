@@ -41,7 +41,7 @@ type Advertiser struct {
 	iface string
 	cfg   config.Interface
 	ll    *log.Logger
-	mm    *AdvertiserMetrics
+	mm    *Metrics
 
 	// Dynamic configuration, set up on each (re)initialization.
 	c conn
@@ -64,12 +64,12 @@ const (
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded. If mm is nil, metrics are discarded.
-func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *AdvertiserMetrics) *Advertiser {
+func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Metrics) *Advertiser {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
 	if mm == nil {
-		mm = NewAdvertiserMetrics(nil)
+		mm = NewMetrics(nil)
 	}
 
 	return &Advertiser{
