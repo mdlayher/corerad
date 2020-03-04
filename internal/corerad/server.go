@@ -252,8 +252,7 @@ func (s *Server) serve(ctx context.Context, fn func() error) error {
 
 // A httpHandler provides the HTTP debug API handler for CoreRAD.
 type httpHandler struct {
-	h       http.Handler
-	version string
+	h http.Handler
 }
 
 // NewHTTPHandler creates a httpHandler with the specified configuration.
