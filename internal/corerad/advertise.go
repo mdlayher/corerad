@@ -30,6 +30,13 @@ import (
 	"github.com/mdlayher/schedgroup"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
+	"inet.af/netaddr"
+)
+
+// IPv6 address "constants" in netaddr.IP format.
+var (
+	unspecified       = mustNetaddrIP("::")
+	linkLocalAllNodes = mustNetaddrIP("ff02::1")
 )
 
 // errLinkChange is a sentinel value which indicates a link state change.
@@ -137,7 +144,7 @@ func (a *Advertiser) advertise(ctx context.Context, watchC <-chan netstate.Chang
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
 
-	ipC := make(chan net.IP, 16)
+	ipC := make(chan netaddr.IP, 16)
 
 	// RA scheduler which consumes requests to send RAs and dispatches them
 	// at the appropriate times.
@@ -203,7 +210,7 @@ const (
 )
 
 // multicast runs a multicast advertising loop until ctx is canceled.
-func (a *Advertiser) multicast(ctx context.Context, ipC chan<- net.IP) {
+func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 	// Initialize PRNG so we can add jitter to our unsolicited multicast RA
 	// delay times.
 	var (
@@ -220,7 +227,7 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- net.IP) {
 		default:
 		}
 
-		ipC <- net.IPv6linklocalallnodes
+		ipC <- linkLocalAllNodes
 
 		select {
 		case <-ctx.Done():
@@ -235,7 +242,7 @@ var deadlineNow = time.Unix(1, 0)
 
 // listen issues unicast router advertisements in response to router
 // solicitations, until ctx is canceled.
-func (a *Advertiser) listen(ctx context.Context, ipC chan<- net.IP) error {
+func (a *Advertiser) listen(ctx context.Context, ipC chan<- netaddr.IP) error {
 	// Wait for cancelation and then force any pending reads to time out.
 	var eg errgroup.Group
 	eg.Go(func() error {
@@ -274,18 +281,23 @@ func (a *Advertiser) listen(ctx context.Context, ipC chan<- net.IP) error {
 		}
 
 		// Handle the incoming message and send a response if one is needed.
-		ip, err := a.handle(m, cm, host)
+		hostAddr, err := netaddr.ParseIP(host.String())
+		if err != nil {
+			return fmt.Errorf("failed to parse IP address: %w", err)
+		}
+
+		ip, err := a.handle(m, cm, hostAddr)
 		if err != nil {
 			return fmt.Errorf("failed to handle NDP message: %w", err)
 		}
 		if ip != nil {
-			ipC <- ip
+			ipC <- *ip
 		}
 	}
 }
 
 // handle handles an incoming NDP message from a remote host.
-func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host net.IP) (net.IP, error) {
+func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr.IP) (*netaddr.IP, error) {
 	a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
 
 	// Ensure this message has a valid hop limit.
@@ -300,13 +312,13 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host net.IP)
 		// Issue a unicast RA for clients with valid addresses, or a multicast
 		// RA for any client contacting us via the IPv6 unspecified address,
 		// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
-		if host.Equal(net.IPv6unspecified) {
-			host = net.IPv6linklocalallnodes
+		if host == unspecified {
+			host = linkLocalAllNodes
 		}
 
 		// TODO: consider checking for numerous RS in succession and issuing
 		// a multicast RA in response.
-		return host, nil
+		return &host, nil
 	case *ndp.RouterAdvertisement:
 		// Received a router advertisement from a different router on this
 		// LAN, verify its consistency with our own.
@@ -335,7 +347,7 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host net.IP)
 
 // schedule consumes RA requests and schedules them with workers so they may
 // occur at the appropriate times.
-func (a *Advertiser) schedule(ctx context.Context, ipC <-chan net.IP) error {
+func (a *Advertiser) schedule(ctx context.Context, ipC <-chan netaddr.IP) error {
 	// Enable canceling schedule's context on send RA error.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -358,7 +370,7 @@ func (a *Advertiser) schedule(ctx context.Context, ipC <-chan net.IP) error {
 
 	for {
 		// New IP for each loop iteration to prevent races.
-		var ip net.IP
+		var ip netaddr.IP
 
 		select {
 		case err := <-errC:
@@ -409,7 +421,7 @@ func (a *Advertiser) schedule(ctx context.Context, ipC <-chan net.IP) error {
 }
 
 // sendWorker is a goroutine worker which sends a router advertisement to ip.
-func (a *Advertiser) sendWorker(ip net.IP) error {
+func (a *Advertiser) sendWorker(ip netaddr.IP) error {
 	if err := a.send(ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
 		a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
@@ -428,7 +440,7 @@ func (a *Advertiser) sendWorker(ip net.IP) error {
 
 // send sends a single router advertisement built from cfg to the destination IP
 // address, which may be a unicast or multicast address.
-func (a *Advertiser) send(dst net.IP, cfg config.Interface) error {
+func (a *Advertiser) send(dst netaddr.IP, cfg config.Interface) error {
 	if cfg.UnicastOnly && dst.IsMulticast() {
 		// Nothing to do.
 		return nil
@@ -452,7 +464,7 @@ func (a *Advertiser) send(dst net.IP, cfg config.Interface) error {
 		ra.RouterLifetime = 0
 	}
 
-	if err := a.c.WriteTo(ra, nil, dst); err != nil {
+	if err := a.c.WriteTo(ra, nil, dst.IPAddr().IP); err != nil {
 		return fmt.Errorf("failed to send router advertisement to %s: %w", dst, err)
 	}
 
@@ -502,7 +514,7 @@ func (a *Advertiser) init() error {
 	// Before starting any other goroutines, verify that the interface can
 	// actually be used to send an initial router advertisement, avoiding a
 	// needless start/error/restart loop.
-	if err := a.send(net.IPv6linklocalallnodes, a.cfg); err != nil {
+	if err := a.send(linkLocalAllNodes, a.cfg); err != nil {
 		return fmt.Errorf("failed to send initial multicast router advertisement: %v", err)
 	}
 
@@ -604,7 +616,7 @@ func (a *Advertiser) shutdown() error {
 	cfg := a.cfg
 	cfg.DefaultLifetime = 0
 
-	if err := a.send(net.IPv6linklocalallnodes, cfg); err != nil {
+	if err := a.send(linkLocalAllNodes, cfg); err != nil {
 		a.logf("failed to send final multicast router advertisement: %v", err)
 	}
 
@@ -642,4 +654,17 @@ func multicastDelay(r *rand.Rand, i int, min, max int64) time.Duration {
 	}
 
 	return d
+}
+
+func mustNetaddrIP(s string) netaddr.IP {
+	ip, err := netaddr.ParseIP(s)
+	if err != nil {
+		panicf("failed to parse IP address: %v", err)
+	}
+
+	return ip
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }

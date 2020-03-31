@@ -18,4 +18,5 @@ require (
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527
+	inet.af/netaddr v0.0.0-20200331210233-6e0532a79e7d
 )

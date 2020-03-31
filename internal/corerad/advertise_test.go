@@ -105,8 +105,8 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 					&plugin.RDNSS{
 						Lifetime: 10 * time.Second,
 						Servers: []net.IP{
-							mustIP("2001:db8::1"),
-							mustIP("2001:db8::2"),
+							mustNetIP("2001:db8::1"),
+							mustNetIP("2001:db8::2"),
 						},
 					},
 					plugin.NewMTU(1500),
@@ -143,19 +143,19 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 						OnLink:            true,
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
-						Prefix:            mustIP("2001:db8::"),
+						Prefix:            mustNetIP("2001:db8::"),
 					},
 					&ndp.RouteInformation{
 						PrefixLength:  64,
 						Preference:    ndp.High,
 						RouteLifetime: 10 * time.Second,
-						Prefix:        mustIP("2001:db8:ffff::"),
+						Prefix:        mustNetIP("2001:db8:ffff::"),
 					},
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,
 						Servers: []net.IP{
-							mustIP("2001:db8::1"),
-							mustIP("2001:db8::2"),
+							mustNetIP("2001:db8::1"),
+							mustNetIP("2001:db8::2"),
 						},
 					},
 					ndp.NewMTU(1500),
@@ -894,15 +894,11 @@ func mustCIDR(s string) *net.IPNet {
 	return ipn
 }
 
-func mustIP(s string) net.IP {
+func mustNetIP(s string) net.IP {
 	ip := net.ParseIP(s)
 	if ip == nil {
 		panicf("failed to parse %q as IP address", s)
 	}
 
 	return ip
-}
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
 }

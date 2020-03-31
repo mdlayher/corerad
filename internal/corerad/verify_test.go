@@ -25,7 +25,7 @@ import (
 func Test_verifyRAs(t *testing.T) {
 	prefix := []ndp.Option{
 		&ndp.PrefixInformation{
-			Prefix:            mustIP("2001:db8::"),
+			Prefix:            mustNetIP("2001:db8::"),
 			PrefixLength:      64,
 			PreferredLifetime: 1 * time.Second,
 			ValidLifetime:     2 * time.Second,
@@ -34,7 +34,7 @@ func Test_verifyRAs(t *testing.T) {
 
 	rdnss := []ndp.Option{
 		&ndp.RecursiveDNSServer{
-			Servers: []net.IP{mustIP("2001:db8::1")},
+			Servers: []net.IP{mustNetIP("2001:db8::1")},
 		},
 	}
 
@@ -59,7 +59,7 @@ func Test_verifyRAs(t *testing.T) {
 				OnLink:            true,
 				PreferredLifetime: 10 * time.Second,
 				ValidLifetime:     20 * time.Second,
-				Prefix:            mustIP("fdff:dead:beef::"),
+				Prefix:            mustNetIP("fdff:dead:beef::"),
 			},
 			rdnss[0],
 			dnssl[0],
@@ -114,7 +114,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.PrefixInformation{
-						Prefix:            mustIP("2001:db8::"),
+						Prefix:            mustNetIP("2001:db8::"),
 						PrefixLength:      64,
 						PreferredLifetime: 3 * time.Second,
 						ValidLifetime:     4 * time.Second,
@@ -155,7 +155,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
-						Servers: []net.IP{mustIP("2001:db8::2")},
+						Servers: []net.IP{mustNetIP("2001:db8::2")},
 					},
 				},
 			},
@@ -168,7 +168,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
-						Servers:  []net.IP{mustIP("2001:db8::1")},
+						Servers:  []net.IP{mustNetIP("2001:db8::1")},
 						Lifetime: 2 * time.Second,
 					},
 				},
@@ -262,7 +262,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.PrefixInformation{
-						Prefix:            mustIP("fdff:dead:beef::"),
+						Prefix:            mustNetIP("fdff:dead:beef::"),
 						PrefixLength:      64,
 						PreferredLifetime: 3 * time.Second,
 						ValidLifetime:     4 * time.Second,

@@ -79,3 +79,6 @@ golang.org/x/sync/errgroup
 ## explicit
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# inet.af/netaddr v0.0.0-20200331210233-6e0532a79e7d
+## explicit
+inet.af/netaddr
