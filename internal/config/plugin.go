@@ -21,6 +21,7 @@ import (
 
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mikioh/ipaddr"
+	"inet.af/netaddr"
 )
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
@@ -268,10 +269,13 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	}
 
 	// Parse all server addresses as IPv6 addresses.
-	servers := make([]net.IP, 0, len(d.Servers))
+	servers := make([]netaddr.IP, 0, len(d.Servers))
 	for _, s := range d.Servers {
-		ip := net.ParseIP(s)
-		if ip == nil || (ip.To16() != nil && ip.To4() != nil) {
+		ip, err := netaddr.ParseIP(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse IP address %q: %v", s, err)
+		}
+		if !ip.Is6() {
 			return nil, fmt.Errorf("string %q is not an IPv6 address", s)
 		}
 

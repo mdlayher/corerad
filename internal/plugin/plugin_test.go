@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/ndp"
+	"inet.af/netaddr"
 )
 
 func TestPluginString(t *testing.T) {
@@ -71,9 +72,9 @@ func TestPluginString(t *testing.T) {
 			name: "RDNSS",
 			p: &RDNSS{
 				Lifetime: 30 * time.Second,
-				Servers: []net.IP{
-					mustIP("2001:db8::1"),
-					mustIP("2001:db8::2"),
+				Servers: []netaddr.IP{
+					mustNetaddrIP("2001:db8::1"),
+					mustNetaddrIP("2001:db8::2"),
 				},
 			},
 			s: "servers: [2001:db8::1, 2001:db8::2], lifetime: 30s",
@@ -224,9 +225,9 @@ func TestBuild(t *testing.T) {
 			name: "RDNSS",
 			plugin: &RDNSS{
 				Lifetime: 10 * time.Second,
-				Servers: []net.IP{
-					mustIP("2001:db8::1"),
-					mustIP("2001:db8::2"),
+				Servers: []netaddr.IP{
+					mustNetaddrIP("2001:db8::1"),
+					mustNetaddrIP("2001:db8::2"),
 				},
 			},
 			ra: &ndp.RouterAdvertisement{
@@ -269,6 +270,15 @@ func mustIP(s string) net.IP {
 	ip := net.ParseIP(s)
 	if ip == nil {
 		panicf("failed to parse %q as IP address", s)
+	}
+
+	return ip
+}
+
+func mustNetaddrIP(s string) netaddr.IP {
+	ip, err := netaddr.ParseIP(s)
+	if err != nil {
+		panicf("failed to parse IP address: %v", err)
 	}
 
 	return ip

@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
+	"inet.af/netaddr"
 )
 
 // Tests in this file use a greatly reduced config to test plugin parsing edge
@@ -523,9 +524,9 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 30 * time.Second,
-				Servers: []net.IP{
-					mustIP("2001:db8::1"),
-					mustIP("2001:db8::2"),
+				Servers: []netaddr.IP{
+					mustNetaddrIP("2001:db8::1"),
+					mustNetaddrIP("2001:db8::2"),
 				},
 			},
 			ok: true,
@@ -539,7 +540,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
-				Servers:  []net.IP{mustIP("2001:db8::1")},
+				Servers:  []netaddr.IP{mustNetaddrIP("2001:db8::1")},
 			},
 			ok: true,
 		},
@@ -553,7 +554,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
-				Servers:  []net.IP{mustIP("2001:db8::1")},
+				Servers:  []netaddr.IP{mustNetaddrIP("2001:db8::1")},
 			},
 			ok: true,
 		},
@@ -598,15 +599,17 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 		return
 	}
 
-	if diff := cmp.Diff([]plugin.Plugin{want}, got); diff != "" {
+	if diff := cmp.Diff([]plugin.Plugin{want}, got, cmp.Comparer(compareNetaddrIP)); diff != "" {
 		t.Fatalf("unexpected Plugin (-want +got):\n%s", diff)
 	}
 }
 
-func mustIP(s string) net.IP {
-	ip := net.ParseIP(s)
-	if ip == nil {
-		panicf("failed to parse %q as IP address", s)
+func compareNetaddrIP(x, y netaddr.IP) bool { return x == y }
+
+func mustNetaddrIP(s string) netaddr.IP {
+	ip, err := netaddr.ParseIP(s)
+	if err != nil {
+		panicf("failed to parse %q as IP address: %v", s, err)
 	}
 
 	return ip

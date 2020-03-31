@@ -24,6 +24,7 @@ import (
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
+	"inet.af/netaddr"
 )
 
 func TestParse(t *testing.T) {
@@ -176,7 +177,7 @@ func TestParse(t *testing.T) {
 							},
 							&plugin.RDNSS{
 								Lifetime: 20 * time.Minute,
-								Servers:  []net.IP{mustIP("2001:db8::1")},
+								Servers:  []netaddr.IP{mustNetaddrIP("2001:db8::1")},
 							},
 							&plugin.DNSSL{
 								Lifetime:    20 * time.Minute,
@@ -236,7 +237,7 @@ func TestParse(t *testing.T) {
 				return
 			}
 
-			if diff := cmp.Diff(tt.c, c); diff != "" {
+			if diff := cmp.Diff(tt.c, c, cmp.Comparer(compareNetaddrIP)); diff != "" {
 				t.Fatalf("unexpected Config (-want +got):\n%s", diff)
 			}
 		})
@@ -278,15 +279,17 @@ func TestParseDefaults(t *testing.T) {
 		t.Fatalf("failed to parse default config: %v", err)
 	}
 
-	if diff := cmp.Diff(defaults, min); diff != "" {
+	if diff := cmp.Diff(defaults, min, cmp.Comparer(compareNetaddrIP)); diff != "" {
 		t.Fatalf("unexpected default Config (-want +got):\n%s", diff)
 	}
 }
 
-func mustIP(s string) net.IP {
-	ip := net.ParseIP(s)
-	if ip == nil {
-		panicf("failed to parse %q as IP address", s)
+func compareNetaddrIP(x, y netaddr.IP) bool { return x == y }
+
+func mustNetaddrIP(s string) netaddr.IP {
+	ip, err := netaddr.ParseIP(s)
+	if err != nil {
+		panicf("failed to parse %q as IP address: %v", s, err)
 	}
 
 	return ip

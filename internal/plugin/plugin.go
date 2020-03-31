@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/mdlayher/ndp"
+	"inet.af/netaddr"
 )
 
 // A Plugin specifies a CoreRAD plugin's configuration.
@@ -252,7 +253,7 @@ func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
 // RDNSS configures a NDP Recursive DNS Servers option.
 type RDNSS struct {
 	Lifetime time.Duration
-	Servers  []net.IP
+	Servers  []netaddr.IP
 }
 
 // Name implements Plugin.
@@ -274,9 +275,14 @@ func (*RDNSS) Prepare(_ *net.Interface) error { return nil }
 
 // Apply implements Plugin.
 func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
+	ips := make([]net.IP, 0, len(r.Servers))
+	for _, s := range r.Servers {
+		ips = append(ips, s.IPAddr().IP)
+	}
+
 	ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{
 		Lifetime: r.Lifetime,
-		Servers:  r.Servers,
+		Servers:  ips,
 	})
 
 	return nil

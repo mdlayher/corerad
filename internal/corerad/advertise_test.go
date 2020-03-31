@@ -35,6 +35,7 @@ import (
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
+	"inet.af/netaddr"
 )
 
 // A testAdvertiserFunc is a function which sets up an Advertiser for testing.
@@ -104,9 +105,9 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 					},
 					&plugin.RDNSS{
 						Lifetime: 10 * time.Second,
-						Servers: []net.IP{
-							mustNetIP("2001:db8::1"),
-							mustNetIP("2001:db8::2"),
+						Servers: []netaddr.IP{
+							mustNetaddrIP("2001:db8::1"),
+							mustNetaddrIP("2001:db8::2"),
 						},
 					},
 					plugin.NewMTU(1500),
