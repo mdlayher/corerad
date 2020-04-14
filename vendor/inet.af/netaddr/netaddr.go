@@ -8,9 +8,11 @@
 package netaddr // import "inet.af/netaddr"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 )
 
 // Sizes: (64-bit)
@@ -34,21 +36,47 @@ type IP struct {
 type ipImpl interface {
 	is4() bool
 	is6() bool
+	is4in6() bool
+	as16() [16]byte
 	String() string
 }
 
 type v4Addr [4]byte
 
-func (v4Addr) is4() bool         { return true }
-func (v4Addr) is6() bool         { return false }
+func (v4Addr) is4() bool    { return true }
+func (v4Addr) is6() bool    { return false }
+func (v4Addr) is4in6() bool { return false }
+func (ip v4Addr) as16() [16]byte {
+	return [16]byte{
+		10: 0xff,
+		11: 0xff,
+		12: ip[0],
+		13: ip[1],
+		14: ip[2],
+		15: ip[3],
+	}
+}
 func (ip v4Addr) String() string { return fmt.Sprintf("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]) }
+
+// mapped4Prefix are the 12 leading bytes in a IPv4-mapped IPv6 address.
+const mapped4Prefix = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff"
 
 type v6Addr [16]byte
 
-func (v6Addr) is4() bool { return false }
-func (v6Addr) is6() bool { return true }
+func (v6Addr) is4() bool         { return false }
+func (v6Addr) is6() bool         { return true }
+func (ip v6Addr) is4in6() bool   { return string(ip[:len(mapped4Prefix)]) == mapped4Prefix }
+func (ip v6Addr) as16() [16]byte { return ip }
 func (ip v6Addr) String() string {
-	// TODO: better implementation
+	// TODO: better implementation; don't jump through these hoops
+	// and pay these allocs just to share a bit of code with
+	// std. Just copy & modify it as needed.
+	if ip.is4in6() {
+		mod := ip
+		mod[10] = 0xfe // change to arbitrary byte that's not 0xff to hide it from Go
+		s := net.IP(mod[:]).String()
+		return strings.Replace(s, "::feff:", "::ffff:", 1)
+	}
 	return (&net.IPAddr{IP: net.IP(ip[:])}).String()
 }
 
@@ -62,6 +90,11 @@ func (ip v6AddrZone) String() string {
 	return (&net.IPAddr{IP: net.IP(ip.v6Addr[:]), Zone: ip.zone}).String()
 }
 
+// IPv4 returns the IP of the IPv4 address a.b.c.d.
+func IPv4(a, b, c, d uint8) IP {
+	return IP{v4Addr{a, b, c, d}}
+}
+
 // ParseIP parses s as an IP address, returning the result. The string
 // s can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").
@@ -73,10 +106,12 @@ func ParseIP(s string) (IP, error) {
 	if err != nil {
 		return IP{}, err
 	}
-	if ip4 := ipa.IP.To4(); ip4 != nil {
-		var v4 v4Addr
-		copy(v4[:], ip4)
-		return IP{v4}, nil
+	if !strings.Contains(s, ":") {
+		if ip4 := ipa.IP.To4(); ip4 != nil {
+			var v4 v4Addr
+			copy(v4[:], ip4)
+			return IP{v4}, nil
+		}
 	}
 	var v6 v6Addr
 	copy(v6[:], ipa.IP.To16())
@@ -86,41 +121,80 @@ func ParseIP(s string) (IP, error) {
 	return IP{v6}, nil
 }
 
-// IPAddr returns the net.IPAddr representation of an IP. The returned value is
-// always non-nil, but the IPAddr.IP will be nil if ip is the zero value.
-// If ip contains a zone identifier, IPAddr.Zone is populated.
-func (ip IP) IPAddr() *net.IPAddr {
+// Zone returns ip's IPv6 scoped addressing zone, if any.
+func (ip IP) Zone() string {
+	if v6z, ok := ip.ipImpl.(v6AddrZone); ok {
+		return v6z.zone
+	}
+	return ""
+}
+
+// Less reports whether ip sorts before ip2.
+// IP addresses sort first by length, then their address.
+// IPv6 addresses with zones sort just after the same address without a zone.
+func (ip IP) Less(ip2 IP) bool {
+	a, b := ip, ip2
+	// Zero value sorts first.
+	if a.ipImpl == nil {
+		return b.ipImpl != nil
+	}
+	if b.ipImpl == nil {
+		return false
+	}
+
+	// At this point, a and b are both either v4 or v6.
+
+	if a4, ok := a.ipImpl.(v4Addr); ok {
+		if b4, ok := b.ipImpl.(v4Addr); ok {
+			return bytes.Compare(a4[:], b4[:]) < 0
+		}
+		// v4 sorts before v6.
+		return true
+	}
+
+	// At this point, a and b are both v6 or v6+zone.
+	a16 := a.ipImpl.as16()
+	b16 := b.ipImpl.as16()
+	switch bytes.Compare(a16[:], b16[:]) {
+	case -1:
+		return true
+	default:
+		return a.Zone() < b.Zone()
+	case 1:
+		return false
+	}
+}
+
+func (ip IP) ipZone() (stdIP net.IP, zone string) {
 	switch ip := ip.ipImpl.(type) {
 	case nil:
-		// Nothing to do.
-		return &net.IPAddr{}
+		return nil, ""
 	case v4Addr:
-		return &net.IPAddr{IP: net.IP{ip[0], ip[1], ip[2], ip[3]}}
+		return net.IP{ip[0], ip[1], ip[2], ip[3]}, ""
 	case v6Addr:
-		b := make(net.IP, net.IPv6len)
-		copy(b, ip[:])
-
-		return &net.IPAddr{IP: b}
+		stdIP = make(net.IP, net.IPv6len)
+		copy(stdIP, ip[:])
+		return stdIP, ""
 	case v6AddrZone:
-		b := make(net.IP, net.IPv6len)
-		copy(b, ip.v6Addr[:])
-
-		return &net.IPAddr{
-			IP:   b,
-			Zone: ip.zone,
-		}
+		stdIP = make(net.IP, net.IPv6len)
+		copy(stdIP, ip.v6Addr[:])
+		return stdIP, ip.zone
 	default:
 		panic("netaddr: unhandled ipImpl representation")
 	}
 }
 
+// IPAddr returns the net.IPAddr representation of an IP. The returned value is
+// always non-nil, but the IPAddr.IP will be nil if ip is the zero value.
+// If ip contains a zone identifier, IPAddr.Zone is populated.
+func (ip IP) IPAddr() *net.IPAddr {
+	stdIP, zone := ip.ipZone()
+	return &net.IPAddr{IP: stdIP, Zone: zone}
+}
+
 // Is4 reports whether ip is an IPv4 address.
 //
-// TODO: decide/clarify the behavior for IPv4-mapped IPv6 addresses.
-// They have different representations and are not equal with ==, but
-// should a 4-in-6 address be Is4? Currently it's not. Maybe add As4?
-// Go treats them as if they were the same (https://github.com/golang/go/issues/29146#issuecomment-454903818)
-// but https://github.com/golang/go/issues/37921 requests more visibility into distinguishing them.
+// It returns false for IP4-mapped IPv6 addresses. See IP.Unmap.
 func (ip IP) Is4() bool {
 	if ip.ipImpl == nil {
 		return false
@@ -128,14 +202,34 @@ func (ip IP) Is4() bool {
 	return ip.ipImpl.is4()
 }
 
-// Is6 reports whether ip is an IPv6 address.
-//
-// TODO: see same TODO for Is4.
+// Is4in6 reports whether ip is an IPv4-mapped IPv6 address.
+func (ip IP) Is4in6() bool {
+	if ip.ipImpl == nil {
+		return false
+	}
+	return ip.ipImpl.is4in6()
+}
+
+// Is6 reports whether ip is an IPv6 address, including IPv4-mapped
+// IPv6 addresses.
 func (ip IP) Is6() bool {
 	if ip.ipImpl == nil {
 		return false
 	}
 	return ip.ipImpl.is6()
+}
+
+// Unmap returns ip with any IPv4-mapped IPv6 address prefix removed.
+//
+// That is, if ip is an IPv6 address wrapping an IPv4 adddress, it
+// returns the wrapped IPv4 address. Otherwise it returns ip, regardless
+// of its type.
+func (ip IP) Unmap() IP {
+	if !ip.Is4in6() {
+		return ip
+	}
+	a := ip.ipImpl.as16()
+	return IP{v4Addr{a[12], a[13], a[14], a[15]}}
 }
 
 // IsMulticast reports whether ip is a multicast address. If ip is the zero
@@ -156,7 +250,16 @@ func (ip IP) IsMulticast() bool {
 	}
 }
 
-// String returns the string representation of ip.
+// String returns the string form of the IP address ip.
+// It returns one of 4 forms:
+//
+//   - "invalid IP", if ip is the zero value
+//   - IPv4 dotted decimal ("192.0.2.1")
+//   - IPv6 ("2001:db8::1")
+//   - IPv6 with zone ("fe80:db8::1%eth0")
+//
+// Note that unlike the Go standard library's IP.String method,
+// IP4-mapped IPv6 addresses do not format as dotted decimals.
 func (ip IP) String() string {
 	if ip.ipImpl == nil {
 		return "invalid IP"
@@ -187,4 +290,36 @@ func (ip *IP) UnmarshalText(text []byte) error {
 	var err error
 	*ip, err = ParseIP(string(text))
 	return err
+}
+
+// IPPort is an IP & port number.
+//
+// It's meant to be used as a value type.
+type IPPort struct {
+	IP   IP
+	Port uint16
+}
+
+// UDPAddr returns a standard library net.UDPAddr from p.
+// The returned value is always non-nil. If p.IP is the zero
+// value, then UDPAddr.IP is nil.
+func (p IPPort) UDPAddr() *net.UDPAddr {
+	ip, zone := p.IP.ipZone()
+	return &net.UDPAddr{
+		IP:   ip,
+		Port: int(p.Port),
+		Zone: zone,
+	}
+}
+
+// TCPAddr returns a standard library net.UDPAddr from p.
+// The returned value is always non-nil. If p.IP is the zero
+// value, then TCPAddr.IP is nil.
+func (p IPPort) TCPAddr() *net.TCPAddr {
+	ip, zone := p.IP.ipZone()
+	return &net.TCPAddr{
+		IP:   ip,
+		Port: int(p.Port),
+		Zone: zone,
+	}
 }
