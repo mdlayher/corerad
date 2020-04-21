@@ -110,6 +110,6 @@ google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
-# inet.af/netaddr v0.0.0-20200411200808-2e6830e57e1f
+# inet.af/netaddr v0.0.0-20200421183448-7e9f9ca2dbf7
 ## explicit
 inet.af/netaddr

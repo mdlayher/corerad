@@ -160,5 +160,5 @@ gopkg.in/yaml.v2 v2.2.1/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v2 v2.2.4/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v2 v2.2.5/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
-inet.af/netaddr v0.0.0-20200411200808-2e6830e57e1f h1:ciZ51o6cOOjMuxdC7PanlOaiuRpVUTce1XbfhlQkAdM=
-inet.af/netaddr v0.0.0-20200411200808-2e6830e57e1f/go.mod h1:qqYzz/2whtrbWJvt+DNWQyvekNN4ePQZcg2xc2/Yjww=
+inet.af/netaddr v0.0.0-20200421183448-7e9f9ca2dbf7 h1:Qlfuch8q3NwffvfFJMXblNNPt1mvkzlAmfF3sh2ggwU=
+inet.af/netaddr v0.0.0-20200421183448-7e9f9ca2dbf7/go.mod h1:qqYzz/2whtrbWJvt+DNWQyvekNN4ePQZcg2xc2/Yjww=

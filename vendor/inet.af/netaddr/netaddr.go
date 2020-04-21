@@ -11,7 +11,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -58,8 +60,13 @@ func (ip v4Addr) as16() [16]byte {
 }
 func (ip v4Addr) String() string { return fmt.Sprintf("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]) }
 
-// mapped4Prefix are the 12 leading bytes in a IPv4-mapped IPv6 address.
-const mapped4Prefix = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff"
+const (
+	// mapped4Prefix are the 12 leading bytes in a IPv4-mapped IPv6 address.
+	mapped4Prefix = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff"
+
+	// v6Loopback is the IPv6 loopback address.
+	v6Loopback = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+)
 
 type v6Addr [16]byte
 
@@ -121,6 +128,22 @@ func ParseIP(s string) (IP, error) {
 	return IP{v6}, nil
 }
 
+// FromStdIP returns an IP from the standard library's IP type.
+// If std is invalid, ok is false.
+func FromStdIP(std net.IP) (ip IP, ok bool) {
+	switch len(std) {
+	case 4:
+		var a v4Addr
+		copy(a[:], std)
+		return IP{a}, true
+	case 16:
+		var a v6Addr
+		copy(a[:], std)
+		return IP{a}, true
+	}
+	return IP{}, false
+}
+
 // Zone returns ip's IPv6 scoped addressing zone, if any.
 func (ip IP) Zone() string {
 	if v6z, ok := ip.ipImpl.(v6AddrZone); ok {
@@ -158,10 +181,10 @@ func (ip IP) Less(ip2 IP) bool {
 	switch bytes.Compare(a16[:], b16[:]) {
 	case -1:
 		return true
-	default:
-		return a.Zone() < b.Zone()
 	case 1:
 		return false
+	default: // case 0 (bytes.Compare only returns -1, 1, 0)
+		return a.Zone() < b.Zone()
 	}
 }
 
@@ -232,6 +255,60 @@ func (ip IP) Unmap() IP {
 	return IP{v4Addr{a[12], a[13], a[14], a[15]}}
 }
 
+// WithZone returns an IP that's the same as ip but with the provided
+// zone. If zone is empty, the zone is removed. If ip is an IPv4
+// address it's returned unchanged.
+func (ip IP) WithZone(zone string) IP {
+	if zone == "" {
+		if z, ok := ip.ipImpl.(v6AddrZone); ok {
+			return IP{z.v6Addr}
+		}
+		return ip
+	}
+	switch ip := ip.ipImpl.(type) {
+	case v6Addr:
+		return IP{v6AddrZone{ip, zone}}
+	case v6AddrZone:
+		return IP{v6AddrZone{ip.v6Addr, zone}}
+	}
+	return ip
+}
+
+// IsLinkLocalUnicast reports whether ip is a link-local unicast address.
+// If ip is the zero value, it will return false.
+func (ip IP) IsLinkLocalUnicast() bool {
+	// See: https://en.wikipedia.org/wiki/Link-local_address.
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		return false
+	case v4Addr:
+		return ip[0] == 169 && ip[1] == 254
+	case v6Addr:
+		return ip[0] == 0xfe && ip[1] == 0x80
+	case v6AddrZone:
+		return ip.v6Addr[0] == 0xfe && ip.v6Addr[1] == 0x80
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+}
+
+// IsLoopback reports whether ip is a loopback address. If ip is the zero value,
+// it will return false.
+func (ip IP) IsLoopback() bool {
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		return false
+	case v4Addr:
+		return ip[0] == 127
+	case v6Addr:
+		return string(ip[:len(v6Loopback)]) == v6Loopback
+	case v6AddrZone:
+		return string(ip.v6Addr[:len(v6Loopback)]) == v6Loopback
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+}
+
 // IsMulticast reports whether ip is a multicast address. If ip is the zero
 // value, it will return false.
 func (ip IP) IsMulticast() bool {
@@ -248,6 +325,73 @@ func (ip IP) IsMulticast() bool {
 	default:
 		panic("netaddr: unhandled ipImpl representation")
 	}
+}
+
+// Prefix applies a CIDR mask of leading bits to IP, producing an IPPrefix
+// of the specified length. If IP is the zero value, a zero-value IPPrefix and
+// a nil error are returned. If bits is larger than 32 for an IPv4 address or
+// 128 for an IPv6 address, an error is returned.
+func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
+	maxBits := uint8(32)
+	if ip.Is6() {
+		maxBits = 128
+	}
+
+	if bits > maxBits {
+		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
+	}
+
+	var b []byte
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		// Zero-value input produces zero-value output.
+		return IPPrefix{}, nil
+	case v4Addr:
+		b = ip[:]
+	case v6Addr:
+		b = ip[:]
+	case v6AddrZone:
+		b = ip.v6Addr[:]
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+
+	// Apply the mask specified by bits.
+	n := bits
+	for i := 0; i < len(b); i++ {
+		if n >= 8 {
+			b[i] &= 0xff
+			n -= 8
+			continue
+		}
+
+		b[i] = ^byte(0xff >> n)
+		n = 0
+	}
+
+	var out IP
+	switch ip.ipImpl.(type) {
+	case v4Addr:
+		var v4 v4Addr
+		copy(v4[:], b)
+		out = IP{ipImpl: v4}
+	case v6Addr:
+		var v6 v6Addr
+		copy(v6[:], b)
+		out = IP{ipImpl: v6}
+	case v6AddrZone:
+		var v6 v6AddrZone
+		copy(v6.v6Addr[:], b)
+		v6.zone = ip.Zone()
+		out = IP{ipImpl: v6}
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+
+	return IPPrefix{
+		IP:   out,
+		Bits: bits,
+	}, nil
 }
 
 // String returns the string form of the IP address ip.
@@ -300,6 +444,28 @@ type IPPort struct {
 	Port uint16
 }
 
+const maxUint16 = 1<<16 - 1
+
+// FromStdAddr maps the components of a standard library TCPAddr or
+// UDPAddr into an IPPort.
+func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
+	ip, ok := FromStdIP(stdIP)
+	if !ok || port < 0 || port > maxUint16 {
+		return
+	}
+	ip = ip.Unmap()
+	ipp := IPPort{IP: ip, Port: uint16(port)}
+	if zone != "" {
+		v6a, is6 := ip.ipImpl.(v6Addr)
+		if !is6 {
+			return
+		}
+		ipp.IP = IP{v6AddrZone{v6a, zone}}
+		return ipp, true
+	}
+	return ipp, true
+}
+
 // UDPAddr returns a standard library net.UDPAddr from p.
 // The returned value is always non-nil. If p.IP is the zero
 // value, then UDPAddr.IP is nil.
@@ -322,4 +488,99 @@ func (p IPPort) TCPAddr() *net.TCPAddr {
 		Port: int(p.Port),
 		Zone: zone,
 	}
+}
+
+// IPPrefix is an IP address prefix representing an IP network.
+//
+// The first Bits of IP are specified, the remaining bits match any address.
+// The range of Bits is [0,32] for IPv4 or [0,128] for IPv6.
+type IPPrefix struct {
+	IP   IP
+	Bits uint8
+}
+
+// ParseIPPrefix parses s as an IP address prefix.
+// The string can be in the form "192.168.1.0/24" or "2001::db8::/32",
+// the CIDR notation defined in RFC 4632 and RFC 4291.
+func ParseIPPrefix(s string) (IPPrefix, error) {
+	i := strings.IndexByte(s, '/')
+	if i < 0 {
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): no '/'", s)
+	}
+	ip, err := ParseIP(s[:i])
+	if err != nil {
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): %v", s, err)
+	}
+	s = s[i+1:]
+	bits, err := strconv.Atoi(s)
+	if err != nil {
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): bad prefix: %v", s, err)
+	}
+	maxBits := 32
+	if ip.Is6() {
+		maxBits = 128
+	}
+	if bits < 0 || bits > maxBits {
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): prefix length out of range", s)
+	}
+	return IPPrefix{
+		IP:   ip,
+		Bits: uint8(bits),
+	}, nil
+}
+
+// IPNet returns the net.IPNet representation of an IPPrefix.
+// The returned value is always non-nil.
+// Any zone identifier is dropped in the conversion.
+func (p IPPrefix) IPNet() *net.IPNet {
+	bits := 128
+	if p.IP.Is4() {
+		bits = 32
+	}
+	stdIP, _ := p.IP.ipZone()
+	return &net.IPNet{
+		IP:   stdIP,
+		Mask: net.CIDRMask(int(p.Bits), bits),
+	}
+}
+
+// Contains reports whether the network p includes addr.
+//
+// An IPv4 address will not match an IPv6 prefix.
+// A 4-in-6 IP will not match an IPv4 prefix.
+func (p IPPrefix) Contains(addr IP) bool {
+	var nn, ip []byte // these do not escape and so do not allocate
+	if p.IP.is4() {
+		if !addr.is4() {
+			return false
+		}
+		a1 := p.IP.ipImpl.(v4Addr)
+		a2 := addr.ipImpl.(v4Addr)
+		nn, ip = a1[:], a2[:]
+	} else {
+		if addr.is4() {
+			return false
+		}
+		a1 := p.IP.ipImpl.(v6Addr)
+		a2 := addr.ipImpl.(v6Addr)
+		nn, ip = a1[:], a2[:]
+	}
+	bits := p.Bits
+	for i := 0; bits > 0 && i < len(nn); i++ {
+		m := uint8(math.MaxUint8)
+		if bits < 8 {
+			zeros := 8 - bits
+			m = m >> zeros << zeros
+		}
+		if nn[i]&m != ip[i]&m {
+			return false
+		}
+		bits -= 8
+	}
+	return true
+}
+
+// Strings returns the CIDR notation of p: "<ip>/<bits>".
+func (p IPPrefix) String() string {
+	return fmt.Sprintf("%s/%d", p.IP, p.Bits)
 }
