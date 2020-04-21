@@ -23,6 +23,8 @@ import (
 	"inet.af/netaddr"
 )
 
+var unspecified = mustNetaddrIP("::")
+
 // A Plugin specifies a CoreRAD plugin's configuration.
 type Plugin interface {
 	// Name is the string name of the plugin.
@@ -119,7 +121,7 @@ func (m *MTU) Apply(ra *ndp.RouterAdvertisement) error {
 
 // A Prefix configures a NDP Prefix Information option.
 type Prefix struct {
-	Prefix            *net.IPNet
+	Prefix            netaddr.IPPrefix
 	OnLink            bool
 	Autonomous        bool
 	ValidLifetime     time.Duration
@@ -157,10 +159,8 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 
 // Apply implements Plugin.
 func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
-	length, _ := p.Prefix.Mask.Size()
-
-	var prefixes []net.IP
-	if p.Prefix.IP.Equal(net.IPv6zero) {
+	var prefixes []netaddr.IP
+	if p.Prefix.IP == unspecified {
 		// Expand ::/N to all unique, non-link local prefixes with matching
 		// length on this interface.
 		addrs, err := p.Addrs()
@@ -168,7 +168,7 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 			return fmt.Errorf("failed to fetch IP addresses: %v", err)
 		}
 
-		seen := make(map[string]struct{})
+		seen := make(map[netaddr.IPPrefix]struct{})
 		for _, a := range addrs {
 			// Only advertise non-link-local prefixes:
 			// https://tools.ietf.org/html/rfc4861#section-4.6.2.
@@ -177,21 +177,28 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 				continue
 			}
 
-			size, _ := ipn.Mask.Size()
-			if size != length {
+			ipp, err := netaddr.ParseIPPrefix(ipn.String())
+			if err != nil {
+				panic(err)
+			}
+
+			if ipp.Bits != p.Prefix.Bits {
 				continue
 			}
 
 			// Found a match, mask and keep the prefix bits of the address.
-			ip := ipn.IP.Mask(ipn.Mask)
+			pfx, err := ipp.IP.Prefix(ipp.Bits)
+			if err != nil {
+				return fmt.Errorf("failed to produce prefix: %v", err)
+			}
 
 			// Only add each prefix once.
-			if _, ok := seen[ip.String()]; ok {
+			if _, ok := seen[pfx]; ok {
 				continue
 			}
-			seen[ip.String()] = struct{}{}
+			seen[pfx] = struct{}{}
 
-			prefixes = append(prefixes, ip)
+			prefixes = append(prefixes, pfx.IP)
 		}
 	} else {
 		// Use the specified prefix.
@@ -202,12 +209,12 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 	// All prefixes expanded from ::/N have the same configuration.
 	for _, pfx := range prefixes {
 		ra.Options = append(ra.Options, &ndp.PrefixInformation{
-			PrefixLength:                   uint8(length),
+			PrefixLength:                   p.Prefix.Bits,
 			OnLink:                         p.OnLink,
 			AutonomousAddressConfiguration: p.Autonomous,
 			ValidLifetime:                  p.ValidLifetime,
 			PreferredLifetime:              p.PreferredLifetime,
-			Prefix:                         pfx,
+			Prefix:                         pfx.IPAddr().IP,
 		})
 	}
 
@@ -216,7 +223,7 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 
 // A Route configures a NDP Route Information option.
 type Route struct {
-	Prefix     *net.IPNet
+	Prefix     netaddr.IPPrefix
 	Preference ndp.Preference
 	Lifetime   time.Duration
 }
@@ -238,13 +245,11 @@ func (*Route) Prepare(_ *net.Interface) error { return nil }
 
 // Apply implements Plugin.
 func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
-	length, _ := r.Prefix.Mask.Size()
-
 	ra.Options = append(ra.Options, &ndp.RouteInformation{
-		PrefixLength:  uint8(length),
+		PrefixLength:  r.Prefix.Bits,
 		Preference:    r.Preference,
 		RouteLifetime: r.Lifetime,
-		Prefix:        r.Prefix.IP,
+		Prefix:        r.Prefix.IP.IPAddr().IP,
 	})
 
 	return nil
@@ -297,4 +302,17 @@ func durString(d time.Duration) string {
 	default:
 		return d.String()
 	}
+}
+
+func mustNetaddrIP(s string) netaddr.IP {
+	ip, err := netaddr.ParseIP(s)
+	if err != nil {
+		panicf("failed to parse IP address: %v", err)
+	}
+
+	return ip
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }

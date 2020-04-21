@@ -14,7 +14,6 @@
 package plugin
 
 import (
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -51,7 +50,7 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "Prefix",
 			p: &Prefix{
-				Prefix:            mustCIDR("::/64"),
+				Prefix:            mustNetaddrIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: 15 * time.Minute,
@@ -62,7 +61,7 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "Route",
 			p: &Route{
-				Prefix:     mustCIDR("2001:db8::/64"),
+				Prefix:     mustNetaddrIPPrefix("2001:db8::/64"),
 				Preference: ndp.High,
 				Lifetime:   15 * time.Minute,
 			},
@@ -143,7 +142,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "static prefix",
 			plugin: &Prefix{
-				Prefix:            mustCIDR("2001:db8::/32"),
+				Prefix:            mustNetaddrIPPrefix("2001:db8::/32"),
 				OnLink:            true,
 				PreferredLifetime: 10 * time.Second,
 				ValidLifetime:     20 * time.Second,
@@ -163,7 +162,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "automatic prefixes",
 			plugin: &Prefix{
-				Prefix:            mustCIDR("::/64"),
+				Prefix:            mustNetaddrIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: 10 * time.Second,
@@ -206,7 +205,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "route",
 			plugin: &Route{
-				Prefix:     mustCIDR("2001:db8::/32"),
+				Prefix:     mustNetaddrIPPrefix("2001:db8::/32"),
 				Preference: ndp.High,
 				Lifetime:   10 * time.Second,
 			},
@@ -275,13 +274,13 @@ func mustIP(s string) net.IP {
 	return ip
 }
 
-func mustNetaddrIP(s string) netaddr.IP {
-	ip, err := netaddr.ParseIP(s)
+func mustNetaddrIPPrefix(s string) netaddr.IPPrefix {
+	p, err := netaddr.ParseIPPrefix(s)
 	if err != nil {
-		panicf("failed to parse IP address: %v", err)
+		panicf("failed to parse IP prefix: %v", err)
 	}
 
-	return ip
+	return p
 }
 
 func mustCIDR(s string) *net.IPNet {
@@ -291,8 +290,4 @@ func mustCIDR(s string) *net.IPNet {
 	}
 
 	return ipn
-}
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
 }

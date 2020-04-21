@@ -14,8 +14,6 @@
 package config
 
 import (
-	"fmt"
-	"net"
 	"strings"
 	"testing"
 	"time"
@@ -150,7 +148,7 @@ func Test_parsePrefix(t *testing.T) {
 	t.Parallel()
 
 	defaults := &plugin.Prefix{
-		Prefix:            mustCIDR("::/64"),
+		Prefix:            mustNetaddrIPPrefix("::/64"),
 		OnLink:            true,
 		Autonomous:        true,
 		PreferredLifetime: 4 * time.Hour,
@@ -292,7 +290,7 @@ func Test_parsePrefix(t *testing.T) {
 			  valid_lifetime = "infinite"
 			`,
 			p: &plugin.Prefix{
-				Prefix:            mustCIDR("::/64"),
+				Prefix:            mustNetaddrIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: ndp.Infinity,
@@ -312,7 +310,7 @@ func Test_parsePrefix(t *testing.T) {
 			  valid_lifetime = "60s"
 			`,
 			p: &plugin.Prefix{
-				Prefix:            mustCIDR("::/64"),
+				Prefix:            mustNetaddrIPPrefix("::/64"),
 				OnLink:            true,
 				PreferredLifetime: 30 * time.Second,
 				ValidLifetime:     60 * time.Second,
@@ -332,7 +330,7 @@ func Test_parseRoute(t *testing.T) {
 	t.Parallel()
 
 	defaults := &plugin.Route{
-		Prefix:     mustCIDR("2001:db8::/64"),
+		Prefix:     mustNetaddrIPPrefix("2001:db8::/64"),
 		Preference: ndp.Medium,
 		Lifetime:   24 * time.Hour,
 	}
@@ -450,7 +448,7 @@ func Test_parseRoute(t *testing.T) {
 			  lifetime = "infinite"
 			`,
 			r: &plugin.Route{
-				Prefix:     mustCIDR("2001:db8::/64"),
+				Prefix:     mustNetaddrIPPrefix("2001:db8::/64"),
 				Preference: ndp.Medium,
 				Lifetime:   ndp.Infinity,
 			},
@@ -466,7 +464,7 @@ func Test_parseRoute(t *testing.T) {
 			  lifetime = "30s"
 			`,
 			r: &plugin.Route{
-				Prefix:     mustCIDR("2001:db8::/64"),
+				Prefix:     mustNetaddrIPPrefix("2001:db8::/64"),
 				Preference: ndp.High,
 				Lifetime:   30 * time.Second,
 			},
@@ -606,24 +604,11 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 
 func compareNetaddrIP(x, y netaddr.IP) bool { return x == y }
 
-func mustNetaddrIP(s string) netaddr.IP {
-	ip, err := netaddr.ParseIP(s)
+func mustNetaddrIPPrefix(s string) netaddr.IPPrefix {
+	p, err := netaddr.ParseIPPrefix(s)
 	if err != nil {
-		panicf("failed to parse %q as IP address: %v", s, err)
+		panicf("failed to parse IP prefix: %v", err)
 	}
 
-	return ip
-}
-
-func mustCIDR(s string) *net.IPNet {
-	_, ipn, err := net.ParseCIDR(s)
-	if err != nil {
-		panicf("failed to parse CIDR: %v", err)
-	}
-
-	return ipn
-}
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
+	return p
 }

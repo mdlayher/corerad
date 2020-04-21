@@ -16,13 +16,14 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mikioh/ipaddr"
 	"inet.af/netaddr"
 )
+
+var unspecified = mustNetaddrIP("::")
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
 func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin, error) {
@@ -39,7 +40,11 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin,
 	// For sanity, configured prefixes on a given interface must not overlap.
 	for _, pfx1 := range prefixes {
 		for _, pfx2 := range prefixes {
-			p1, p2 := ipaddr.NewPrefix(pfx1.Prefix), ipaddr.NewPrefix(pfx2.Prefix)
+			var (
+				p1 = ipaddr.NewPrefix(pfx1.Prefix.IPNet())
+				p2 = ipaddr.NewPrefix(pfx2.Prefix.IPNet())
+			)
+
 			if !p1.Equal(p2) && p1.Overlaps(p2) {
 				return nil, fmt.Errorf("prefixes overlap: %s and %s",
 					pfx1.Prefix, pfx2.Prefix)
@@ -66,7 +71,11 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin,
 	// For sanity, configured routes on a given interface must not overlap.
 	for _, rt1 := range routes {
 		for _, rt2 := range routes {
-			p1, p2 := ipaddr.NewPrefix(rt1.Prefix), ipaddr.NewPrefix(rt2.Prefix)
+			var (
+				p1 = ipaddr.NewPrefix(rt1.Prefix.IPNet())
+				p2 = ipaddr.NewPrefix(rt2.Prefix.IPNet())
+			)
+
 			if !p1.Equal(p2) && p1.Overlaps(p2) {
 				return nil, fmt.Errorf("routes overlap: %s and %s",
 					rt1.Prefix, rt2.Prefix)
@@ -137,25 +146,14 @@ func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
 
 // parsePrefix parses a Prefix plugin.
 func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
-	ip, prefix, err := net.ParseCIDR(p.Prefix)
+	prefix, err := parseIPPrefix(p.Prefix)
 	if err != nil {
 		return nil, err
 	}
 
-	// Don't allow individual IP addresses.
-	if !prefix.IP.Equal(ip) {
-		return nil, fmt.Errorf("%q is not a CIDR prefix", ip)
-	}
-
-	// Only allow IPv6 addresses.
-	if prefix.IP.To16() != nil && prefix.IP.To4() != nil {
-		return nil, fmt.Errorf("%q is not an IPv6 CIDR prefix", prefix.IP)
-	}
-
 	// Only permit ::/64 as a special case. It isn't clear if other prefix
 	// lengths with :: would be useful, so throw an error for now.
-	length, _ := prefix.Mask.Size()
-	if prefix.IP.Equal(net.IPv6zero) && length != 64 {
+	if prefix.IP == unspecified && prefix.Bits != 64 {
 		return nil, errors.New("only ::/64 is permitted for inferring prefixes from interface addresses")
 	}
 
@@ -212,19 +210,9 @@ func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
 
 // parsePrefix parses a Prefix plugin.
 func parseRoute(r rawRoute) (*plugin.Route, error) {
-	ip, prefix, err := net.ParseCIDR(r.Prefix)
+	prefix, err := parseIPPrefix(r.Prefix)
 	if err != nil {
 		return nil, err
-	}
-
-	// Don't allow individual IP addresses.
-	if !prefix.IP.Equal(ip) {
-		return nil, fmt.Errorf("%q is not a CIDR prefix", ip)
-	}
-
-	// Only allow IPv6 addresses.
-	if prefix.IP.To16() != nil && prefix.IP.To4() != nil {
-		return nil, fmt.Errorf("%q is not an IPv6 CIDR prefix", prefix.IP)
 	}
 
 	pref, err := parsePreference(r.Preference)
@@ -286,4 +274,42 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 		Lifetime: lifetime,
 		Servers:  servers,
 	}, nil
+}
+
+// parseIPPrefix parses s an IPv6 prefix. It returns an error if the prefix is
+// invalid, refers to an address within a prefix, or is an IPv4 prefix.
+func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
+	p, err := netaddr.ParseIPPrefix(s)
+	if err != nil {
+		return netaddr.IPPrefix{}, err
+	}
+
+	// Don't allow individual IP addresses.
+	ip, err := p.IP.Prefix(p.Bits)
+	if err != nil {
+		return netaddr.IPPrefix{}, err
+	}
+	if p.IP != ip.IP {
+		return netaddr.IPPrefix{}, fmt.Errorf("%q is not a CIDR prefix", ip)
+	}
+
+	// Only allow IPv6 addresses.
+	if !p.IP.Is6() {
+		return netaddr.IPPrefix{}, fmt.Errorf("%q is not an IPv6 CIDR prefix", p.IP)
+	}
+
+	return p, nil
+}
+
+func mustNetaddrIP(s string) netaddr.IP {
+	ip, err := netaddr.ParseIP(s)
+	if err != nil {
+		panicf("failed to parse IP address: %v", err)
+	}
+
+	return ip
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }

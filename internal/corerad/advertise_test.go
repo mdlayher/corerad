@@ -93,13 +93,13 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 						},
 					},
 					&plugin.Prefix{
-						Prefix:            mustCIDR("2001:db8::/32"),
+						Prefix:            mustNetaddrIPPrefix("2001:db8::/32"),
 						OnLink:            true,
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
 					},
 					&plugin.Route{
-						Prefix:     mustCIDR("2001:db8:ffff::/64"),
+						Prefix:     mustNetaddrIPPrefix("2001:db8:ffff::/64"),
 						Preference: ndp.High,
 						Lifetime:   10 * time.Second,
 					},
@@ -886,13 +886,13 @@ func mustSysctl(t *testing.T, iface, key, value string) {
 	}
 }
 
-func mustCIDR(s string) *net.IPNet {
-	_, ipn, err := net.ParseCIDR(s)
+func mustNetaddrIPPrefix(s string) netaddr.IPPrefix {
+	p, err := netaddr.ParseIPPrefix(s)
 	if err != nil {
-		panicf("failed to parse CIDR: %v", err)
+		panicf("failed to parse IP prefix: %v", err)
 	}
 
-	return ipn
+	return p
 }
 
 func mustNetIP(s string) net.IP {

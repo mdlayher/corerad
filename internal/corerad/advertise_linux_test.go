@@ -31,6 +31,7 @@ import (
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
+	"inet.af/netaddr"
 )
 
 func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
@@ -175,8 +176,8 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 		},
 	}
 
-	prefix := mustCIDR("2001:db8:dead:beef::/64")
-	route := mustCIDR("2001:db8:ffff:ffff::/64")
+	prefix := mustNetaddrIPPrefix("2001:db8:dead:beef::/64")
+	route := mustNetaddrIPPrefix("2001:db8:ffff:ffff::/64")
 
 	icfg := &config.Interface{
 		Plugins: []plugin.Plugin{
@@ -219,9 +220,14 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 				continue
 			}
 
+			ip, ok := netaddr.FromStdIP(a.IP)
+			if !ok {
+				panicf("bad IP address: %s", ip)
+			}
+
 			// Verify all addresses reside within prefix.
-			if !prefix.Contains(a.IP) {
-				t.Fatalf("prefix %s does not contain address %s", prefix, a.IP)
+			if !prefix.Contains(ip) {
+				t.Fatalf("prefix %s does not contain address %s", prefix, ip)
 			}
 
 			t.Logf("IP: %s", a)
@@ -246,9 +252,14 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 				continue
 			}
 
+			dst, ok := netaddr.FromStdIP(r.Attributes.Dst)
+			if !ok {
+				panicf("bad IP address: %s", dst)
+			}
+
 			// Ensure we find routes for both our prefix and specified route.
-			if prefix.Contains(r.Attributes.Dst) || route.Contains(r.Attributes.Dst) {
-				t.Logf("route: %s/%d", r.Attributes.Dst, r.DstLength)
+			if prefix.Contains(dst) || route.Contains(dst) {
+				t.Logf("route: %s/%d", dst, r.DstLength)
 				found++
 			}
 		}

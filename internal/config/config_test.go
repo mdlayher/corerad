@@ -15,7 +15,6 @@ package config_test
 
 import (
 	"fmt"
-	"net"
 	"strings"
 	"testing"
 	"time"
@@ -157,21 +156,21 @@ func TestParse(t *testing.T) {
 						UnicastOnly:     false,
 						Plugins: []plugin.Plugin{
 							&plugin.Prefix{
-								Prefix:            mustCIDR("::/64"),
+								Prefix:            mustNetaddrIPPrefix("::/64"),
 								OnLink:            true,
 								Autonomous:        true,
 								ValidLifetime:     24 * time.Hour,
 								PreferredLifetime: 4 * time.Hour,
 							},
 							&plugin.Prefix{
-								Prefix:            mustCIDR("2001:db8::/64"),
+								Prefix:            mustNetaddrIPPrefix("2001:db8::/64"),
 								OnLink:            true,
 								Autonomous:        false,
 								ValidLifetime:     24 * time.Hour,
 								PreferredLifetime: 4 * time.Hour,
 							},
 							&plugin.Route{
-								Prefix:     mustCIDR("2001:db8:ffff::/64"),
+								Prefix:     mustNetaddrIPPrefix("2001:db8:ffff::/64"),
 								Preference: ndp.Medium,
 								Lifetime:   24 * time.Hour,
 							},
@@ -295,13 +294,13 @@ func mustNetaddrIP(s string) netaddr.IP {
 	return ip
 }
 
-func mustCIDR(s string) *net.IPNet {
-	_, ipn, err := net.ParseCIDR(s)
+func mustNetaddrIPPrefix(s string) netaddr.IPPrefix {
+	p, err := netaddr.ParseIPPrefix(s)
 	if err != nil {
-		panicf("failed to parse CIDR: %v", err)
+		panicf("failed to parse IP prefix: %v", err)
 	}
 
-	return ipn
+	return p
 }
 
 func panicf(format string, a ...interface{}) {
