@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
 )
@@ -50,7 +51,7 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "Prefix",
 			p: &Prefix{
-				Prefix:            mustNetaddrIPPrefix("::/64"),
+				Prefix:            crtest.MustIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: 15 * time.Minute,
@@ -61,7 +62,7 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "Route",
 			p: &Route{
-				Prefix:     mustNetaddrIPPrefix("2001:db8::/64"),
+				Prefix:     crtest.MustIPPrefix("2001:db8::/64"),
 				Preference: ndp.High,
 				Lifetime:   15 * time.Minute,
 			},
@@ -72,8 +73,8 @@ func TestPluginString(t *testing.T) {
 			p: &RDNSS{
 				Lifetime: 30 * time.Second,
 				Servers: []netaddr.IP{
-					mustNetaddrIP("2001:db8::1"),
-					mustNetaddrIP("2001:db8::2"),
+					crtest.MustIP("2001:db8::1"),
+					crtest.MustIP("2001:db8::2"),
 				},
 			},
 			s: "servers: [2001:db8::1, 2001:db8::2], lifetime: 30s",
@@ -142,7 +143,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "static prefix",
 			plugin: &Prefix{
-				Prefix:            mustNetaddrIPPrefix("2001:db8::/32"),
+				Prefix:            crtest.MustIPPrefix("2001:db8::/32"),
 				OnLink:            true,
 				PreferredLifetime: 10 * time.Second,
 				ValidLifetime:     20 * time.Second,
@@ -162,7 +163,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "automatic prefixes",
 			plugin: &Prefix{
-				Prefix:            mustNetaddrIPPrefix("::/64"),
+				Prefix:            crtest.MustIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: 10 * time.Second,
@@ -205,7 +206,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "route",
 			plugin: &Route{
-				Prefix:     mustNetaddrIPPrefix("2001:db8::/32"),
+				Prefix:     crtest.MustIPPrefix("2001:db8::/32"),
 				Preference: ndp.High,
 				Lifetime:   10 * time.Second,
 			},
@@ -225,8 +226,8 @@ func TestBuild(t *testing.T) {
 			plugin: &RDNSS{
 				Lifetime: 10 * time.Second,
 				Servers: []netaddr.IP{
-					mustNetaddrIP("2001:db8::1"),
-					mustNetaddrIP("2001:db8::2"),
+					crtest.MustIP("2001:db8::1"),
+					crtest.MustIP("2001:db8::2"),
 				},
 			},
 			ra: &ndp.RouterAdvertisement{
@@ -272,15 +273,6 @@ func mustIP(s string) net.IP {
 	}
 
 	return ip
-}
-
-func mustNetaddrIPPrefix(s string) netaddr.IPPrefix {
-	p, err := netaddr.ParseIPPrefix(s)
-	if err != nil {
-		panicf("failed to parse IP prefix: %v", err)
-	}
-
-	return p
 }
 
 func mustCIDR(s string) *net.IPNet {

@@ -18,12 +18,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mikioh/ipaddr"
 	"inet.af/netaddr"
 )
 
-var unspecified = mustNetaddrIP("::")
+var unspecified = crtest.MustIP("::")
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
 func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin, error) {
@@ -299,15 +300,6 @@ func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
 	}
 
 	return p, nil
-}
-
-func mustNetaddrIP(s string) netaddr.IP {
-	ip, err := netaddr.ParseIP(s)
-	if err != nil {
-		panicf("failed to parse IP address: %v", err)
-	}
-
-	return ip
 }
 
 func panicf(format string, a ...interface{}) {

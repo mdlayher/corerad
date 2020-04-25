@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
@@ -156,27 +157,27 @@ func TestParse(t *testing.T) {
 						UnicastOnly:     false,
 						Plugins: []plugin.Plugin{
 							&plugin.Prefix{
-								Prefix:            mustNetaddrIPPrefix("::/64"),
+								Prefix:            crtest.MustIPPrefix("::/64"),
 								OnLink:            true,
 								Autonomous:        true,
 								ValidLifetime:     24 * time.Hour,
 								PreferredLifetime: 4 * time.Hour,
 							},
 							&plugin.Prefix{
-								Prefix:            mustNetaddrIPPrefix("2001:db8::/64"),
+								Prefix:            crtest.MustIPPrefix("2001:db8::/64"),
 								OnLink:            true,
 								Autonomous:        false,
 								ValidLifetime:     24 * time.Hour,
 								PreferredLifetime: 4 * time.Hour,
 							},
 							&plugin.Route{
-								Prefix:     mustNetaddrIPPrefix("2001:db8:ffff::/64"),
+								Prefix:     crtest.MustIPPrefix("2001:db8:ffff::/64"),
 								Preference: ndp.Medium,
 								Lifetime:   24 * time.Hour,
 							},
 							&plugin.RDNSS{
 								Lifetime: 20 * time.Minute,
-								Servers:  []netaddr.IP{mustNetaddrIP("2001:db8::1")},
+								Servers:  []netaddr.IP{crtest.MustIP("2001:db8::1")},
 							},
 							&plugin.DNSSL{
 								Lifetime:    20 * time.Minute,
@@ -284,24 +285,6 @@ func TestParseDefaults(t *testing.T) {
 }
 
 func compareNetaddrIP(x, y netaddr.IP) bool { return x == y }
-
-func mustNetaddrIP(s string) netaddr.IP {
-	ip, err := netaddr.ParseIP(s)
-	if err != nil {
-		panicf("failed to parse %q as IP address: %v", s, err)
-	}
-
-	return ip
-}
-
-func mustNetaddrIPPrefix(s string) netaddr.IPPrefix {
-	p, err := netaddr.ParseIPPrefix(s)
-	if err != nil {
-		panicf("failed to parse IP prefix: %v", err)
-	}
-
-	return p
-}
 
 func panicf(format string, a ...interface{}) {
 	panic(fmt.Sprintf(format, a...))

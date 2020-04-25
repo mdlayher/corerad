@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
@@ -176,8 +177,8 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 		},
 	}
 
-	prefix := mustNetaddrIPPrefix("2001:db8:dead:beef::/64")
-	route := mustNetaddrIPPrefix("2001:db8:ffff:ffff::/64")
+	prefix := crtest.MustIPPrefix("2001:db8:dead:beef::/64")
+	route := crtest.MustIPPrefix("2001:db8:ffff:ffff::/64")
 
 	icfg := &config.Interface{
 		Plugins: []plugin.Plugin{

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
@@ -35,8 +36,8 @@ import (
 
 // IPv6 address "constants" in netaddr.IP format.
 var (
-	unspecified       = mustNetaddrIP("::")
-	linkLocalAllNodes = mustNetaddrIP("ff02::1")
+	unspecified       = crtest.MustIP("::")
+	linkLocalAllNodes = crtest.MustIP("ff02::1")
 )
 
 // errLinkChange is a sentinel value which indicates a link state change.
@@ -654,15 +655,6 @@ func multicastDelay(r *rand.Rand, i int, min, max int64) time.Duration {
 	}
 
 	return d
-}
-
-func mustNetaddrIP(s string) netaddr.IP {
-	ip, err := netaddr.ParseIP(s)
-	if err != nil {
-		panicf("failed to parse IP address: %v", err)
-	}
-
-	return ip
 }
 
 func panicf(format string, a ...interface{}) {

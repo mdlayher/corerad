@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netstate"
@@ -93,21 +94,21 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 						},
 					},
 					&plugin.Prefix{
-						Prefix:            mustNetaddrIPPrefix("2001:db8::/32"),
+						Prefix:            crtest.MustIPPrefix("2001:db8::/32"),
 						OnLink:            true,
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
 					},
 					&plugin.Route{
-						Prefix:     mustNetaddrIPPrefix("2001:db8:ffff::/64"),
+						Prefix:     crtest.MustIPPrefix("2001:db8:ffff::/64"),
 						Preference: ndp.High,
 						Lifetime:   10 * time.Second,
 					},
 					&plugin.RDNSS{
 						Lifetime: 10 * time.Second,
 						Servers: []netaddr.IP{
-							mustNetaddrIP("2001:db8::1"),
-							mustNetaddrIP("2001:db8::2"),
+							crtest.MustIP("2001:db8::1"),
+							crtest.MustIP("2001:db8::2"),
 						},
 					},
 					plugin.NewMTU(1500),
@@ -884,15 +885,6 @@ func mustSysctl(t *testing.T, iface, key, value string) {
 	if err := ioutil.WriteFile(file, []byte(value), 0o644); err != nil {
 		t.Fatalf("failed to write sysctl %s/%s: %v", iface, key, err)
 	}
-}
-
-func mustNetaddrIPPrefix(s string) netaddr.IPPrefix {
-	p, err := netaddr.ParseIPPrefix(s)
-	if err != nil {
-		panicf("failed to parse IP prefix: %v", err)
-	}
-
-	return p
 }
 
 func mustNetIP(s string) net.IP {

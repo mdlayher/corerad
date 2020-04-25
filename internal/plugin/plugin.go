@@ -19,11 +19,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
 )
 
-var unspecified = mustNetaddrIP("::")
+var unspecified = crtest.MustIP("::")
 
 // A Plugin specifies a CoreRAD plugin's configuration.
 type Plugin interface {
@@ -302,15 +303,6 @@ func durString(d time.Duration) string {
 	default:
 		return d.String()
 	}
-}
-
-func mustNetaddrIP(s string) netaddr.IP {
-	ip, err := netaddr.ParseIP(s)
-	if err != nil {
-		panicf("failed to parse IP address: %v", err)
-	}
-
-	return ip
 }
 
 func panicf(format string, a ...interface{}) {
