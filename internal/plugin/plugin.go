@@ -171,26 +171,27 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 
 		seen := make(map[netaddr.IPPrefix]struct{})
 		for _, a := range addrs {
-			// Only advertise non-link-local prefixes:
-			// https://tools.ietf.org/html/rfc4861#section-4.6.2.
 			ipn, ok := a.(*net.IPNet)
-			if !ok || ipn.IP.IsLinkLocalUnicast() {
+			if !ok {
 				continue
 			}
 
-			ipp, err := netaddr.ParseIPPrefix(ipn.String())
-			if err != nil {
-				panic(err)
+			ipp, ok := netaddr.FromStdIPNet(ipn)
+			if !ok {
+				panicf("corerad: invalid net.IPNet: %+v", a)
 			}
 
-			if ipp.Bits != p.Prefix.Bits {
+			// Only advertise non-link-local prefixes that also have a
+			// matching mask:
+			// https://tools.ietf.org/html/rfc4861#section-4.6.2.
+			if ipp.IP.IsLinkLocalUnicast() || ipp.Bits != p.Prefix.Bits {
 				continue
 			}
 
 			// Found a match, mask and keep the prefix bits of the address.
 			pfx, err := ipp.IP.Prefix(ipp.Bits)
 			if err != nil {
-				return fmt.Errorf("failed to produce prefix: %v", err)
+				panicf("corerad: failed to produce prefix: %v", err)
 			}
 
 			// Only add each prefix once.
