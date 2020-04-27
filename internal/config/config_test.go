@@ -14,7 +14,6 @@
 package config_test
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -285,7 +284,3 @@ func TestParseDefaults(t *testing.T) {
 }
 
 func compareNetaddrIP(x, y netaddr.IP) bool { return x == y }
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
-}

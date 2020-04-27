@@ -301,7 +301,3 @@ func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
 
 	return p, nil
 }
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
-}
