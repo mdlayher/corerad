@@ -18,13 +18,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mikioh/ipaddr"
 	"inet.af/netaddr"
 )
-
-var unspecified = crtest.MustIP("::")
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
 func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin, error) {
@@ -154,7 +151,7 @@ func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
 
 	// Only permit ::/64 as a special case. It isn't clear if other prefix
 	// lengths with :: would be useful, so throw an error for now.
-	if prefix.IP == unspecified && prefix.Bits != 64 {
+	if prefix.IP == netaddr.IPv6Unspecified() && prefix.Bits != 64 {
 		return nil, errors.New("only ::/64 is permitted for inferring prefixes from interface addresses")
 	}
 

@@ -19,12 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
 )
-
-var unspecified = crtest.MustIP("::")
 
 // A Plugin specifies a CoreRAD plugin's configuration.
 type Plugin interface {
@@ -161,7 +158,7 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 // Apply implements Plugin.
 func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 	var prefixes []netaddr.IP
-	if p.Prefix.IP == unspecified {
+	if p.Prefix.IP == netaddr.IPv6Unspecified() {
 		// Expand ::/N to all unique, non-link local prefixes with matching
 		// length on this interface.
 		addrs, err := p.Addrs()

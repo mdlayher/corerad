@@ -25,19 +25,12 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
-	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"inet.af/netaddr"
-)
-
-// IPv6 address "constants" in netaddr.IP format.
-var (
-	unspecified       = crtest.MustIP("::")
-	linkLocalAllNodes = crtest.MustIP("ff02::1")
 )
 
 // errLinkChange is a sentinel value which indicates a link state change.
@@ -228,7 +221,7 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 		default:
 		}
 
-		ipC <- linkLocalAllNodes
+		ipC <- netaddr.IPv6LinkLocalAllNodes()
 
 		select {
 		case <-ctx.Done():
@@ -313,8 +306,8 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr
 		// Issue a unicast RA for clients with valid addresses, or a multicast
 		// RA for any client contacting us via the IPv6 unspecified address,
 		// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
-		if host == unspecified {
-			host = linkLocalAllNodes
+		if host == netaddr.IPv6Unspecified() {
+			host = netaddr.IPv6LinkLocalAllNodes()
 		}
 
 		// TODO: consider checking for numerous RS in succession and issuing
@@ -515,7 +508,7 @@ func (a *Advertiser) init() error {
 	// Before starting any other goroutines, verify that the interface can
 	// actually be used to send an initial router advertisement, avoiding a
 	// needless start/error/restart loop.
-	if err := a.send(linkLocalAllNodes, a.cfg); err != nil {
+	if err := a.send(netaddr.IPv6LinkLocalAllNodes(), a.cfg); err != nil {
 		return fmt.Errorf("failed to send initial multicast router advertisement: %v", err)
 	}
 
@@ -617,7 +610,7 @@ func (a *Advertiser) shutdown() error {
 	cfg := a.cfg
 	cfg.DefaultLifetime = 0
 
-	if err := a.send(linkLocalAllNodes, cfg); err != nil {
+	if err := a.send(netaddr.IPv6LinkLocalAllNodes(), cfg); err != nil {
 		a.logf("failed to send final multicast router advertisement: %v", err)
 	}
 
