@@ -292,7 +292,7 @@ func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
 	}
 
 	// Only allow IPv6 addresses.
-	if !p.IP.Is6() {
+	if !p.IP.Is6() || p.IP.Is4in6() {
 		return netaddr.IPPrefix{}, fmt.Errorf("%q is not an IPv6 CIDR prefix", p.IP)
 	}
 

@@ -194,6 +194,14 @@ func Test_parsePrefix(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad prefix IPv6-mapped IPv4",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::ffff:192.0.2.0/128"
+			`,
+		},
+		{
 			name: "bad prefix ::/N",
 			s: `
 			[[interfaces]]
