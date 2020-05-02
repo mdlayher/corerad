@@ -486,6 +486,28 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 		ra.RouterLifetime = 0
 	}
 
+	// Finally, update Prometheus metrics to provide a consistent view of the
+	// router advertisement state.
+
+	for _, o := range ra.Options {
+		// TODO(mdlayher): consider extracting this logic if it grows unwieldy.
+		switch o := o.(type) {
+		case *ndp.PrefixInformation:
+			// Combine the prefix and prefix length fields into a proper CIDR
+			// subnet for the label.
+			pfx := &net.IPNet{
+				IP:   o.Prefix,
+				Mask: net.CIDRMask(int(o.PrefixLength), 128),
+			}
+
+			a.mm.updateGauge(
+				a.mm.RouterAdvertisementPrefixAutonomous,
+				[]string{a.cfg.Name, pfx.String()},
+				boolFloat(o.AutonomousAddressConfiguration),
+			)
+		}
+	}
+
 	return ra, nil
 }
 

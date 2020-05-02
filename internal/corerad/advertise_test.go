@@ -59,6 +59,7 @@ type clientContext struct {
 	router, client *net.Interface
 	reinitC        <-chan struct{}
 	eventC         <-chan Event
+	mm             *Metrics
 }
 
 func TestAdvertiserUnsolicitedFull(t *testing.T) {
@@ -392,6 +393,72 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 	}
 }
 
+func TestAdvertiserPrometheusMetrics(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   testAdvertiserFunc
+	}{
+		{
+			name: "simulated",
+			fn:   testSimulatedAdvertiserClient,
+		},
+		{
+			name: "real",
+			fn:   testAdvertiserClient,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const autonomous = true
+			prefix := crtest.MustIPPrefix("2001:db8::/64")
+
+			cfg := &config.Interface{
+				Plugins: []plugin.Plugin{
+					&plugin.Prefix{
+						Prefix:            prefix,
+						OnLink:            true,
+						Autonomous:        autonomous,
+						PreferredLifetime: 10 * time.Second,
+						ValidLifetime:     20 * time.Second,
+					},
+				},
+			}
+
+			done := tt.fn(t, cfg, nil, func(_ func(), cctx *clientContext) {
+				if _, _, _, err := cctx.c.ReadFrom(); err != nil {
+					t.Fatalf("failed to read RA: %v", err)
+				}
+
+				// Assume exactly 2 labels that store the advertising interface's
+				// name and the prefix being advertised.
+				labels := cctx.mm.lastRAPA.Labels
+				if len(labels) != 2 {
+					t.Fatal("expected exactly two labels")
+				}
+
+				// TODO: redesign the Metrics abstraction to be more testable
+				// and don't share mutexes outside of the type.
+				cctx.mm.mu.Lock()
+				defer cctx.mm.mu.Unlock()
+
+				if diff := cmp.Diff(cctx.router.Name, labels[0]); diff != "" {
+					t.Fatalf("unexpected metrics interface name (-want +got):\n%s", diff)
+				}
+
+				if diff := cmp.Diff(prefix.String(), labels[1]); diff != "" {
+					t.Fatalf("unexpected metrics prefix (-want +got):\n%s", diff)
+				}
+
+				if diff := cmp.Diff(boolFloat(autonomous), cctx.mm.lastRAPA.Value); diff != "" {
+					t.Fatalf("unexpected metrics value (-want +got):\n%s", diff)
+				}
+			})
+			defer done()
+		})
+	}
+}
+
 func Test_multicastDelay(t *testing.T) {
 	// Static seed for deterministic output.
 	r := rand.New(rand.NewSource(0))
@@ -459,11 +526,13 @@ func testSimulatedAdvertiserClient(
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Set up metrics node so we can inspect its contents at a later time.
+	mm := NewMetrics(nil)
 	ad := NewAdvertiser(
 		cfg.Name,
 		*cfg,
 		log.New(os.Stderr, "", 0),
-		NewMetrics(nil),
+		mm,
 	)
 
 	// Swap out the underlying connections for a UDP socket pair.
@@ -488,8 +557,10 @@ func testSimulatedAdvertiserClient(
 				Addr:      net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 			}},
 		},
+		router:  &net.Interface{Name: cfg.Name},
 		reinitC: ad.reinitC,
 		eventC:  ad.Events(),
+		mm:      mm,
 	}
 
 	// Run the advertiser and invoke the client's input function with some
@@ -697,7 +768,9 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to look up router veth: %v", err)
 	}
 
-	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), nil)
+	// Set up metrics node so we can inspect its contents at a later time.
+	mm := NewMetrics(nil)
+	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), mm)
 
 	sc := newSystemConn(nil, nil)
 	client, _, err := sc.Dial(veth1)
@@ -736,6 +809,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		client:  client,
 		reinitC: ad.reinitC,
 		eventC:  ad.Events(),
+		mm:      mm,
 	}
 
 	done := func() {

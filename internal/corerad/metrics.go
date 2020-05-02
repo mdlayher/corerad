@@ -14,6 +14,8 @@
 package corerad
 
 import (
+	"sync"
+
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,13 +27,42 @@ type Metrics struct {
 	Info *prometheus.GaugeVec
 	Time prometheus.Gauge
 
+	// TODO(mdlayher): potentially add metrics for more prefix fields and
+	// RDNSS/DNSSL option configurations.
+
+	// TODO(mdlayher): redesign this to not need a mutex here.
+	mu sync.Mutex
+
 	// Per-advertiser metrics.
 	LastMulticastTime                       *prometheus.GaugeVec
 	MessagesReceivedTotal                   *prometheus.CounterVec
 	MessagesReceivedInvalidTotal            *prometheus.CounterVec
+	RouterAdvertisementPrefixAutonomous     *prometheus.GaugeVec
+	lastRAPA                                metric
 	RouterAdvertisementInconsistenciesTotal *prometheus.CounterVec
 	RouterAdvertisementsTotal               *prometheus.CounterVec
 	ErrorsTotal                             *prometheus.CounterVec
+}
+
+// A metric is the labels and value passed into a Prometheus metric when it
+// was last updated.
+type metric struct {
+	Labels []string
+	Value  float64
+}
+
+// updateGauge updates the input gauge with the specified labels and values,
+// and stores the last state of the metric.
+func (m *Metrics) updateGauge(g *prometheus.GaugeVec, labels []string, value float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.lastRAPA = metric{
+		Labels: labels,
+		Value:  value,
+	}
+
+	g.WithLabelValues(labels...).Set(value)
 }
 
 // NewMetrics creates and registers Metrics. If reg is nil, the metrics are
@@ -83,6 +114,14 @@ func NewMetrics(reg *prometheus.Registry) *Metrics {
 			Help: "The total number of invalid NDP messages received on a listening interface.",
 		}, []string{"interface", "message"}),
 
+		RouterAdvertisementPrefixAutonomous: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: adv,
+			Name:      "router_advertisement_prefix_autonomous",
+
+			Help: "Indicates whether or not a given prefix assigned to an interface has the autonomous flag set for Stateless Address Autoconfiguration (SLAAC).",
+		}, []string{"interface", "prefix"}),
+
 		RouterAdvertisementInconsistenciesTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: adv,
@@ -121,6 +160,7 @@ func NewMetrics(reg *prometheus.Registry) *Metrics {
 			mm.LastMulticastTime,
 			mm.MessagesReceivedTotal,
 			mm.MessagesReceivedInvalidTotal,
+			mm.RouterAdvertisementPrefixAutonomous,
 			mm.RouterAdvertisementInconsistenciesTotal,
 			mm.RouterAdvertisementsTotal,
 		)
