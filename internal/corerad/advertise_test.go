@@ -430,17 +430,17 @@ func TestAdvertiserPrometheusMetrics(t *testing.T) {
 					t.Fatalf("failed to read RA: %v", err)
 				}
 
+				// TODO: redesign the Metrics abstraction to be more testable
+				// and don't share mutexes outside of the type.
+				cctx.mm.mu.Lock()
+				defer cctx.mm.mu.Unlock()
+
 				// Assume exactly 2 labels that store the advertising interface's
 				// name and the prefix being advertised.
 				labels := cctx.mm.lastRAPA.Labels
 				if len(labels) != 2 {
 					t.Fatal("expected exactly two labels")
 				}
-
-				// TODO: redesign the Metrics abstraction to be more testable
-				// and don't share mutexes outside of the type.
-				cctx.mm.mu.Lock()
-				defer cctx.mm.mu.Unlock()
 
 				if diff := cmp.Diff(cctx.router.Name, labels[0]); diff != "" {
 					t.Fatalf("unexpected metrics interface name (-want +got):\n%s", diff)
