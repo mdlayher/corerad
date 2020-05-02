@@ -447,17 +447,6 @@ func (a *Advertiser) send(dst netaddr.IP, cfg config.Interface) error {
 		return fmt.Errorf("failed to build router advertisement: %w", err)
 	}
 
-	// If the interface is not forwarding packets, we must set the router
-	// lifetime field to zero, per:
-	//  https://tools.ietf.org/html/rfc4861#section-6.2.5.
-	forwarding, err := a.c.IPv6Forwarding()
-	if err != nil {
-		return fmt.Errorf("failed to get IPv6 forwarding state: %w", err)
-	}
-	if !forwarding {
-		ra.RouterLifetime = 0
-	}
-
 	if err := a.c.WriteTo(ra, nil, dst.IPAddr().IP); err != nil {
 		return fmt.Errorf("failed to send router advertisement to %s: %w", dst, err)
 	}
@@ -482,6 +471,19 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 		if err := p.Apply(ra); err != nil {
 			return nil, fmt.Errorf("failed to apply plugin %q: %v", p.Name(), err)
 		}
+	}
+
+	// Apply any necessary changes due to modification in system state.
+
+	// If the interface is not forwarding packets, we must set the router
+	// lifetime field to zero, per:
+	//  https://tools.ietf.org/html/rfc4861#section-6.2.5.
+	forwarding, err := a.c.IPv6Forwarding()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get IPv6 forwarding state: %w", err)
+	}
+	if !forwarding {
+		ra.RouterLifetime = 0
 	}
 
 	return ra, nil
