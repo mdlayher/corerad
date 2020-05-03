@@ -31,6 +31,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// TODO(mdlayher): deduplicate with tests in internal/crhttp.
+
 func TestServerRun(t *testing.T) {
 	t.Parallel()
 
