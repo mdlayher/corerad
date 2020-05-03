@@ -13,7 +13,7 @@
 
 //+build linux
 
-package corerad
+package system
 
 import (
 	"bytes"

@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/promtest"
 )
 
@@ -50,7 +51,8 @@ func Test_interfaceCollector(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			body := promtest.Collect(t, newInterfaceCollector(tt.ifis))
+			// TODO: parameterize.
+			body := promtest.Collect(t, newInterfaceCollector(system.NewState(), tt.ifis))
 
 			if !promtest.Lint(t, body) {
 				t.Fatal("one or more promlint errors found")

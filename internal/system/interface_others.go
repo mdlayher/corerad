@@ -13,7 +13,7 @@
 
 //+build !linux
 
-package corerad
+package system
 
 // These functions are no-op on non-Linux platforms.
 

@@ -27,6 +27,7 @@ import (
 
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/crhttp"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/netstate"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
@@ -37,7 +38,8 @@ const namespace = "corerad"
 // A Server coordinates the goroutines that handle various pieces of the
 // CoreRAD server.
 type Server struct {
-	cfg config.Config
+	cfg   config.Config
+	state system.State
 
 	ll  *log.Logger
 	reg *prometheus.Registry
@@ -53,16 +55,20 @@ func NewServer(cfg config.Config, ll *log.Logger) *Server {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
 
+	// TODO: parameterize if needed.
+	state := system.NewState()
+
 	// Set up Prometheus instrumentation using the typical Go collectors.
 	reg := prometheus.NewPedanticRegistry()
 	reg.MustRegister(
 		prometheus.NewGoCollector(),
 		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
-		newInterfaceCollector(cfg.Interfaces),
+		newInterfaceCollector(state, cfg.Interfaces),
 	)
 
 	return &Server{
-		cfg: cfg,
+		cfg:   cfg,
+		state: state,
 
 		ll:  ll,
 		reg: reg,
@@ -133,7 +139,7 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	// Configure the HTTP debug server, if applicable.
-	if err := s.runDebug(ctx); err != nil {
+	if err := s.runDebug(ctx, s.cfg.Interfaces); err != nil {
 		return fmt.Errorf("failed to start debug HTTP server: %v", err)
 	}
 
@@ -162,7 +168,7 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 // runDebug runs a debug HTTP server using goroutines, until ctx is canceled.
-func (s *Server) runDebug(ctx context.Context) error {
+func (s *Server) runDebug(ctx context.Context, ifaces []config.Interface) error {
 	d := s.cfg.Debug
 	if d.Address == "" {
 		// Nothing to do, don't start the server.
@@ -194,6 +200,8 @@ func (s *Server) runDebug(ctx context.Context) error {
 			}()
 
 			return http.Serve(l, crhttp.NewHandler(
+				s.state,
+				ifaces,
 				d.Prometheus,
 				d.PProf,
 				s.reg,

@@ -28,6 +28,7 @@ import (
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
@@ -84,7 +85,8 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 
 	// Capture the IPv6 autoconfiguration state while the advertiser is running
 	// and immediately after it stops.
-	start, err := getIPv6Autoconf(ad.iface)
+	state := system.NewState()
+	start, err := state.IPv6Autoconf(ad.iface)
 	if err != nil {
 		t.Fatalf("failed to get start state: %v", err)
 	}
@@ -107,7 +109,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 		t.Fatalf("failed to stop advertiser: %v", err)
 	}
 
-	end, err := getIPv6Autoconf(ad.iface)
+	end, err := state.IPv6Autoconf(ad.iface)
 	if err != nil {
 		t.Fatalf("failed to get end state: %v", err)
 	}
