@@ -10,4 +10,5 @@ make:
 			-X $(BUILDPKG).linkTimestamp=$(TIMESTAMP) \
 			-X $(BUILDPKG).linkVersion=$(VERSION) \
 		" \
+	-o ./cmd/corerad/corerad \
 	./cmd/corerad
