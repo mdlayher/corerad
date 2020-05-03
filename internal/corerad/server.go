@@ -17,21 +17,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/crhttp"
 	"github.com/mdlayher/netstate"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -196,7 +193,7 @@ func (s *Server) runDebug(ctx context.Context) error {
 				_ = l.Close()
 			}()
 
-			return http.Serve(l, newHTTPHandler(
+			return http.Serve(l, crhttp.NewHandler(
 				d.Prometheus,
 				d.PProf,
 				s.reg,
@@ -248,47 +245,4 @@ func (s *Server) serve(ctx context.Context, fn func() error) error {
 	}
 
 	return errors.New("timed out starting HTTP debug server")
-}
-
-// A httpHandler provides the HTTP debug API handler for CoreRAD.
-type httpHandler struct {
-	h http.Handler
-}
-
-// NewHTTPHandler creates a httpHandler with the specified configuration.
-func newHTTPHandler(
-	usePrometheus, usePProf bool,
-	reg *prometheus.Registry,
-) *httpHandler {
-	mux := http.NewServeMux()
-
-	h := &httpHandler{
-		h: mux,
-	}
-
-	// Optionally enable Prometheus and pprof support.
-	if usePrometheus {
-		mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
-	}
-
-	if usePProf {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	}
-
-	return h
-}
-
-func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Matching on "/" would produce an overly broad rule, so check manually
-	// here and indicate that this is the CoreRAD service.
-	if r.URL.Path == "/" {
-		_, _ = io.WriteString(w, build.Banner()+"\n")
-		return
-	}
-
-	h.h.ServeHTTP(w, r)
 }
