@@ -283,4 +283,58 @@ func TestParseDefaults(t *testing.T) {
 	}
 }
 
+func TestInterfaceRouterAdvertisement(t *testing.T) {
+	// More comprehensive tests exist in internal/corerad; just check the
+	// basics.
+
+	tests := []struct {
+		name       string
+		ifi        config.Interface
+		forwarding bool
+		ra         *ndp.RouterAdvertisement
+	}{
+		{
+			name: "no forwarding",
+			ifi: config.Interface{
+				HopLimit:        64,
+				Preference:      ndp.High,
+				DefaultLifetime: 30 * time.Minute,
+				Plugins:         []plugin.Plugin{plugin.NewMTU(1500)},
+			},
+			ra: &ndp.RouterAdvertisement{
+				CurrentHopLimit:           64,
+				RouterSelectionPreference: ndp.High,
+				RouterLifetime:            0,
+				Options:                   []ndp.Option{ndp.NewMTU(1500)},
+			},
+		},
+		{
+			name: "forwarding",
+			ifi: config.Interface{
+				HopLimit:        64,
+				DefaultLifetime: 30 * time.Minute,
+			},
+			forwarding: true,
+			ra: &ndp.RouterAdvertisement{
+				CurrentHopLimit: 64,
+				RouterLifetime:  30 * time.Minute,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ra, err := tt.ifi.RouterAdvertisement(tt.forwarding)
+			if err != nil {
+				t.Fatalf("failed to generate router advertisement: %v", err)
+			}
+
+			if diff := cmp.Diff(tt.ra, ra); diff != "" {
+				t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
+			}
+
+		})
+	}
+}
+
 func compareNetaddrIP(x, y netaddr.IP) bool { return x == y }

@@ -457,36 +457,19 @@ func (a *Advertiser) send(dst netaddr.IP, cfg config.Interface) error {
 	return nil
 }
 
-// buildRA builds a router advertisement from configuration and applies any
-// necessary plugins.
+// buildRA builds a router advertisement from configuration and updates any
+// necessary metrics.
 func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, error) {
-	ra := &ndp.RouterAdvertisement{
-		CurrentHopLimit:           ifi.HopLimit,
-		ManagedConfiguration:      ifi.Managed,
-		OtherConfiguration:        ifi.OtherConfig,
-		RouterSelectionPreference: ifi.Preference,
-		RouterLifetime:            ifi.DefaultLifetime,
-		ReachableTime:             ifi.ReachableTime,
-		RetransmitTimer:           ifi.RetransmitTimer,
-	}
-
-	for _, p := range ifi.Plugins {
-		if err := p.Apply(ra); err != nil {
-			return nil, fmt.Errorf("failed to apply plugin %q: %v", p.Name(), err)
-		}
-	}
-
-	// Apply any necessary changes due to modification in system state.
-
-	// If the interface is not forwarding packets, we must set the router
-	// lifetime field to zero, per:
-	//  https://tools.ietf.org/html/rfc4861#section-6.2.5.
+	// Check for any system state changes which could impact the router
+	// advertisement, and then build it using an interface configuration.
 	forwarding, err := a.state.IPv6Forwarding(ifi.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get IPv6 forwarding state: %w", err)
 	}
-	if !forwarding {
-		ra.RouterLifetime = 0
+
+	ra, err := ifi.RouterAdvertisement(forwarding)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate router advertisement: %v", err)
 	}
 
 	// Finally, update Prometheus metrics to provide a consistent view of the
