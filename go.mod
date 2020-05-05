@@ -13,7 +13,7 @@ require (
 	github.com/mdlayher/schedgroup v0.0.0-20200121174254-e4d07b039d0e
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/prometheus/client_golang v1.6.0
-	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
+	golang.org/x/net v0.0.0-20200505041828-1ed23360d12c
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
 	golang.org/x/sys v0.0.0-20200430082407-1f5687305801
 	inet.af/netaddr v0.0.0-20200430175045-5aaf2097c7fc

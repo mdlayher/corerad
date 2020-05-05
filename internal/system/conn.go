@@ -88,8 +88,12 @@ func (c *NDPConn) Close() error {
 
 // Dial implements Conn.
 func (c *NDPConn) Dial(iface string) (*net.Interface, net.IP, error) {
-	ifi, err := checkInterface(iface)
+	ifi, err := lookupInterface(iface)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := checkInterface(ifi, ifi.Addrs); err != nil {
 		return nil, nil, err
 	}
 
@@ -165,9 +169,9 @@ func (c *NDPConn) logf(format string, v ...interface{}) {
 // for use with an Advertiser.
 var ErrLinkNotReady = errors.New("link not ready")
 
-// checkInterface verifies the readiness of an interface.
-func checkInterface(iface string) (*net.Interface, error) {
-	// Link must exist.
+// lookupInterface looks up an interface by name, but also returns ErrLinkNotReady
+// if the interface doesn't exist.
+func lookupInterface(iface string) (*net.Interface, error) {
 	ifi, err := net.InterfaceByName(iface)
 	if err != nil {
 		if isNoSuchInterface(err) {
@@ -178,21 +182,26 @@ func checkInterface(iface string) (*net.Interface, error) {
 		return nil, fmt.Errorf("failed to get interface %q: %v", iface, err)
 	}
 
+	return ifi, nil
+}
+
+// checkInterface verifies the readiness of an interface.
+func checkInterface(ifi *net.Interface, addrFunc func() ([]net.Addr, error)) error {
 	// Link must have a MAC address (e.g. WireGuard links do not).
 	if ifi.HardwareAddr == nil {
-		return nil, fmt.Errorf("interface %q has no MAC address", iface)
+		return fmt.Errorf("interface %q has no MAC address", ifi.Name)
 	}
 
 	// Link must be up.
 	// TODO: check point-to-point and multicast flags and configure accordingly.
 	if ifi.Flags&net.FlagUp == 0 {
-		return nil, fmt.Errorf("interface %q is not up: %w", iface, ErrLinkNotReady)
+		return fmt.Errorf("interface %q is not up: %w", ifi.Name, ErrLinkNotReady)
 	}
 
 	// Link must have an IPv6 link-local unicast address.
-	addrs, err := ifi.Addrs()
+	addrs, err := addrFunc()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get interface %q addresses: %w", iface, err)
+		return fmt.Errorf("failed to get interface %q addresses: %w", ifi.Name, err)
 	}
 
 	var foundLL bool
@@ -205,10 +214,10 @@ func checkInterface(iface string) (*net.Interface, error) {
 		}
 	}
 	if !foundLL {
-		return nil, fmt.Errorf("interface %q has no IPv6 link-local address: %w", iface, ErrLinkNotReady)
+		return fmt.Errorf("interface %q has no IPv6 link-local address: %w", ifi.Name, ErrLinkNotReady)
 	}
 
-	return ifi, nil
+	return nil
 }
 
 // isNoSuchInterface determines if an error matches package net's "no such
