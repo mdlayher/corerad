@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netstate"
 	"golang.org/x/net/ipv6"
@@ -54,7 +56,7 @@ type testConfig struct {
 }
 
 type clientContext struct {
-	c              conn
+	c              system.Conn
 	rs             *ndp.RouterSolicitation
 	router, client *net.Interface
 	reinitC        <-chan struct{}
@@ -537,6 +539,7 @@ func testSimulatedAdvertiserClient(
 
 	// Swap out the underlying connections for a UDP socket pair.
 	sc, cc, cDone := testConnPair(t)
+	ad.state = &testState{forwarding: true}
 	ad.c = sc
 
 	var eg errgroup.Group
@@ -580,7 +583,7 @@ func testSimulatedAdvertiserClient(
 	return done
 }
 
-func testConnPair(t *testing.T) (conn, conn, func()) {
+func testConnPair(t *testing.T) (system.Conn, system.Conn, func()) {
 	// TODO: parameterize?
 	ifi, err := net.InterfaceByName("lo")
 	if err != nil {
@@ -596,7 +599,6 @@ func testConnPair(t *testing.T) (conn, conn, func()) {
 
 	peerC := make(chan struct{})
 	server := &udpConn{
-		Forwarding:     true,
 		ControlMessage: &ipv6.ControlMessage{HopLimit: ndp.HopLimit},
 
 		iface: ifi.Name,
@@ -641,7 +643,6 @@ func testConnPair(t *testing.T) (conn, conn, func()) {
 
 type udpConn struct {
 	ControlMessage *ipv6.ControlMessage
-	Forwarding     bool
 
 	mu    sync.Mutex
 	iface string
@@ -649,6 +650,8 @@ type udpConn struct {
 	peer  net.Addr
 	pc    net.PacketConn
 }
+
+var _ system.Conn = &udpConn{}
 
 func (c *udpConn) Close() error {
 	c.mu.Lock()
@@ -680,8 +683,6 @@ func (c *udpConn) Dial(_ string) (*net.Interface, net.IP, error) {
 
 	return ifi, net.IPv6loopback, nil
 }
-
-func (c *udpConn) IPv6Forwarding() (bool, error) { return c.Forwarding, nil }
 
 func (c *udpConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
 	b := make([]byte, 1024)
@@ -715,6 +716,15 @@ func (c *udpConn) WriteTo(m ndp.Message, _ *ipv6.ControlMessage, _ net.IP) error
 	_, err = c.pc.WriteTo(b, c.peer)
 	return err
 }
+
+type testState struct {
+	autoconf, forwarding bool
+}
+
+var _ system.State = &testState{}
+
+func (tks *testState) IPv6Autoconf(_ string) (bool, error)   { return tks.autoconf, nil }
+func (tks *testState) IPv6Forwarding(_ string) (bool, error) { return tks.forwarding, nil }
 
 func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Advertiser, *clientContext, func()) {
 	t.Helper()
@@ -772,7 +782,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	mm := NewMetrics(nil)
 	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), mm)
 
-	sc := newSystemConn(nil, nil)
+	sc := system.NewConn(nil)
 	client, _, err := sc.Dial(veth1)
 	if err != nil {
 		t.Fatalf("failed to dial client connection: %v", err)
@@ -783,13 +793,13 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	f.SetAll(true)
 	f.Accept(ipv6.ICMPTypeRouterAdvertisement)
 
-	if err := sc.c.SetICMPFilter(&f); err != nil {
+	if err := sc.Conn.SetICMPFilter(&f); err != nil {
 		t.Fatalf("failed to apply ICMPv6 filter: %v", err)
 	}
 
 	// Enable inspection of IPv6 control messages.
 	flags := ipv6.FlagHopLimit | ipv6.FlagDst
-	if err := sc.c.SetControlMessage(flags, true); err != nil {
+	if err := sc.Conn.SetControlMessage(flags, true); err != nil {
 		t.Fatalf("failed to apply IPv6 control message flags: %v", err)
 	}
 
@@ -952,7 +962,7 @@ func shell(t *testing.T, name string, arg ...string) {
 func mustSysctl(t *testing.T, iface, key, value string) {
 	t.Helper()
 
-	file := sysctl(iface, key)
+	file := filepath.Join(fmt.Sprintf("/proc/sys/net/ipv6/conf/%s", iface), key)
 
 	t.Logf("sysctl %q = %q", file, value)
 

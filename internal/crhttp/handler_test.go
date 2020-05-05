@@ -94,7 +94,14 @@ func TestHandlerRoutes(t *testing.T) {
 			reg.MustRegister(prometheus.NewGoCollector())
 
 			srv := httptest.NewServer(
-				crhttp.NewHandler(tt.prometheus, tt.pprof, reg),
+				crhttp.NewHandler(
+					// TODO: parameterize.
+					nil,
+					nil,
+					tt.prometheus,
+					tt.pprof,
+					reg,
+				),
 			)
 			defer srv.Close()
 

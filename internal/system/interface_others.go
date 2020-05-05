@@ -13,7 +13,7 @@
 
 //+build !linux
 
-package corerad
+package system
 
 // These functions are no-op on non-Linux platforms.
 
@@ -25,5 +25,3 @@ func getIPv6Forwarding(_ string) (bool, error) {
 	// Assume that an interface running CoreRAD is forwarding packets.
 	return true, nil
 }
-
-func sysctl(_, _ string) string { return "" }

@@ -62,7 +62,7 @@ github.com/prometheus/procfs/internal/util
 github.com/prometheus/prometheus/util/promlint
 # gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f
 gitlab.com/golang-commonmark/puny
-# golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
+# golang.org/x/net v0.0.0-20200505041828-1ed23360d12c
 ## explicit
 golang.org/x/net/bpf
 golang.org/x/net/icmp
@@ -70,6 +70,7 @@ golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
 golang.org/x/net/ipv6
+golang.org/x/net/nettest
 # golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
 ## explicit
 golang.org/x/sync/errgroup

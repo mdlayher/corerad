@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
@@ -41,11 +42,12 @@ type Advertiser struct {
 	// Static configuration.
 	iface string
 	cfg   config.Interface
+	state system.State
 	ll    *log.Logger
 	mm    *Metrics
 
 	// Dynamic configuration, set up on each (re)initialization.
-	c conn
+	c system.Conn
 
 	// TODO: collapse reinitC into eventC.
 	reinitC chan struct{}
@@ -76,11 +78,12 @@ func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Metri
 	return &Advertiser{
 		iface: iface,
 		cfg:   cfg,
+		state: system.NewState(),
 		ll:    ll,
 		mm:    mm,
 
 		// By default, directly manipulate the system.
-		c: newSystemConn(ll, mm),
+		c: system.NewConn(ll),
 
 		reinitC: make(chan struct{}),
 		eventC:  make(chan Event),
@@ -454,36 +457,19 @@ func (a *Advertiser) send(dst netaddr.IP, cfg config.Interface) error {
 	return nil
 }
 
-// buildRA builds a router advertisement from configuration and applies any
-// necessary plugins.
+// buildRA builds a router advertisement from configuration and updates any
+// necessary metrics.
 func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, error) {
-	ra := &ndp.RouterAdvertisement{
-		CurrentHopLimit:           ifi.HopLimit,
-		ManagedConfiguration:      ifi.Managed,
-		OtherConfiguration:        ifi.OtherConfig,
-		RouterSelectionPreference: ifi.Preference,
-		RouterLifetime:            ifi.DefaultLifetime,
-		ReachableTime:             ifi.ReachableTime,
-		RetransmitTimer:           ifi.RetransmitTimer,
-	}
-
-	for _, p := range ifi.Plugins {
-		if err := p.Apply(ra); err != nil {
-			return nil, fmt.Errorf("failed to apply plugin %q: %v", p.Name(), err)
-		}
-	}
-
-	// Apply any necessary changes due to modification in system state.
-
-	// If the interface is not forwarding packets, we must set the router
-	// lifetime field to zero, per:
-	//  https://tools.ietf.org/html/rfc4861#section-6.2.5.
-	forwarding, err := a.c.IPv6Forwarding()
+	// Check for any system state changes which could impact the router
+	// advertisement, and then build it using an interface configuration.
+	forwarding, err := a.state.IPv6Forwarding(ifi.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get IPv6 forwarding state: %w", err)
 	}
-	if !forwarding {
-		ra.RouterLifetime = 0
+
+	ra, err := ifi.RouterAdvertisement(forwarding)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate router advertisement: %v", err)
 	}
 
 	// Finally, update Prometheus metrics to provide a consistent view of the
@@ -576,7 +562,7 @@ func (a *Advertiser) reinit(ctx context.Context, err error) error {
 
 		// For other syscall errors, try again.
 		a.logf("error advertising, reinitializing")
-	case errors.Is(err, errLinkNotReady):
+	case errors.Is(err, system.ErrLinkNotReady):
 		a.logf("interface not ready, reinitializing")
 	case errors.Is(err, errLinkChange):
 		a.logf("interface state changed, reinitializing")

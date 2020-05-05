@@ -112,6 +112,38 @@ type Interface struct {
 	Plugins                        []plugin.Plugin
 }
 
+// RouterAdvertisement generates an IPv6 NDP router advertisement for this
+// interface. Input parameters are used to tune parts of the RA, per the
+// NDP RFCs.
+func (ifi Interface) RouterAdvertisement(forwarding bool) (*ndp.RouterAdvertisement, error) {
+	ra := &ndp.RouterAdvertisement{
+		CurrentHopLimit:           ifi.HopLimit,
+		ManagedConfiguration:      ifi.Managed,
+		OtherConfiguration:        ifi.OtherConfig,
+		RouterSelectionPreference: ifi.Preference,
+		RouterLifetime:            ifi.DefaultLifetime,
+		ReachableTime:             ifi.ReachableTime,
+		RetransmitTimer:           ifi.RetransmitTimer,
+	}
+
+	for _, p := range ifi.Plugins {
+		if err := p.Apply(ra); err != nil {
+			return nil, fmt.Errorf("failed to apply plugin %q: %v", p.Name(), err)
+		}
+	}
+
+	// Apply any necessary changes due to modification in system state.
+
+	// If the interface is not forwarding packets, we must set the router
+	// lifetime field to zero, per:
+	// https://tools.ietf.org/html/rfc4861#section-6.2.5.
+	if !forwarding {
+		ra.RouterLifetime = 0
+	}
+
+	return ra, nil
+}
+
 // Debug provides configuration for debugging and observability.
 type Debug struct {
 	Address    string `toml:"address"`

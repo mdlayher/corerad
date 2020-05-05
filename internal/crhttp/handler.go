@@ -19,17 +19,23 @@ import (
 	"net/http/pprof"
 
 	"github.com/mdlayher/corerad/internal/build"
+	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // A Handler provides the HTTP debug API handler for CoreRAD.
 type Handler struct {
-	h http.Handler
+	h      http.Handler
+	ifaces []config.Interface
+	state  system.State
 }
 
 // NewHandler creates a Handler with the specified configuration.
 func NewHandler(
+	state system.State,
+	ifaces []config.Interface,
 	usePrometheus, usePProf bool,
 	reg *prometheus.Registry,
 ) *Handler {
@@ -37,6 +43,10 @@ func NewHandler(
 
 	h := &Handler{
 		h: mux,
+
+		// TODO(mdlayher): use to build out other API handlers.
+		ifaces: ifaces,
+		state:  state,
 	}
 
 	// Optionally enable Prometheus and pprof support.

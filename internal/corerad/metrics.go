@@ -18,6 +18,7 @@ import (
 
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -175,11 +176,12 @@ type interfaceCollector struct {
 	Forwarding        *prometheus.Desc
 	Advertise         *prometheus.Desc
 
-	ifis []config.Interface
+	state system.State
+	ifis  []config.Interface
 }
 
 // newInterfaceCollector creates an interfaceCollector.
-func newInterfaceCollector(ifis []config.Interface) prometheus.Collector {
+func newInterfaceCollector(state system.State, ifis []config.Interface) prometheus.Collector {
 	const subsystem = "interface"
 
 	labels := []string{"interface"}
@@ -206,7 +208,8 @@ func newInterfaceCollector(ifis []config.Interface) prometheus.Collector {
 			nil,
 		),
 
-		ifis: ifis,
+		state: state,
+		ifis:  ifis,
 	}
 }
 
@@ -227,13 +230,13 @@ func (c *interfaceCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector.
 func (c *interfaceCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, ifi := range c.ifis {
-		auto, err := getIPv6Autoconf(ifi.Name)
+		auto, err := c.state.IPv6Autoconf(ifi.Name)
 		if err != nil {
 			ch <- prometheus.NewInvalidMetric(c.Autoconfiguration, err)
 			return
 		}
 
-		fwd, err := getIPv6Forwarding(ifi.Name)
+		fwd, err := c.state.IPv6Forwarding(ifi.Name)
 		if err != nil {
 			ch <- prometheus.NewInvalidMetric(c.Forwarding, err)
 			return
