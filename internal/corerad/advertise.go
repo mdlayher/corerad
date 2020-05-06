@@ -385,11 +385,10 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 			// This is a unicast RA. Delay it for a short period of time per
 			// the RFC and then send it.
 			delay := time.Duration(prng.Int63n(maxRADelay.Nanoseconds())) * time.Nanosecond
-			sg.Delay(delay, func() error {
+			sg.Delay(delay, func() {
 				if err := a.sendWorker(conn, ip); err != nil {
 					errC <- err
 				}
-				return nil
 			})
 			continue
 		}
@@ -402,11 +401,10 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 
 		// Ready to send this multicast RA.
 		lastMulticast = time.Now()
-		sg.Delay(delay, func() error {
+		sg.Delay(delay, func() {
 			if err := a.sendWorker(conn, ip); err != nil {
 				errC <- err
 			}
-			return nil
 		})
 	}
 }
