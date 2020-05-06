@@ -129,13 +129,6 @@ func (s *Server) Run(ctx context.Context) error {
 
 			return nil
 		})
-
-		// Drain events produced by the Advertiser; we don't need them.
-		s.eg.Go(func() error {
-			for range ad.Events() {
-			}
-			return nil
-		})
 	}
 
 	// Configure the HTTP debug server, if applicable.

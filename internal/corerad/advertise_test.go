@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -51,13 +52,15 @@ type testConfig struct {
 	// An optional hook which can be used to apply additional configuration to
 	// the test veth interfaces before they are brought up.
 	vethConfig func(t *testing.T, veth0, veth1 string)
+
+	// An optional hook for Advertiser.OnInconsistentRA.
+	onInconsistentRA func(ours, theirs *ndp.RouterAdvertisement)
 }
 
 type clientContext struct {
 	c              system.Conn
 	rs             *ndp.RouterSolicitation
 	router, client *net.Interface
-	eventC         <-chan Event
 	mm             *Metrics
 }
 
@@ -353,7 +356,16 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			done := tt.fn(t, nil, nil, func(_ func(), cctx *clientContext) {
+			// Whenever an inconsistent RA is detected, fire the hook and
+			// consume it on a channel.
+			raC := make(chan *ndp.RouterAdvertisement)
+			tcfg := &testConfig{
+				onInconsistentRA: func(_, theirs *ndp.RouterAdvertisement) {
+					raC <- theirs
+				},
+			}
+
+			done := tt.fn(t, nil, tcfg, func(_ func(), cctx *clientContext) {
 				// Capture the advertiser's initial RA so that we can manipulate
 				// and reflect it to test RA verification.
 				m, _, ip, err := cctx.c.ReadFrom()
@@ -371,28 +383,39 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 				})
 				defer timer.Stop()
 
-				// Reflect the router advertisement as-is and wait for it to
-				// be processed.
-				if err := cctx.c.WriteTo(ra, nil, ip); err != nil {
-					panicf("failed to send RA: %v", err)
-				}
-				events := []Event{<-cctx.eventC}
+				// Reflect the router advertisement several times and look for
+				// inconsistencies.
 
-				// Create a minor inconsistency in the router advertisement and
-				// reflect it again. This time, we'll expect to see an event
-				// indicating the inconsistency.
-				ra.ManagedConfiguration = true
-				if err := cctx.c.WriteTo(ra, nil, ip); err != nil {
-					panicf("failed to send RA: %v", err)
-				}
-				events = append(events, <-cctx.eventC)
-				events = append(events, <-cctx.eventC)
+				var wg sync.WaitGroup
+				wg.Add(1)
+				defer wg.Wait()
 
-				// Finally, verify the events and ensure the advertiser reported
-				// an inconsistency.
-				want := []Event{ReceiveRA, ReceiveRA, InconsistentRA}
-				if diff := cmp.Diff(want, events); diff != "" {
-					t.Fatalf("unexpected Advertiser events (-want +got):\n%s", diff)
+				go func() {
+					defer wg.Done()
+
+					// Reflect the router advertisement 5 times with a minor
+					// inconsistency in one of those RAs.
+					for i := 0; i < 5; i++ {
+						var managed bool
+						if i == 3 {
+							managed = true
+						}
+
+						ra.ManagedConfiguration = managed
+						if err := cctx.c.WriteTo(ra, nil, ip); err != nil {
+							panicf("failed to send RA: %v", err)
+						}
+					}
+				}()
+
+				// Expect to receive an RA that is identical but has a modified
+				// managed flag.
+				want := *ra
+				want.ManagedConfiguration = true
+
+				got := <-raC
+				if diff := cmp.Diff(&want, got); diff != "" {
+					t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
 				}
 			})
 			defer done()
@@ -544,6 +567,10 @@ func testSimulatedAdvertiserClient(
 		mm,
 	)
 
+	if tcfg != nil && tcfg.onInconsistentRA != nil {
+		ad.OnInconsistentRA = tcfg.onInconsistentRA
+	}
+
 	// Swap out the underlying connections for a UDP socket pair.
 	sc, cc, cDone := testConnPair(t)
 	ad.state = &testState{forwarding: true}
@@ -579,7 +606,6 @@ func testSimulatedAdvertiserClient(
 			}},
 		},
 		router: &net.Interface{Name: cfg.Name},
-		eventC: ad.Events(),
 		mm:     mm,
 	}
 
@@ -743,6 +769,10 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	mm := NewMetrics(nil)
 	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), mm)
 
+	if tcfg != nil && tcfg.onInconsistentRA != nil {
+		ad.OnInconsistentRA = tcfg.onInconsistentRA
+	}
+
 	cconn, _, err := ndp.Dial(client, ndp.LinkLocal)
 	if err != nil {
 		t.Fatalf("failed to dial client connection: %v", err)
@@ -777,7 +807,6 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		},
 		router: router,
 		client: client,
-		eventC: ad.Events(),
 		mm:     mm,
 	}
 
