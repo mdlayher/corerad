@@ -52,7 +52,7 @@ func Test_lookupInterface(t *testing.T) {
 			if tt.ok && err != nil {
 				t.Fatalf("failed to look up interface: %v", err)
 			}
-			if !tt.ok && !errors.Is(err, ErrLinkNotReady) {
+			if !tt.ok && !errors.Is(err, errLinkNotReady) {
 				t.Fatalf("expected link not ready, but got: %v", err)
 			}
 			if err != nil {
@@ -143,7 +143,7 @@ func Test_checkInterface(t *testing.T) {
 				t.Fatal("expected an error, but none occurred")
 			}
 
-			notReady := errors.Is(err, ErrLinkNotReady)
+			notReady := errors.Is(err, errLinkNotReady)
 			if tt.tempErr && !notReady {
 				t.Fatalf("error should be link not ready, but got: %v", err)
 			}

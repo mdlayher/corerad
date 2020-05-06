@@ -21,36 +21,28 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"os"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
-	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"inet.af/netaddr"
 )
 
-// errLinkChange is a sentinel value which indicates a link state change.
-var errLinkChange = errors.New("link state change")
-
 // An Advertiser sends NDP router advertisements.
 type Advertiser struct {
 	// Static configuration.
 	iface string
 	cfg   config.Interface
-	state system.State
 	ll    *log.Logger
 	mm    *Metrics
 
-	// Dynamic configuration, set up on each (re)initialization.
-	c system.Conn
-
-	// TODO: collapse reinitC into eventC.
-	reinitC chan struct{}
+	// Socket creation and system state manipulation.
+	dialer *system.Dialer
+	state  system.State
 
 	// Notifications of state change for tests.
 	eventC chan Event
@@ -78,15 +70,14 @@ func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Metri
 	return &Advertiser{
 		iface: iface,
 		cfg:   cfg,
-		state: system.NewState(),
 		ll:    ll,
 		mm:    mm,
 
 		// By default, directly manipulate the system.
-		c: system.NewConn(ll),
+		dialer: system.NewDialer(ll, iface),
+		state:  system.NewState(),
 
-		reinitC: make(chan struct{}),
-		eventC:  make(chan Event),
+		eventC: make(chan Event),
 	}
 }
 
@@ -96,47 +87,60 @@ func (a *Advertiser) Events() <-chan Event { return a.eventC }
 
 // Advertise initializes the configured interface and begins router solicitation
 // and advertisement handling. Advertise will block until ctx is canceled or an
-// error occurs. If watchC is not nil, it will be used to trigger the
-// reinitialization process. Typically watchC is used with the netstate.Watcher
-// type.
+// error occurs.
 //
 // Before calling Advertise, call Events and ensure that the returned channel is
 // being drained, or Advertiser will stop processing.
-func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Change) error {
+func (a *Advertiser) Advertise(ctx context.Context) error {
 	// No more events when Advertise returns.
 	defer close(a.eventC)
 
-	// err is reused for each loop, and intentionally nil on the first pass
-	// so initialization occurs.
-	var err error
-	for {
-		// Either initialize or reinitialize the Advertiser based on the value
-		// of err, and whether or not err is recoverable.
-		if err := a.reinit(ctx, err); err != nil {
-			// Don't block user shutdown.
-			if errors.Is(err, context.Canceled) {
-				return nil
+	return a.dialer.Dial(ctx, func(ctx context.Context, dctx *system.DialContext) error {
+		// We can now initialize any plugins that rely on dynamic information
+		// about the network interface.
+		for _, p := range a.cfg.Plugins {
+			if err := p.Prepare(dctx.Interface); err != nil {
+				return fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
 			}
 
-			return fmt.Errorf("failed to reinitialize %q advertiser: %v", a.iface, err)
+			a.logf("%q: %s", p.Name(), p)
 		}
+
+		// Before starting any other goroutines, verify that the interface can
+		// actually be used to send an initial router advertisement, avoiding a
+		// needless start/error/restart loop.
+		//
+		// TODO: don't do this for unicast-only mode.
+		if err := a.send(dctx.Conn, netaddr.IPv6LinkLocalAllNodes(), a.cfg); err != nil {
+			return fmt.Errorf("failed to send initial multicast router advertisement: %v", err)
+		}
+
+		// Note unicast-only mode in logs.
+		var method string
+		if a.cfg.UnicastOnly {
+			method = "unicast-only "
+		}
+
+		a.logf("initialized, advertising %sfrom %s", method, dctx.IP)
 
 		// Advertise until an error occurs, reinitializing under certain
 		// circumstances.
-		err = a.advertise(ctx, watchC)
+		err := a.advertise(ctx, dctx.Conn)
 		switch {
 		case errors.Is(err, context.Canceled):
 			// Intentional shutdown.
-			return a.shutdown()
+			return a.shutdown(dctx.Conn)
 		case err == nil:
 			panic("corerad: advertise must never return nil error")
+		default:
+			return err
 		}
-	}
+	})
 }
 
 // advertise is the internal loop for Advertise which coordinates the various
 // Advertiser goroutines.
-func (a *Advertiser) advertise(ctx context.Context, watchC <-chan netstate.Change) error {
+func (a *Advertiser) advertise(ctx context.Context, conn system.Conn) error {
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
@@ -146,7 +150,7 @@ func (a *Advertiser) advertise(ctx context.Context, watchC <-chan netstate.Chang
 	// RA scheduler which consumes requests to send RAs and dispatches them
 	// at the appropriate times.
 	eg.Go(func() error {
-		if err := a.schedule(ctx, ipC); err != nil {
+		if err := a.schedule(ctx, conn, ipC); err != nil {
 			return fmt.Errorf("failed to schedule router advertisements: %w", err)
 		}
 
@@ -163,32 +167,12 @@ func (a *Advertiser) advertise(ctx context.Context, watchC <-chan netstate.Chang
 
 	// Listener which issues RAs in response to RS messages.
 	eg.Go(func() error {
-		if err := a.listen(ctx, ipC); err != nil {
+		if err := a.listen(ctx, conn, ipC); err != nil {
 			return fmt.Errorf("failed to listen: %w", err)
 		}
 
 		return nil
 	})
-
-	// Link state watcher, unless no watch channel was specified.
-	if watchC != nil {
-		eg.Go(func() error {
-			select {
-			case <-ctx.Done():
-				return nil
-			case _, ok := <-watchC:
-				if !ok {
-					// Watcher halted or not available on this OS.
-					return nil
-				}
-
-				// TODO: inspect for specific state changes.
-
-				// Watcher indicated a state change.
-				return errLinkChange
-			}
-		})
-	}
 
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("failed to run advertiser: %w", err)
@@ -239,13 +223,13 @@ var deadlineNow = time.Unix(1, 0)
 
 // listen issues unicast router advertisements in response to router
 // solicitations, until ctx is canceled.
-func (a *Advertiser) listen(ctx context.Context, ipC chan<- netaddr.IP) error {
+func (a *Advertiser) listen(ctx context.Context, conn system.Conn, ipC chan<- netaddr.IP) error {
 	// Wait for cancelation and then force any pending reads to time out.
 	var eg errgroup.Group
 	eg.Go(func() error {
 		<-ctx.Done()
 
-		if err := a.c.SetReadDeadline(deadlineNow); err != nil {
+		if err := conn.SetReadDeadline(deadlineNow); err != nil {
 			return fmt.Errorf("failed to interrupt listener: %w", err)
 		}
 
@@ -258,7 +242,7 @@ func (a *Advertiser) listen(ctx context.Context, ipC chan<- netaddr.IP) error {
 			return eg.Wait()
 		}
 
-		m, cm, host, err := a.c.ReadFrom()
+		m, cm, host, err := conn.ReadFrom()
 		if err != nil {
 			if ctx.Err() != nil {
 				// Context canceled.
@@ -344,7 +328,7 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr
 
 // schedule consumes RA requests and schedules them with workers so they may
 // occur at the appropriate times.
-func (a *Advertiser) schedule(ctx context.Context, ipC <-chan netaddr.IP) error {
+func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan netaddr.IP) error {
 	// Enable canceling schedule's context on send RA error.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -392,7 +376,7 @@ func (a *Advertiser) schedule(ctx context.Context, ipC <-chan netaddr.IP) error 
 			// the RFC and then send it.
 			delay := time.Duration(prng.Int63n(maxRADelay.Nanoseconds())) * time.Nanosecond
 			sg.Delay(delay, func() error {
-				if err := a.sendWorker(ip); err != nil {
+				if err := a.sendWorker(conn, ip); err != nil {
 					errC <- err
 				}
 				return nil
@@ -409,7 +393,7 @@ func (a *Advertiser) schedule(ctx context.Context, ipC <-chan netaddr.IP) error 
 		// Ready to send this multicast RA.
 		lastMulticast = time.Now()
 		sg.Delay(delay, func() error {
-			if err := a.sendWorker(ip); err != nil {
+			if err := a.sendWorker(conn, ip); err != nil {
 				errC <- err
 			}
 			return nil
@@ -418,8 +402,8 @@ func (a *Advertiser) schedule(ctx context.Context, ipC <-chan netaddr.IP) error 
 }
 
 // sendWorker is a goroutine worker which sends a router advertisement to ip.
-func (a *Advertiser) sendWorker(ip netaddr.IP) error {
-	if err := a.send(ip, a.cfg); err != nil {
+func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
+	if err := a.send(conn, ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
 		a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
 		return err
@@ -437,7 +421,7 @@ func (a *Advertiser) sendWorker(ip netaddr.IP) error {
 
 // send sends a single router advertisement built from cfg to the destination IP
 // address, which may be a unicast or multicast address.
-func (a *Advertiser) send(dst netaddr.IP, cfg config.Interface) error {
+func (a *Advertiser) send(conn system.Conn, dst netaddr.IP, cfg config.Interface) error {
 	if cfg.UnicastOnly && dst.IsMulticast() {
 		// Nothing to do.
 		return nil
@@ -450,7 +434,7 @@ func (a *Advertiser) send(dst netaddr.IP, cfg config.Interface) error {
 		return fmt.Errorf("failed to build router advertisement: %w", err)
 	}
 
-	if err := a.c.WriteTo(ra, nil, dst.IPAddr().IP); err != nil {
+	if err := conn.WriteTo(ra, nil, dst.IPAddr().IP); err != nil {
 		return fmt.Errorf("failed to send router advertisement to %s: %w", dst, err)
 	}
 
@@ -497,135 +481,22 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 	return ra, nil
 }
 
-// init initializes the Advertiser in preparation for handling NDP traffic.
-func (a *Advertiser) init() error {
-	// Verify the interface is available and ready for listening.
-	ifi, ip, err := a.c.Dial(a.iface)
-	if err != nil {
-		return err
-	}
-
-	// We can now initialize any plugins that rely on dynamic information
-	// about the network interface.
-	for _, p := range a.cfg.Plugins {
-		if err := p.Prepare(ifi); err != nil {
-			return fmt.Errorf("failed to prepare plugin %q: %v", p.Name(), err)
-		}
-
-		a.logf("%q: %s", p.Name(), p)
-	}
-
-	// Before starting any other goroutines, verify that the interface can
-	// actually be used to send an initial router advertisement, avoiding a
-	// needless start/error/restart loop.
-	if err := a.send(netaddr.IPv6LinkLocalAllNodes(), a.cfg); err != nil {
-		return fmt.Errorf("failed to send initial multicast router advertisement: %v", err)
-	}
-
-	// Note unicast-only mode in logs.
-	var method string
-	if a.cfg.UnicastOnly {
-		method = "unicast-only "
-	}
-
-	a.logf("initialized, advertising %sfrom %s", method, ip)
-
-	return nil
-}
-
-// reinit attempts repeated reinitialization of the Advertiser based on whether
-// the input error is considered recoverbale.
-func (a *Advertiser) reinit(ctx context.Context, err error) error {
-	// Notify progress in reinit logic to anyone listening.
-	notify := func() {
-		select {
-		case a.reinitC <- struct{}{}:
-		default:
-		}
-	}
-
-	defer notify()
-
-	if err == nil {
-		// Nil input error, this must be the first initialization.
-		err = a.init()
-	}
-
-	// Check for conditions which are recoverable.
-	var serr *os.SyscallError
-	switch {
-	case errors.As(err, &serr):
-		if errors.Is(serr, os.ErrPermission) {
-			// Permission denied means this will never work, so exit immediately.
-			return err
-		}
-
-		// For other syscall errors, try again.
-		a.logf("error advertising, reinitializing")
-	case errors.Is(err, system.ErrLinkNotReady):
-		a.logf("interface not ready, reinitializing")
-	case errors.Is(err, errLinkChange):
-		a.logf("interface state changed, reinitializing")
-	case err == nil:
-		// Successful init.
-		return nil
-	default:
-		// Unrecoverable error
-		return err
-	}
-
-	// Recoverable error, try to initialize for delay*attempts seconds, every
-	// delay seconds.
-	const (
-		attempts = 40
-		delay    = 3 * time.Second
-	)
-
-	for i := 0; i < attempts; i++ {
-		// Notify of reinit on each attempt.
-		notify()
-
-		// Don't wait on the first attempt.
-		if i != 0 {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(delay):
-			}
-		}
-
-		if err := a.init(); err != nil {
-			a.logf("retrying initialization, %d attempt(s) remaining: %v", attempts-(i+1), err)
-			continue
-		}
-
-		return nil
-	}
-
-	return fmt.Errorf("timed out trying to initialize after error: %v", err)
-}
-
-// shutdown indicates to hosts that this host is no longer a router and restores
-// the previous state of the interface.
-func (a *Advertiser) shutdown() error {
+// shutdown indicates to hosts that this host is no longer a router.
+func (a *Advertiser) shutdown(conn system.Conn) error {
 	// In general, many of these actions are best-effort and should not halt
 	// shutdown on failure.
 
 	// Send a final router advertisement (TODO: more than one) with a router
 	// lifetime of 0 to indicate that hosts should not use this router as a
-	// default router, and then leave the all-routers group.
+	// default router.
 	//
 	// a.cfg is copied in case any delayed send workers are outstanding and
 	// the server's context is canceled.
 	cfg := a.cfg
 	cfg.DefaultLifetime = 0
 
-	if err := a.send(netaddr.IPv6LinkLocalAllNodes(), cfg); err != nil {
+	if err := a.send(conn, netaddr.IPv6LinkLocalAllNodes(), cfg); err != nil {
 		a.logf("failed to send final multicast router advertisement: %v", err)
-	}
-
-	if err := a.c.Close(); err != nil {
-		a.logf("failed to stop NDP listener: %v", err)
 	}
 
 	return nil
@@ -658,8 +529,4 @@ func multicastDelay(r *rand.Rand, i int, min, max int64) time.Duration {
 	}
 
 	return d
-}
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
 }

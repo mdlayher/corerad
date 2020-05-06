@@ -24,7 +24,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
-	"github.com/mdlayher/netstate"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
@@ -59,7 +57,6 @@ type clientContext struct {
 	c              system.Conn
 	rs             *ndp.RouterSolicitation
 	router, client *net.Interface
-	reinitC        <-chan struct{}
 	eventC         <-chan Event
 	mm             *Metrics
 }
@@ -540,12 +537,23 @@ func testSimulatedAdvertiserClient(
 	// Swap out the underlying connections for a UDP socket pair.
 	sc, cc, cDone := testConnPair(t)
 	ad.state = &testState{forwarding: true}
-	ad.c = sc
+
+	ad.dialer = &system.Dialer{
+		DialFunc: func() *system.DialContext {
+			return &system.DialContext{
+				Conn: sc,
+				Interface: &net.Interface{
+					Name:         "test0",
+					HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+				},
+				IP: net.IPv6loopback,
+			}
+		},
+	}
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		// TODO: hook into watcher.
-		if err := ad.Advertise(ctx, nil); err != nil {
+		if err := ad.Advertise(ctx); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 
@@ -560,10 +568,9 @@ func testSimulatedAdvertiserClient(
 				Addr:      net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 			}},
 		},
-		router:  &net.Interface{Name: cfg.Name},
-		reinitC: ad.reinitC,
-		eventC:  ad.Events(),
-		mm:      mm,
+		router: &net.Interface{Name: cfg.Name},
+		eventC: ad.Events(),
+		mm:     mm,
 	}
 
 	// Run the advertiser and invoke the client's input function with some
@@ -584,10 +591,9 @@ func testSimulatedAdvertiserClient(
 }
 
 func testConnPair(t *testing.T) (system.Conn, system.Conn, func()) {
-	// TODO: parameterize?
-	ifi, err := net.InterfaceByName("lo")
+	sc, err := net.ListenPacket("udp6", ":0")
 	if err != nil {
-		t.Skipf("skipping, failed to get loopback: %v", err)
+		t.Fatalf("failed to create server peer: %v", err)
 	}
 
 	cc, err := net.ListenPacket("udp6", ":0")
@@ -597,92 +603,38 @@ func testConnPair(t *testing.T) (system.Conn, system.Conn, func()) {
 
 	// Set up a simulated client/server pair.
 
-	peerC := make(chan struct{})
 	server := &udpConn{
 		ControlMessage: &ipv6.ControlMessage{HopLimit: ndp.HopLimit},
-
-		iface: ifi.Name,
-		peer:  cc.LocalAddr(),
-		peerC: peerC,
+		peer:           cc.LocalAddr(),
+		pc:             sc,
 	}
 
 	client := &udpConn{
 		ControlMessage: &ipv6.ControlMessage{HopLimit: ndp.HopLimit},
-
-		peerC: peerC,
-		pc:    cc,
+		peer:           sc.LocalAddr(),
+		pc:             cc,
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-
-		// When a message is received, reconfigure the peers for each of these
-		// simulated connections, so they continue to point to each other.
-		for range peerC {
-			server.mu.Lock()
-			client.mu.Lock()
-
-			server.peer = client.pc.LocalAddr()
-			client.peer = server.pc.LocalAddr()
-
-			client.mu.Unlock()
-			server.mu.Unlock()
+	return server, client, func() {
+		if err := sc.Close(); err != nil {
+			t.Fatalf("failed to close server: %v", err)
 		}
-	}()
-
-	done := func() {
-		close(peerC)
-		wg.Wait()
+		if err := cc.Close(); err != nil {
+			t.Fatalf("failed to close client: %v", err)
+		}
 	}
-
-	return server, client, done
 }
 
 type udpConn struct {
 	ControlMessage *ipv6.ControlMessage
 
-	mu    sync.Mutex
-	iface string
-	peerC chan struct{}
-	peer  net.Addr
-	pc    net.PacketConn
+	peer net.Addr
+	pc   net.PacketConn
 }
 
 var _ system.Conn = &udpConn{}
 
-func (c *udpConn) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.pc.Close()
-}
-
-func (c *udpConn) Dial(_ string) (*net.Interface, net.IP, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	ifi, err := net.InterfaceByName(c.iface)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Loopback has no address.
-	ifi.HardwareAddr = net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad}
-
-	pc, err := net.ListenPacket("udp6", ":0")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// New connection, update peer associations.
-	c.pc = pc
-	c.peerC <- struct{}{}
-
-	return ifi, net.IPv6loopback, nil
-}
+func (c *udpConn) Close() error { return c.pc.Close() }
 
 func (c *udpConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
 	b := make([]byte, 1024)
@@ -690,9 +642,6 @@ func (c *udpConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error) 
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	// Got a message, update peer associations.
-	c.peerC <- struct{}{}
 
 	m, err := ndp.ParseMessage(b[:n])
 	if err != nil {
@@ -705,9 +654,6 @@ func (c *udpConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error) 
 func (c *udpConn) SetReadDeadline(t time.Time) error { return c.pc.SetReadDeadline(t) }
 
 func (c *udpConn) WriteTo(m ndp.Message, _ *ipv6.ControlMessage, _ net.IP) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	b, err := ndp.MarshalMessage(m)
 	if err != nil {
 		return err
@@ -778,12 +724,16 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to look up router veth: %v", err)
 	}
 
+	client, err := net.InterfaceByName(veth1)
+	if err != nil {
+		t.Fatalf("failed to look up client veth: %v", err)
+	}
+
 	// Set up metrics node so we can inspect its contents at a later time.
 	mm := NewMetrics(nil)
 	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), mm)
 
-	sc := system.NewConn(nil)
-	client, _, err := sc.Dial(veth1)
+	cconn, _, err := ndp.Dial(client, ndp.LinkLocal)
 	if err != nil {
 		t.Fatalf("failed to dial client connection: %v", err)
 	}
@@ -793,37 +743,36 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	f.SetAll(true)
 	f.Accept(ipv6.ICMPTypeRouterAdvertisement)
 
-	if err := sc.Conn.SetICMPFilter(&f); err != nil {
+	if err := cconn.SetICMPFilter(&f); err != nil {
 		t.Fatalf("failed to apply ICMPv6 filter: %v", err)
 	}
 
 	// Enable inspection of IPv6 control messages.
 	flags := ipv6.FlagHopLimit | ipv6.FlagDst
-	if err := sc.Conn.SetControlMessage(flags, true); err != nil {
+	if err := cconn.SetControlMessage(flags, true); err != nil {
 		t.Fatalf("failed to apply IPv6 control message flags: %v", err)
 	}
 
-	if err := sc.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+	if err := cconn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 		t.Fatalf("failed to set client read deadline: %v", err)
 	}
 
 	cctx := &clientContext{
-		c: sc,
+		c: cconn,
 		rs: &ndp.RouterSolicitation{
 			Options: []ndp.Option{&ndp.LinkLayerAddress{
 				Direction: ndp.Source,
 				Addr:      client.HardwareAddr,
 			}},
 		},
-		router:  router,
-		client:  client,
-		reinitC: ad.reinitC,
-		eventC:  ad.Events(),
-		mm:      mm,
+		router: router,
+		client: client,
+		eventC: ad.Events(),
+		mm:     mm,
 	}
 
 	done := func() {
-		if err := sc.Close(); err != nil {
+		if err := cconn.Close(); err != nil {
 			t.Fatalf("failed to close NDP router solicitation connection: %v", err)
 		}
 
@@ -848,21 +797,10 @@ func testAdvertiserClient(
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	w := netstate.NewWatcher()
-	watchC := w.Subscribe(cctx.router.Name, netstate.LinkDown)
-
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx, watchC); err != nil {
+		if err := ad.Advertise(ctx); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
-		}
-
-		return nil
-	})
-
-	eg.Go(func() error {
-		if err := w.Watch(ctx); err != nil {
-			return fmt.Errorf("failed to watch: %v", err)
 		}
 
 		return nil
@@ -978,4 +916,8 @@ func mustNetIP(s string) net.IP {
 	}
 
 	return ip
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }

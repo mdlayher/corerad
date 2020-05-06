@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"runtime"
 	"testing"
 	"time"
 
@@ -74,7 +73,7 @@ func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 	cancel()
 
 	// This should not block because the context is already canceled.
-	if err := ad.Advertise(ctx, nil); err != nil {
+	if err := ad.Advertise(ctx); err != nil {
 		t.Fatalf("failed to advertise: %v", err)
 	}
 }
@@ -96,8 +95,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		// TODO: hook into internal state?
-		if err := ad.Advertise(ctx, nil); err != nil {
+		if err := ad.Advertise(ctx); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 
@@ -250,8 +248,9 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 
 		var found int
 		for _, r := range routes {
-			// Skip non-IPv6 routes and routes for other interfaces.
-			if r.Family != unix.AF_INET6 || int(r.Attributes.OutIface) != cctx.client.Index {
+			// Skip non-IPv6 routes, routes for other interfaces, and individual
+			// host routes.
+			if r.Family != unix.AF_INET6 || int(r.Attributes.OutIface) != cctx.client.Index || r.DstLength == 128 {
 				continue
 			}
 
@@ -269,46 +268,6 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 
 		if diff := cmp.Diff(2, found); diff != "" {
 			t.Fatalf("unexpected number of installed routes (-want +got):\n%s", diff)
-		}
-	})
-	defer done()
-}
-
-func TestAdvertiserLinuxReinitialize(t *testing.T) {
-	skipShort(t)
-
-	done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
-		if err := cctx.c.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
-			t.Fatalf("failed to extend read deadline: %v", err)
-		}
-
-		// Consume the initial multicast router advertisement.
-		if _, _, _, err := cctx.c.ReadFrom(); err != nil {
-			t.Fatalf("failed to read first RA: %v", err)
-		}
-
-		// TODO: shorten timeout once link state is watched.
-		timer := time.AfterFunc(20*time.Second, func() {
-			panic("took too long to reinitialize")
-		})
-		defer timer.Stop()
-
-		// Make the link state flap, forcing a reinit by the watcher.
-		shell(t, "ip", "link", "set", "down", cctx.router.Name)
-		// TODO: this works fine locally but flaps a lot in CI so perhaps this
-		// will help.
-		runtime.Gosched()
-		shell(t, "ip", "link", "set", "up", cctx.router.Name)
-		<-cctx.reinitC
-
-		// Consume the multicast router advertisement immediately after reinit.
-		m, _, _, err := cctx.c.ReadFrom()
-		if err != nil {
-			t.Fatalf("failed to read second RA: %v", err)
-		}
-
-		if _, ok := m.(*ndp.RouterAdvertisement); !ok {
-			t.Fatalf("expected router advertisement, but got: %#v", m)
 		}
 	})
 	defer done()
