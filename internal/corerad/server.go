@@ -117,13 +117,13 @@ func (s *Server) Run(ctx context.Context) error {
 		// TODO: more events? It seems that rtnetlink at least generates a
 		// variety of events when a link is brought up and we don't want the
 		// Advertiser to flap.
-		//watchC := w.Subscribe(iface.Name, netstate.LinkDown)
+		watchC := w.Subscribe(iface.Name, netstate.LinkDown)
 
 		ad := NewAdvertiser(iface.Name, iface, s.ll, mm)
 
 		// Begin advertising on this interface until the context is canceled.
 		s.eg.Go(func() error {
-			if err := ad.Advertise(ctx); err != nil {
+			if err := ad.Advertise(ctx, watchC); err != nil {
 				return fmt.Errorf("failed to advertise NDP: %v", err)
 			}
 

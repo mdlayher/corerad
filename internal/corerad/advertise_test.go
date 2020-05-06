@@ -563,7 +563,7 @@ func testSimulatedAdvertiserClient(
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx); err != nil {
+		if err := ad.Advertise(ctx, nil); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 
@@ -809,7 +809,7 @@ func testAdvertiserClient(
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx); err != nil {
+		if err := ad.Advertise(ctx, nil); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 

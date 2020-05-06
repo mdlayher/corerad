@@ -29,6 +29,7 @@ import (
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
+	"github.com/mdlayher/netstate"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
@@ -62,6 +63,8 @@ func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 	defer done()
 }
 
+// TODO(mdlayher): move these two tests into the general tests.
+
 func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 	t.Parallel()
 
@@ -77,7 +80,36 @@ func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 	cancel()
 
 	// This should not block because the context is already canceled.
-	if err := ad.Advertise(ctx); err != nil {
+	if err := ad.Advertise(ctx, nil); err != nil {
+		t.Fatalf("failed to advertise: %v", err)
+	}
+}
+
+func TestAdvertiserLinuxNetstateChange(t *testing.T) {
+	t.Parallel()
+
+	ad, _, done := testAdvertiser(t, nil, nil)
+	defer done()
+
+	t1 := time.AfterFunc(5*time.Second, func() {
+		panic("took too long")
+	})
+	defer t1.Stop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	watchC := make(chan netstate.Change)
+	t2 := time.AfterFunc(250*time.Millisecond, func() {
+		// Once the Advertiser consumes this notification, cancel the context
+		// to make it fully shut down.
+		watchC <- netstate.LinkDown
+		cancel()
+	})
+	defer t2.Stop()
+
+	// This should not block because a state change is ready.
+	if err := ad.Advertise(ctx, watchC); err != nil {
 		t.Fatalf("failed to advertise: %v", err)
 	}
 }
@@ -101,7 +133,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx); err != nil {
+		if err := ad.Advertise(ctx, nil); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 

@@ -26,6 +26,7 @@ import (
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
+	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
@@ -91,7 +92,7 @@ func (a *Advertiser) Events() <-chan Event { return a.eventC }
 //
 // Before calling Advertise, call Events and ensure that the returned channel is
 // being drained, or Advertiser will stop processing.
-func (a *Advertiser) Advertise(ctx context.Context) error {
+func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Change) error {
 	// No more events when Advertise returns.
 	defer close(a.eventC)
 
@@ -125,7 +126,7 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 
 		// Advertise until an error occurs, reinitializing under certain
 		// circumstances.
-		err := a.advertise(ctx, dctx.Conn)
+		err := a.advertise(ctx, dctx.Conn, watchC)
 		switch {
 		case errors.Is(err, context.Canceled):
 			// Intentional shutdown.
@@ -140,7 +141,7 @@ func (a *Advertiser) Advertise(ctx context.Context) error {
 
 // advertise is the internal loop for Advertise which coordinates the various
 // Advertiser goroutines.
-func (a *Advertiser) advertise(ctx context.Context, conn system.Conn) error {
+func (a *Advertiser) advertise(ctx context.Context, conn system.Conn, watchC <-chan netstate.Change) error {
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
@@ -173,6 +174,26 @@ func (a *Advertiser) advertise(ctx context.Context, conn system.Conn) error {
 
 		return nil
 	})
+
+	// Link state watcher, unless no watch channel was specified.
+	if watchC != nil {
+		eg.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return nil
+			case _, ok := <-watchC:
+				if !ok {
+					// Watcher halted or not available on this OS.
+					return nil
+				}
+
+				// TODO: inspect for specific state changes.
+
+				// Watcher indicated a state change.
+				return system.ErrLinkChange
+			}
+		})
+	}
 
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("failed to run advertiser: %w", err)

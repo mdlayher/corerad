@@ -62,8 +62,6 @@ type DialContext struct {
 // TODO(mdlayher): tests for reinit logic on Dialer type now that it has been
 // factored out from the Advertiser.
 
-// TODO(mdlayher): reincorporate netstate.Watcher.
-
 // Dial creates a Conn and invokes fn with a populated DialContext for the
 // caller's use. If fn returns an error which is considered retryable, Dial
 // will attempt to re-dial the Conn and invoke fn again.
@@ -103,8 +101,8 @@ func (d *Dialer) Dial(ctx context.Context, fn func(ctx context.Context, dctx *Di
 	}
 }
 
-// errLinkChange is a sentinel value which indicates a link state change.
-var errLinkChange = errors.New("link state change")
+// ErrLinkChange is a sentinel value which indicates a link state change.
+var ErrLinkChange = errors.New("link state change")
 
 // reinit attempts repeated reinitialization of the Advertiser based on whether
 // the input error is considered recoverbale.
@@ -129,7 +127,7 @@ func (d *Dialer) init(ctx context.Context, err error) (*DialContext, error) {
 		d.logf("error advertising, reinitializing")
 	case errors.Is(err, errLinkNotReady):
 		d.logf("interface not ready, reinitializing")
-	case errors.Is(err, errLinkChange):
+	case errors.Is(err, ErrLinkChange):
 		d.logf("interface state changed, reinitializing")
 	case err == nil:
 		// Successful init.
