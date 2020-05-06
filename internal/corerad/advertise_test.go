@@ -375,8 +375,10 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 				ra := m.(*ndp.RouterAdvertisement)
 
 				// Copy over our source link-layer address from the synthetic RS
-				// for reporting.
+				// for reporting, and make a copy for later comparisons.
 				ra.Options = cctx.rs.Options
+
+				want := *ra
 
 				timer := time.AfterFunc(10*time.Second, func() {
 					panic("took too long")
@@ -410,9 +412,7 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 
 				// Expect to receive an RA that is identical but has a modified
 				// managed flag.
-				want := *ra
 				want.ManagedConfiguration = true
-
 				got := <-raC
 				if diff := cmp.Diff(&want, got); diff != "" {
 					t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
