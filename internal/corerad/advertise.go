@@ -249,7 +249,7 @@ func (a *Advertiser) listen(ctx context.Context, conn system.Conn, ipC chan<- ne
 			return eg.Wait()
 		}
 
-		m, cm, host, err := conn.ReadFrom()
+		m, cm, from, err := conn.ReadFrom()
 		if err != nil {
 			if ctx.Err() != nil {
 				// Context canceled.
@@ -269,12 +269,12 @@ func (a *Advertiser) listen(ctx context.Context, conn system.Conn, ipC chan<- ne
 		}
 
 		// Handle the incoming message and send a response if one is needed.
-		hostAddr, err := netaddr.ParseIP(host.String())
-		if err != nil {
-			return fmt.Errorf("failed to parse IP address: %w", err)
+		host, ok := netaddr.FromStdIP(from)
+		if !ok {
+			panicf("netaddr: invalid IP address: %q", from)
 		}
 
-		ip, err := a.handle(m, cm, hostAddr)
+		ip, err := a.handle(m, cm, host)
 		if err != nil {
 			return fmt.Errorf("failed to handle NDP message: %w", err)
 		}
@@ -541,4 +541,8 @@ func multicastDelay(r *rand.Rand, i int, min, max time.Duration) time.Duration {
 	}
 
 	return d
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }

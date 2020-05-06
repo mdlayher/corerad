@@ -956,7 +956,3 @@ func mustNetIP(s string) net.IP {
 
 	return ip
 }
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
-}
