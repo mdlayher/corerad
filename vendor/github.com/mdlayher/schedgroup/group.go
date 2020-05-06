@@ -6,8 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 // Although unnecessary, explicit break labels should be used in all select
@@ -27,7 +25,7 @@ type Group struct {
 	cancel func()
 
 	// Task runner and a heap of tasks to be run.
-	eg    *errgroup.Group
+	wg    sync.WaitGroup
 	mu    sync.Mutex
 	tasks tasks
 
@@ -48,18 +46,15 @@ func New(ctx context.Context) *Group {
 		ctx:    ctx,
 		cancel: cancel,
 
-		eg: &errgroup.Group{},
-
 		addC: make(chan struct{}),
 		lenC: make(chan int),
 	}
 
-	g.eg.Go(func() error {
-		// Monitor returns no errors because we shouldn't expose its internal
-		// state to the caller.
+	g.wg.Add(1)
+	go func() {
+		defer g.wg.Done()
 		g.monitor(mctx)
-		return nil
-	})
+	}()
 
 	return g
 }
@@ -69,7 +64,7 @@ func New(ctx context.Context) *Group {
 // Specifying a negative delay will cause the task to be scheduled immediately.
 //
 // If Delay is called after a call to Wait, Delay will panic.
-func (g *Group) Delay(delay time.Duration, fn func() error) {
+func (g *Group) Delay(delay time.Duration, fn func()) {
 	g.Schedule(time.Now().Add(delay), fn)
 }
 
@@ -77,7 +72,7 @@ func (g *Group) Delay(delay time.Duration, fn func() error) {
 // Specifying a past time will cause the task to be scheduled immediately.
 //
 // If Schedule is called after a call to Wait, Schedule will panic.
-func (g *Group) Schedule(when time.Time, fn func() error) {
+func (g *Group) Schedule(when time.Time, fn func()) {
 	if atomic.LoadUint32(g.waiting) != 0 {
 		panic("schedgroup: attempted to schedule task after Group.Wait was called")
 	}
@@ -100,7 +95,9 @@ func (g *Group) Schedule(when time.Time, fn func() error) {
 }
 
 // Wait waits for the completion of all scheduled tasks, or for cancelation of
-// the context passed to New.
+// the context passed to New. Wait will only returns errors due to context
+// cancelation. If no context is associated the the Group, wait never returns
+// an error.
 //
 // Once Wait is called, any further calls to Delay or Schedule will panic. If
 // Wait is called more than once, Wait will panic.
@@ -121,7 +118,8 @@ func (g *Group) Wait() error {
 		// complete and send on g.lenC.
 		g.mu.Unlock()
 		g.cancel()
-		return g.eg.Wait()
+		g.wg.Wait()
+		return nil
 	}
 	g.mu.Unlock()
 
@@ -143,7 +141,8 @@ func (g *Group) Wait() error {
 			// No more tasks left, cancel the monitor goroutine and wait for
 			// all tasks to complete.
 			g.cancel()
-			return g.eg.Wait()
+			g.wg.Wait()
+			return nil
 		}
 	}
 }
@@ -216,7 +215,11 @@ func (g *Group) trigger(now time.Time) time.Time {
 
 		// This task is ready, pop it from the heap and run it.
 		t := heap.Pop(&g.tasks).(task)
-		g.eg.Go(t.Call)
+		g.wg.Add(1)
+		go func() {
+			defer g.wg.Done()
+			t.Call()
+		}()
 	}
 
 	return time.Time{}
@@ -225,7 +228,7 @@ func (g *Group) trigger(now time.Time) time.Time {
 // A task is a function which is called after the specified deadline.
 type task struct {
 	Deadline time.Time
-	Call     func() error
+	Call     func()
 }
 
 // tasks implements heap.Interface.

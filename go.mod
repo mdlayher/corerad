@@ -4,17 +4,17 @@ go 1.14
 
 require (
 	github.com/BurntSushi/toml v0.3.1
+	github.com/golang/protobuf v1.4.1 // indirect
 	github.com/google/go-cmp v0.4.0
-	github.com/jsimonetti/rtnetlink v0.0.0-20200413170823-2d3c724ef0c3
+	github.com/jsimonetti/rtnetlink v0.0.0-20200505065535-3ee32e7e21a4
 	github.com/mdlayher/ndp v0.0.0-20200208214239-6af7d78093a1
-	github.com/mdlayher/netlink v1.1.0 // indirect
 	github.com/mdlayher/netstate v0.0.0-20200128183539-95bdfedbb6a3
 	github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
-	github.com/mdlayher/schedgroup v0.0.0-20200121174254-e4d07b039d0e
+	github.com/mdlayher/schedgroup v0.0.0-20200506182200-45678742bdc7
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/prometheus/client_golang v1.6.0
-	golang.org/x/net v0.0.0-20200505041828-1ed23360d12c
+	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
-	golang.org/x/sys v0.0.0-20200430082407-1f5687305801
+	golang.org/x/sys v0.0.0-20200501145240-bc7a7d42d5c3
 	inet.af/netaddr v0.0.0-20200430175045-5aaf2097c7fc
 )
