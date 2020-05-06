@@ -487,7 +487,7 @@ func Test_multicastDelay(t *testing.T) {
 			name:  "random",
 			min:   1 * time.Second,
 			max:   10 * time.Second,
-			delay: 4 * time.Second,
+			delay: 5 * time.Second,
 		},
 		{
 			name: "clamped",
@@ -503,13 +503,13 @@ func Test_multicastDelay(t *testing.T) {
 			i:     100,
 			min:   30 * time.Second,
 			max:   60 * time.Second,
-			delay: 52 * time.Second,
+			delay: 54 * time.Second,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := multicastDelay(r, tt.i, tt.min.Nanoseconds(), tt.max.Nanoseconds())
+			d := multicastDelay(r, tt.i, tt.min, tt.max)
 			if diff := cmp.Diff(tt.delay, d); diff != "" {
 				t.Fatalf("unexpected delay (-want +got):\n%s", diff)
 			}

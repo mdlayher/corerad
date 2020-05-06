@@ -217,8 +217,8 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 	// delay times.
 	var (
 		prng = rand.New(rand.NewSource(time.Now().UnixNano()))
-		min  = a.cfg.MinInterval.Nanoseconds()
-		max  = a.cfg.MaxInterval.Nanoseconds()
+		min  = a.cfg.MinInterval
+		max  = a.cfg.MaxInterval
 	)
 
 	for i := 0; ; i++ {
@@ -530,7 +530,7 @@ func (a *Advertiser) logf(format string, v ...interface{}) {
 
 // multicastDelay selects an appropriate delay duration for unsolicited
 // multicast RA sending.
-func multicastDelay(r *rand.Rand, i int, min, max int64) time.Duration {
+func multicastDelay(r *rand.Rand, i int, min, max time.Duration) time.Duration {
 	// Implements the algorithm described in:
 	// https://tools.ietf.org/html/rfc4861#section-6.2.4.
 
@@ -540,7 +540,9 @@ func multicastDelay(r *rand.Rand, i int, min, max int64) time.Duration {
 		d = (time.Duration(max) * time.Nanosecond).Round(time.Second)
 	} else {
 		// min <= wait <= max, rounded to 1 second granularity.
-		d = (time.Duration(min+rand.Int63n(max-min)) * time.Nanosecond).Round(time.Second)
+		d = (min + time.Duration(
+			r.Int63n(max.Nanoseconds()-min.Nanoseconds()),
+		)*time.Nanosecond).Round(time.Second)
 	}
 
 	// For first few advertisements, select a shorter wait time so routers
