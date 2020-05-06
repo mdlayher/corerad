@@ -62,6 +62,8 @@ type clientContext struct {
 }
 
 func TestAdvertiserUnsolicitedFull(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		fn   testAdvertiserFunc
@@ -183,6 +185,8 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 }
 
 func TestAdvertiserUnsolicitedShutdown(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		fn   testAdvertiserFunc
@@ -237,6 +241,7 @@ func TestAdvertiserUnsolicitedShutdown(t *testing.T) {
 
 func TestAdvertiserUnsolicitedDelay(t *testing.T) {
 	skipShort(t)
+	t.Parallel()
 
 	tests := []struct {
 		name string
@@ -274,6 +279,7 @@ func TestAdvertiserUnsolicitedDelay(t *testing.T) {
 
 func TestAdvertiserSolicited(t *testing.T) {
 	skipShort(t)
+	t.Parallel()
 
 	tests := []struct {
 		name string
@@ -329,6 +335,8 @@ func TestAdvertiserSolicited(t *testing.T) {
 }
 
 func TestAdvertiserVerifyRAs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		fn   testAdvertiserFunc
@@ -393,6 +401,8 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 }
 
 func TestAdvertiserPrometheusMetrics(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		fn   testAdvertiserFunc

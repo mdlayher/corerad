@@ -36,6 +36,8 @@ import (
 )
 
 func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
+	t.Parallel()
+
 	done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
 		// Consume the initial multicast.
 		if _, _, _, err := cctx.c.ReadFrom(); err != nil {
@@ -61,6 +63,8 @@ func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 }
 
 func TestAdvertiserLinuxContextCanceled(t *testing.T) {
+	t.Parallel()
+
 	ad, _, done := testAdvertiser(t, nil, nil)
 	defer done()
 
@@ -79,6 +83,8 @@ func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 }
 
 func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
+	t.Parallel()
+
 	ad, _, done := testAdvertiser(t, nil, nil)
 	defer done()
 
@@ -120,6 +126,8 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 }
 
 func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
+	t.Parallel()
+
 	const lifetime = 3 * time.Second
 	cfg := &config.Interface{
 		DefaultLifetime: lifetime,
@@ -166,6 +174,8 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 }
 
 func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
+	t.Parallel()
+
 	tcfg := &testConfig{
 		vethConfig: func(t *testing.T, _, veth1 string) {
 			// Ensure SLAAC can be used on the client interface.
@@ -274,6 +284,8 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 }
 
 func TestAdvertiserLinuxSolicitedUnicastOnly(t *testing.T) {
+	t.Parallel()
+
 	cfg := &config.Interface{UnicastOnly: true}
 	done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
 		// Issue repeated router solicitations and expect router advertisements
