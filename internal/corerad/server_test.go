@@ -14,9 +14,7 @@
 package corerad_test
 
 import (
-	"bytes"
 	"context"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -27,7 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/corerad"
-	"github.com/mdlayher/promtest"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -48,7 +45,7 @@ func TestServerRun(t *testing.T) {
 			name: "no configuration",
 		},
 		{
-			name: "debug no prometheus or pprof",
+			name: "debug HTTP",
 			cfg: config.Config{
 				Debug: config.Debug{
 					Address: randAddr(t),
@@ -63,66 +60,9 @@ func TestServerRun(t *testing.T) {
 					t.Fatal("debug listener did not start")
 				}
 
-				prom := httpGet(t, debug+"/metrics")
-				if diff := cmp.Diff(http.StatusNotFound, prom.StatusCode); diff != "" {
-					t.Fatalf("unexpected Prometheus HTTP status (-want +got):\n%s", diff)
-				}
-
-				pprof := httpGet(t, debug+"/debug/pprof/")
-				if diff := cmp.Diff(http.StatusNotFound, pprof.StatusCode); diff != "" {
-					t.Fatalf("unexpected pprof HTTP status (-want +got):\n%s", diff)
-				}
-			},
-		},
-		{
-			name: "debug prometheus and pprof",
-			cfg: config.Config{
-				Debug: config.Debug{
-					Address:    randAddr(t),
-					Prometheus: true,
-					PProf:      true,
-				},
-			},
-			fn: func(t *testing.T, cancel func(), debug string) {
-				defer cancel()
-
-				// Debug listener should start with both configured endpoints
-				// available.
-				if !probeTCP(t, debug) {
-					t.Fatal("debug listener did not start")
-				}
-
-				pprof := httpGet(t, debug+"/debug/pprof/")
-				if diff := cmp.Diff(http.StatusOK, pprof.StatusCode); diff != "" {
-					t.Fatalf("unexpected pprof HTTP status (-want +got):\n%s", diff)
-				}
-
-				prom := httpGet(t, debug+"/metrics")
-				defer prom.Body.Close()
-
-				if diff := cmp.Diff(http.StatusOK, prom.StatusCode); diff != "" {
-					t.Fatalf("unexpected Prometheus HTTP status (-want +got):\n%s", diff)
-				}
-
-				b, err := ioutil.ReadAll(prom.Body)
-				if err != nil {
-					t.Fatalf("failed to read Prometheus metrics: %v", err)
-				}
-
-				// Validate the necessary metrics.
-				if !promtest.Lint(t, b) {
-					t.Fatal("Prometheus metrics are not lint-clean")
-				}
-
-				// Check for specific metrics.
-				want := []string{
-					// TODO.
-				}
-
-				for _, w := range want {
-					if !bytes.Contains(b, []byte(w)) {
-						t.Errorf("prometheus metrics do not contain %q", w)
-					}
+				res := httpGet(t, debug)
+				if diff := cmp.Diff(http.StatusOK, res.StatusCode); diff != "" {
+					t.Fatalf("unexpected debug HTTP status (-want +got):\n%s", diff)
 				}
 			},
 		},

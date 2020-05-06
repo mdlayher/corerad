@@ -187,8 +187,20 @@ func (s *Server) runDebug(ctx context.Context, ifaces []config.Interface) error 
 				return err
 			}
 
+			srv := &http.Server{
+				ReadTimeout: 1 * time.Second,
+				Handler: crhttp.NewHandler(
+					s.state,
+					ifaces,
+					d.Prometheus,
+					d.PProf,
+					s.reg,
+				),
+			}
+
 			// Listener ready, wait for cancelation via context and serve
-			// the HTTP server.
+			// the HTTP server until context is canceled, then immediately
+			// close the server.
 			var wg sync.WaitGroup
 			wg.Add(1)
 			defer wg.Wait()
@@ -196,16 +208,10 @@ func (s *Server) runDebug(ctx context.Context, ifaces []config.Interface) error 
 			go func() {
 				defer wg.Done()
 				<-ctx.Done()
-				_ = l.Close()
+				_ = srv.Close()
 			}()
 
-			return http.Serve(l, crhttp.NewHandler(
-				s.state,
-				ifaces,
-				d.Prometheus,
-				d.PProf,
-				s.reg,
-			))
+			return srv.Serve(l)
 		})
 	})
 
@@ -233,6 +239,9 @@ func (s *Server) serve(ctx context.Context, fn func() error) error {
 
 		err := fn()
 		switch {
+		case errors.Is(err, http.ErrServerClosed):
+			// Expected shutdown.
+			return nil
 		case errors.As(err, &nerr):
 			// Handle outside switch.
 		case err == nil:
@@ -240,13 +249,6 @@ func (s *Server) serve(ctx context.Context, fn func() error) error {
 		default:
 			// Nothing to do.
 			return err
-		}
-
-		// Unfortunately there isn't an easier way to check for this, but
-		// we want to ignore errors related to the connection closing, since
-		// s.Close is triggered on signal.
-		if nerr.Err.Error() == "use of closed network connection" {
-			return nil
 		}
 
 		s.ll.Printf("error starting HTTP debug server, %d attempt(s) remaining: %v", attempts-(i+1), err)
