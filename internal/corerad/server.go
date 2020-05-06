@@ -157,9 +157,7 @@ func (s *Server) Run(ctx context.Context) error {
 		return nil
 	})
 
-	// Indicate readiness to any waiting callers, and then wait for all
-	// goroutines to be canceled and stopped successfully.
-	s.ready <- struct{}{}
+	// Wait for all goroutines to be canceled and stopped successfully.
 	if err := s.eg.Wait(); err != nil {
 		return fmt.Errorf("failed to serve: %v", err)
 	}
@@ -171,7 +169,8 @@ func (s *Server) Run(ctx context.Context) error {
 func (s *Server) runDebug(ctx context.Context, ifaces []config.Interface) error {
 	d := s.cfg.Debug
 	if d.Address == "" {
-		// Nothing to do, don't start the server.
+		// Nothing to do, don't start the server. Indicate ready now.
+		s.ready <- struct{}{}
 		return nil
 	}
 
@@ -210,6 +209,10 @@ func (s *Server) runDebug(ctx context.Context, ifaces []config.Interface) error 
 				<-ctx.Done()
 				_ = srv.Close()
 			}()
+
+			// Now that the HTTP server will be running, indicate readiness
+			// to callers.
+			s.ready <- struct{}{}
 
 			return srv.Serve(l)
 		})

@@ -18,7 +18,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -28,10 +27,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// TODO(mdlayher): deduplicate with tests in internal/crhttp.
-
 func TestServerRun(t *testing.T) {
 	t.Parallel()
+
+	// This test covers basic server setup behaviors, but should not cover
+	// in-depth test cases for the Advertiser or HTTP server.
 
 	tests := []struct {
 		name string
@@ -53,12 +53,6 @@ func TestServerRun(t *testing.T) {
 			},
 			fn: func(t *testing.T, cancel func(), debug string) {
 				defer cancel()
-
-				// Debug listener should start, but Prometheus and pprof
-				// endpoints should not.
-				if !probeTCP(t, debug) {
-					t.Fatal("debug listener did not start")
-				}
 
 				res := httpGet(t, debug)
 				if diff := cmp.Diff(http.StatusOK, res.StatusCode); diff != "" {
@@ -98,47 +92,8 @@ func TestServerRun(t *testing.T) {
 			if err := eg.Wait(); err != nil {
 				t.Fatalf("failed to run server: %v", err)
 			}
-
-			// All services should be stopped.
-			if probeTCP(t, debug) {
-				t.Fatal("debug server still running")
-			}
 		})
 	}
-}
-
-func probeTCP(t *testing.T, addr string) bool {
-	t.Helper()
-
-	// As a convenience, if the address is empty, we know that the service
-	// cannot be probed.
-	if addr == "" {
-		return false
-	}
-
-	const (
-		attempts = 4
-		delay    = 250 * time.Millisecond
-	)
-
-	for i := 0; i < attempts; i++ {
-		c, err := net.Dial("tcp", addr)
-		if err == nil {
-			_ = c.Close()
-			return true
-		}
-
-		// String comparison isn't great but using build tags for syscall errno
-		// seems like overkill.
-		nerr, ok := err.(*net.OpError)
-		if !ok || !strings.Contains(nerr.Err.Error(), "connection refused") {
-			t.Fatalf("failed to dial TCP: %v", err)
-		}
-
-		time.Sleep(delay)
-	}
-
-	return false
 }
 
 func httpGet(t *testing.T, addr string) *http.Response {
