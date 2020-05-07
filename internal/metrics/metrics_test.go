@@ -209,6 +209,33 @@ func TestMemoryPanics(t *testing.T) {
 	}
 }
 
+func TestDiscardDoesNotPanic(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func(m metrics.Interface)
+	}{
+		{
+			name: "counters",
+			fn:   testCounters,
+		},
+		{
+			name: "gauges",
+			fn:   testGauges,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, panics := panics(func() {
+				tt.fn(metrics.Discard())
+			})
+			if panics {
+				t.Fatalf("test panicked: %s", msg)
+			}
+		})
+	}
+}
+
 func testCounters(m metrics.Interface) {
 	var (
 		c1 = m.Counter("foo_total", "A counter.", "address", "interface")
