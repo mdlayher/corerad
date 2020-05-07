@@ -14,158 +14,88 @@
 package corerad
 
 import (
-	"sync"
-
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/metrics"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Metrics contains metrics for a CoreRAD instance.
 type Metrics struct {
-	// Server metrics.
-	Info *prometheus.GaugeVec
-	Time prometheus.Gauge
-
-	// TODO(mdlayher): potentially add metrics for more prefix fields and
-	// RDNSS/DNSSL option configurations.
-
-	// TODO(mdlayher): redesign this to not need a mutex here.
-	mu sync.Mutex
+	Info metrics.Gauge
+	Time metrics.Gauge
 
 	// Per-advertiser metrics.
-	LastMulticastTime                       *prometheus.GaugeVec
-	MessagesReceivedTotal                   *prometheus.CounterVec
-	MessagesReceivedInvalidTotal            *prometheus.CounterVec
-	RouterAdvertisementPrefixAutonomous     *prometheus.GaugeVec
-	lastRAPA                                metric
-	RouterAdvertisementInconsistenciesTotal *prometheus.CounterVec
-	RouterAdvertisementsTotal               *prometheus.CounterVec
-	ErrorsTotal                             *prometheus.CounterVec
+	LastMulticastTime                       metrics.Gauge
+	MessagesReceivedTotal                   metrics.Counter
+	MessagesReceivedInvalidTotal            metrics.Counter
+	RouterAdvertisementPrefixAutonomous     metrics.Gauge
+	RouterAdvertisementInconsistenciesTotal metrics.Counter
+	RouterAdvertisementsTotal               metrics.Counter
+	ErrorsTotal                             metrics.Counter
 }
 
-// A metric is the labels and value passed into a Prometheus metric when it
-// was last updated.
-type metric struct {
-	Labels []string
-	Value  float64
-}
-
-// updateGauge updates the input gauge with the specified labels and values,
-// and stores the last state of the metric.
-func (m *Metrics) updateGauge(g *prometheus.GaugeVec, labels []string, value float64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.lastRAPA = metric{
-		Labels: labels,
-		Value:  value,
+// NewMetrics produces a Metrics structure which will register its metrics to
+// the specified metrics.Interface. If m is nil, metrics are discarded.
+func NewMetrics(m metrics.Interface) *Metrics {
+	if m == nil {
+		m = metrics.Discard()
 	}
 
-	g.WithLabelValues(labels...).Set(value)
-}
-
-// NewMetrics creates and registers Metrics. If reg is nil, the metrics are
-// not registered.
-func NewMetrics(reg *prometheus.Registry) *Metrics {
-	const (
-		bld = "build"
-		adv = "advertiser"
-	)
-
 	mm := &Metrics{
-		Info: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: bld,
-			Name:      "info",
+		Info: m.Gauge(
+			"corerad_build_info",
+			"Metadata about this build of CoreRAD.",
+			"version",
+		),
 
-			Help: "Metadata about this build of CoreRAD.",
-		}, []string{"version"}),
+		Time: m.Gauge(
+			"corerad_build_time",
+			"The UNIX timestamp of when this build of CoreRAD was produced.",
+		),
 
-		Time: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: bld,
-			Name:      "time",
+		LastMulticastTime: m.Gauge(
+			"corerad_advertiser_last_multicast_time_seconds",
+			"The UNIX timestamp of when the last multicast router advertisement was sent.",
+			"interface",
+		),
 
-			Help: "The UNIX timestamp of when this build of CoreRAD was produced.",
-		}),
+		MessagesReceivedTotal: m.Counter(
+			"corerad_advertiser_messages_received_total",
+			"The total number of valid NDP messages received on a listening interface.",
+			"interface", "message",
+		),
 
-		LastMulticastTime: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: adv,
-			Name:      "last_multicast_time_seconds",
+		MessagesReceivedInvalidTotal: m.Counter(
+			"corerad_advertiser_messages_received_invalid_total",
+			"The total number of invalid NDP messages received on a listening interface.",
+			"interface", "message",
+		),
 
-			Help: "The UNIX timestamp of when the last multicast router advertisement was sent.",
-		}, []string{"interface"}),
+		RouterAdvertisementInconsistenciesTotal: m.Counter(
+			"corerad_advertiser_router_advertisement_inconsistencies_total",
+			"The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration.",
+			"interface",
+		),
 
-		MessagesReceivedTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: adv,
-			Name:      "messages_received_total",
+		RouterAdvertisementsTotal: m.Counter(
+			"corerad_advertiser_router_advertisements_total",
+			"The total number of NDP router advertisements sent by the advertiser on an interface.",
+			"interface", "type",
+		),
 
-			Help: "The total number of valid NDP messages received on a listening interface.",
-		}, []string{"interface", "message"}),
-
-		MessagesReceivedInvalidTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: adv,
-			Name:      "messages_received_invalid_total",
-
-			Help: "The total number of invalid NDP messages received on a listening interface.",
-		}, []string{"interface", "message"}),
-
-		RouterAdvertisementPrefixAutonomous: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: adv,
-			Name:      "router_advertisement_prefix_autonomous",
-
-			Help: "Indicates whether or not a given prefix assigned to an interface has the autonomous flag set for Stateless Address Autoconfiguration (SLAAC).",
-		}, []string{"interface", "prefix"}),
-
-		RouterAdvertisementInconsistenciesTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: adv,
-			Name:      "router_advertisement_inconsistencies_total",
-
-			Help: "The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration.",
-		}, []string{"interface"}),
-
-		RouterAdvertisementsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: adv,
-			Name:      "router_advertisements_total",
-
-			Help: "The total number of NDP router advertisements sent by the advertiser on an interface.",
-		}, []string{"interface", "type"}),
-
-		ErrorsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: adv,
-			Name:      "errors_total",
-
-			Help: "The total number and type of errors that occurred while advertising.",
-		}, []string{"interface", "error"}),
+		ErrorsTotal: m.Counter(
+			"corerad_advertiser_errors_total",
+			"The total number and type of errors that occurred while advertising.",
+			"interface", "error",
+		),
 	}
 
 	// Initialize any info metrics which are static throughout the lifetime of
 	// the program.
-	mm.Info.WithLabelValues(build.Version()).Set(1)
-	mm.Time.Set(float64(build.Time().Unix()))
-
-	if reg != nil {
-		reg.MustRegister(
-			mm.Info,
-			mm.Time,
-
-			mm.LastMulticastTime,
-			mm.MessagesReceivedTotal,
-			mm.MessagesReceivedInvalidTotal,
-			mm.RouterAdvertisementPrefixAutonomous,
-			mm.RouterAdvertisementInconsistenciesTotal,
-			mm.RouterAdvertisementsTotal,
-		)
-	}
+	mm.Info(1, build.Version())
+	mm.Time(float64(build.Time().Unix()))
 
 	return mm
 }

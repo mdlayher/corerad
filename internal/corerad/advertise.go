@@ -256,7 +256,7 @@ func (a *Advertiser) listen(ctx context.Context, conn system.Conn, ipC chan<- ne
 				return eg.Wait()
 			}
 
-			a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "receive").Inc()
+			a.mm.ErrorsTotal(a.cfg.Name, "receive")
 
 			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
 				// Temporary error or timeout, just continue.
@@ -286,12 +286,12 @@ func (a *Advertiser) listen(ctx context.Context, conn system.Conn, ipC chan<- ne
 
 // handle handles an incoming NDP message from a remote host.
 func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr.IP) (*netaddr.IP, error) {
-	a.mm.MessagesReceivedTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+	a.mm.MessagesReceivedTotal(a.cfg.Name, m.Type().String())
 
 	// Ensure this message has a valid hop limit.
 	if cm.HopLimit != ndp.HopLimit {
 		a.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
-		a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+		a.mm.MessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
 		return nil, nil
 	}
 
@@ -325,11 +325,11 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr
 
 			a.logf("inconsistencies detected in router advertisement from router with IP %q, source link-layer address %q",
 				host, sourceLLA(m.Options))
-			a.mm.RouterAdvertisementInconsistenciesTotal.WithLabelValues(a.cfg.Name).Add(1)
+			a.mm.RouterAdvertisementInconsistenciesTotal(a.cfg.Name)
 		}
 	default:
 		a.logf("received NDP message of type %T from %s, ignoring", m, host)
-		a.mm.MessagesReceivedInvalidTotal.WithLabelValues(a.cfg.Name, m.Type().String()).Add(1)
+		a.mm.MessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
 	}
 
 	// No response necessary.
@@ -413,17 +413,17 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
 	if err := a.send(conn, ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
-		a.mm.ErrorsTotal.WithLabelValues(a.cfg.Name, "transmit").Inc()
+		a.mm.ErrorsTotal(a.cfg.Name, "transmit")
 		return err
 	}
 
 	typ := "unicast"
 	if ip.IsMulticast() {
 		typ = "multicast"
-		a.mm.LastMulticastTime.WithLabelValues(a.cfg.Name).SetToCurrentTime()
+		a.mm.LastMulticastTime(float64(time.Now().Unix()), a.cfg.Name)
 	}
 
-	a.mm.RouterAdvertisementsTotal.WithLabelValues(a.cfg.Name, typ).Add(1)
+	a.mm.RouterAdvertisementsTotal(a.cfg.Name, typ)
 	return nil
 }
 
@@ -478,11 +478,8 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 				Mask: net.CIDRMask(int(o.PrefixLength), 128),
 			}
 
-			a.mm.updateGauge(
-				a.mm.RouterAdvertisementPrefixAutonomous,
-				[]string{a.cfg.Name, pfx.String()},
-				boolFloat(o.AutonomousAddressConfiguration),
-			)
+			// TODO(mdlayher): work on during a stream!
+			_ = pfx
 		}
 	}
 
