@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // A Counter is a function which increments a metric's value by 1 when invoked.
@@ -34,6 +36,47 @@ type Gauge func(value float64, labels ...string)
 type Interface interface {
 	Counter(name, help string, labelNames ...string) Counter
 	Gauge(name, help string, labelNames ...string) Gauge
+}
+
+// prom implements Interface by wrapping the Prometheus client library.
+type prom struct {
+	reg *prometheus.Registry
+}
+
+var _ Interface = &prom{}
+
+// NewPrometheus creates an Interface which will register all of its metrics
+// to the specified Prometheus registry. The registry must not be nil.
+func NewPrometheus(reg *prometheus.Registry) Interface {
+	return &prom{reg: reg}
+}
+
+// Counter implements Interface.
+func (p *prom) Counter(name, help string, labelNames ...string) Counter {
+	c := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: name,
+		Help: help,
+	}, labelNames)
+
+	p.reg.MustRegister(c)
+
+	return func(labels ...string) {
+		c.WithLabelValues(labels...).Inc()
+	}
+}
+
+// Gauge implements Interface.
+func (p *prom) Gauge(name, help string, labelNames ...string) Gauge {
+	g := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: name,
+		Help: help,
+	}, labelNames)
+
+	p.reg.MustRegister(g)
+
+	return func(value float64, labels ...string) {
+		g.WithLabelValues(labels...).Set(value)
+	}
 }
 
 // discard implements Interface by discarding all metrics.
