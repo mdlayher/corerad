@@ -23,7 +23,9 @@ import (
 
 // Names of metrics which are referenced here and in tests.
 const (
-	raInconsistencies = "corerad_advertiser_router_advertisement_inconsistencies_total"
+	raPrefixAutonomous = "corerad_advertiser_router_advertisement_prefix_autonomous"
+	raPrefixOnLink     = "corerad_advertiser_router_advertisement_prefix_on_link"
+	raInconsistencies  = "corerad_advertiser_router_advertisement_inconsistencies_total"
 )
 
 // Metrics contains metrics for a CoreRAD instance.
@@ -36,6 +38,7 @@ type Metrics struct {
 	MessagesReceivedTotal                   metrics.Counter
 	MessagesReceivedInvalidTotal            metrics.Counter
 	RouterAdvertisementPrefixAutonomous     metrics.Gauge
+	RouterAdvertisementPrefixOnLink         metrics.Gauge
 	RouterAdvertisementInconsistenciesTotal metrics.Counter
 	RouterAdvertisementsTotal               metrics.Counter
 	ErrorsTotal                             metrics.Counter
@@ -81,6 +84,20 @@ func NewMetrics(m metrics.Interface) *Metrics {
 			"corerad_advertiser_messages_received_invalid_total",
 			"The total number of invalid NDP messages received on a listening interface.",
 			"interface", "message",
+		),
+
+		RouterAdvertisementPrefixAutonomous: m.Gauge(
+			raPrefixAutonomous,
+			"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
+			// TODO: verify uniqueness of prefixes per interface.
+			"interface", "prefix",
+		),
+
+		RouterAdvertisementPrefixOnLink: m.Gauge(
+			raPrefixOnLink,
+			"Indicates whether or not the On-Link flag is enabled for a given prefix.",
+			// TODO: verify uniqueness of prefixes per interface.
+			"interface", "prefix",
 		),
 
 		RouterAdvertisementInconsistenciesTotal: m.Counter(

@@ -419,26 +419,104 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 					t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
 				}
 
-				series, ok := cctx.mm.Series()
-				if !ok {
-					t.Fatalf("metrics node does not support Series output: %T", cctx.mm)
-				}
+				// Verify that a metric was produced indicating an RA
+				// inconsistency detected by this interface.
+				ts := findMetric(t, cctx.mm, raInconsistencies)
 
-				for name, ts := range series {
-					// Filter by the inconsistencies detection metric.
-					if name != raInconsistencies {
-						continue
-					}
-
-					// Verify that a metric was produced indicating an RA
-					// inconsistency detected by this interface.
-					label := fmt.Sprintf("interface=%s", cctx.router.Name)
-					if diff := cmp.Diff(1., ts.Samples[label]); diff != "" {
-						t.Fatalf("unexpected value for interface inconsistencies (-want +got):\n%s", diff)
-					}
+				label := fmt.Sprintf("interface=%s", cctx.router.Name)
+				if diff := cmp.Diff(1., ts.Samples[label]); diff != "" {
+					t.Fatalf("unexpected value for interface inconsistencies (-want +got):\n%s", diff)
 				}
 			})
 			defer done()
+		})
+	}
+}
+
+func TestAdvertiserPrometheusMetrics(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		fn   testAdvertiserFunc
+	}{
+		{
+			name: "simulated",
+			fn:   testSimulatedAdvertiserClient,
+		},
+		{
+			name: "real",
+			fn:   testAdvertiserClient,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Interface{
+				Plugins: []plugin.Plugin{
+					// Expose two prefixes with differing flags to verify
+					// against the metrics output.
+					&plugin.Prefix{
+						Prefix:            crtest.MustIPPrefix("2001:db8:1111::/64"),
+						Autonomous:        true,
+						OnLink:            true,
+						PreferredLifetime: 10 * time.Second,
+						ValidLifetime:     20 * time.Second,
+					},
+					&plugin.Prefix{
+						Prefix:            crtest.MustIPPrefix("2001:db8:2222::/64"),
+						PreferredLifetime: 10 * time.Second,
+						ValidLifetime:     20 * time.Second,
+					},
+				},
+			}
+
+			var (
+				ra                 *ndp.RouterAdvertisement
+				pfxAuto, pfxOnLink metrics.Series
+				iface              string
+			)
+
+			// TODO(mdlayher): consider refactoring clientContext so that it
+			// is also a return value of each tt.fn invocation.
+
+			done := tt.fn(t, cfg, nil, func(_ func(), cctx *clientContext) {
+				m, _, _, err := cctx.c.ReadFrom()
+				if err != nil {
+					t.Fatalf("failed to read RA: %v", err)
+				}
+
+				// Gather only the necessary information after a single RA and
+				// immediately stop the Advertiser to verify the output.
+				ra = m.(*ndp.RouterAdvertisement)
+				pfxAuto = findMetric(t, cctx.mm, raPrefixAutonomous)
+				pfxOnLink = findMetric(t, cctx.mm, raPrefixOnLink)
+				iface = cctx.router.Name
+			})
+			done()
+
+			// Verify the presence of matching metrics for any prefixes produced
+			// by the router advertisement.
+			var (
+				auto   = make(map[string]float64)
+				onLink = make(map[string]float64)
+			)
+
+			for _, p := range pickPrefixes(ra.Options) {
+				labels := fmt.Sprintf("interface=%s,prefix=%s/%d",
+					iface, p.Prefix, p.PrefixLength)
+
+				auto[labels] = boolFloat(p.AutonomousAddressConfiguration)
+				onLink[labels] = boolFloat(p.OnLink)
+			}
+
+			if diff := cmp.Diff(pfxAuto.Samples, auto); diff != "" {
+				t.Fatalf("unexpected prefix autonomous timeseries (-want +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff(pfxOnLink.Samples, auto); diff != "" {
+				t.Fatalf("unexpected prefix on-link timeseries (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -907,4 +985,25 @@ func mustNetIP(s string) net.IP {
 	}
 
 	return ip
+}
+
+func findMetric(t *testing.T, mm *Metrics, name string) metrics.Series {
+	t.Helper()
+
+	series, ok := mm.Series()
+	if !ok {
+		t.Fatalf("metrics node does not support Series output: %T", mm)
+	}
+
+	for sname, ts := range series {
+		// Filter to only return the specified metric.
+		if sname != name {
+			continue
+		}
+
+		return ts
+	}
+
+	t.Fatalf("no metric with name %q was found", name)
+	panic("unreachable")
 }

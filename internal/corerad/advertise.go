@@ -469,6 +469,8 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 
 	for _, o := range ra.Options {
 		// TODO(mdlayher): consider extracting this logic if it grows unwieldy.
+		// TODO(mdlayher): metrics for other options and base RA info, like
+		// default lifetime.
 		switch o := o.(type) {
 		case *ndp.PrefixInformation:
 			// Combine the prefix and prefix length fields into a proper CIDR
@@ -478,8 +480,15 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 				Mask: net.CIDRMask(int(o.PrefixLength), 128),
 			}
 
-			// TODO(mdlayher): work on during a stream!
-			_ = pfx
+			a.mm.RouterAdvertisementPrefixAutonomous(
+				boolFloat(o.AutonomousAddressConfiguration),
+				ifi.Name, pfx.String(),
+			)
+
+			a.mm.RouterAdvertisementPrefixOnLink(
+				boolFloat(o.OnLink),
+				ifi.Name, pfx.String(),
+			)
 		}
 	}
 
