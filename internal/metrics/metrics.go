@@ -130,14 +130,11 @@ func (m *Memory) Counter(name, help string, labelNames ...string) Counter {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var (
-		mu      sync.Mutex
-		samples = m.register(name, help, labelNames...)
-	)
+	samples := m.register(name, help, labelNames...)
 
 	return func(labels ...string) {
-		mu.Lock()
-		defer mu.Unlock()
+		m.mu.Lock()
+		defer m.mu.Unlock()
 
 		// Counter always increment.
 		samples[sampleKVs(name, labelNames, labels)]++
@@ -149,14 +146,11 @@ func (m *Memory) Gauge(name, help string, labelNames ...string) Gauge {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var (
-		mu      sync.Mutex
-		samples = m.register(name, help, labelNames...)
-	)
+	samples := m.register(name, help, labelNames...)
 
 	return func(value float64, labels ...string) {
-		mu.Lock()
-		defer mu.Unlock()
+		m.mu.Lock()
+		defer m.mu.Unlock()
 
 		// Gauges set an arbitrary value.
 		samples[sampleKVs(name, labelNames, labels)] = value
