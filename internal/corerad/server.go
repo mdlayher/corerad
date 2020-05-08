@@ -183,6 +183,7 @@ func (s *Server) runDebug(ctx context.Context, ifaces []config.Interface) error 
 			srv := &http.Server{
 				ReadTimeout: 1 * time.Second,
 				Handler: crhttp.NewHandler(
+					s.ll,
 					s.state,
 					ifaces,
 					d.Prometheus,

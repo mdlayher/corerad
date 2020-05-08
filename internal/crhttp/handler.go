@@ -14,7 +14,10 @@
 package crhttp
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/pprof"
 
@@ -28,12 +31,14 @@ import (
 // A Handler provides the HTTP debug API handler for CoreRAD.
 type Handler struct {
 	h      http.Handler
+	ll     *log.Logger
 	ifaces []config.Interface
 	state  system.State
 }
 
 // NewHandler creates a Handler with the specified configuration.
 func NewHandler(
+	ll *log.Logger,
 	state system.State,
 	ifaces []config.Interface,
 	usePrometheus, usePProf bool,
@@ -45,9 +50,13 @@ func NewHandler(
 		h: mux,
 
 		// TODO(mdlayher): use to build out other API handlers.
+		ll:     ll,
 		ifaces: ifaces,
 		state:  state,
 	}
+
+	// Plumb in debugging API handlers.
+	mux.HandleFunc("/api/interfaces", h.interfaces)
 
 	// Optionally enable Prometheus and pprof support.
 	if usePrometheus {
@@ -74,4 +83,47 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.h.ServeHTTP(w, r)
+}
+
+// interfaces returns a JSON representation of the advertising state of each
+// configured interface.
+func (h *Handler) interfaces(w http.ResponseWriter, r *http.Request) {
+	body := raBody{
+		Interfaces: make([]interfaceBody, 0, len(h.ifaces)),
+	}
+
+	for i, iface := range h.ifaces {
+		body.Interfaces = append(body.Interfaces, interfaceBody{
+			Interface:   iface.Name,
+			Advertising: iface.Advertise,
+		})
+
+		if !iface.Advertise {
+			// For interfaces which are not advertising, only report basic
+			// information with null RA output.
+			continue
+		}
+
+		forwarding, err := h.state.IPv6Forwarding(iface.Name)
+		if err != nil {
+			h.errorf(w, "failed to check interface %q forwarding state: %v", iface.Name, err)
+			return
+		}
+
+		ra, err := iface.RouterAdvertisement(forwarding)
+		if err != nil {
+			h.errorf(w, "failed to generate router advertisements: %v", err)
+			return
+		}
+
+		body.Interfaces[i].Advertisement = packRA(ra)
+	}
+
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func (h *Handler) errorf(w http.ResponseWriter, format string, v ...interface{}) {
+	err := fmt.Errorf(format, v...)
+	h.ll.Printf("HTTP server error: %v", err)
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }

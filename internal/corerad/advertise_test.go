@@ -603,7 +603,7 @@ func testSimulatedAdvertiserClient(
 
 	// Swap out the underlying connections for a UDP socket pair.
 	sc, cc, cDone := testConnPair(t)
-	ad.state = &testState{forwarding: true}
+	ad.state = &system.TestState{Forwarding: true}
 
 	ad.dialer = &system.Dialer{
 		DialFunc: func() *system.DialContext {
@@ -728,15 +728,6 @@ func (c *udpConn) WriteTo(m ndp.Message, _ *ipv6.ControlMessage, _ net.IP) error
 	_, err = c.pc.WriteTo(b, c.peer)
 	return err
 }
-
-type testState struct {
-	autoconf, forwarding bool
-}
-
-var _ system.State = &testState{}
-
-func (tks *testState) IPv6Autoconf(_ string) (bool, error)   { return tks.autoconf, nil }
-func (tks *testState) IPv6Forwarding(_ string) (bool, error) { return tks.forwarding, nil }
 
 func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Advertiser, *clientContext, func()) {
 	t.Helper()

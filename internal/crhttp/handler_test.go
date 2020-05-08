@@ -15,8 +15,10 @@ package crhttp_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -24,13 +26,24 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/crhttp"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+// TODO: export from the package.
+type tempBody struct {
+	Interfaces []struct {
+		Interface string `json:"interface"`
+	} `json:"interfaces"`
+}
 
 func TestHandlerRoutes(t *testing.T) {
 	tests := []struct {
 		name              string
+		state             system.State
+		ifaces            []config.Interface
 		prometheus, pprof bool
 		path              string
 		status            int
@@ -83,6 +96,58 @@ func TestHandlerRoutes(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "no interfaces",
+			state: &system.TestState{
+				// TODO: parameterize this per interface.
+				Forwarding: true,
+			},
+			path:   "/api/interfaces",
+			status: http.StatusOK,
+			check: func(t *testing.T, b []byte) {
+				var body tempBody
+				if err := json.Unmarshal(b, &body); err != nil {
+					t.Fatalf("failed to unmarshal JSON: %v", err)
+				}
+
+				if diff := cmp.Diff(0, len(body.Interfaces)); diff != "" {
+					t.Fatalf("unexpected number of interfaces in HTTP body (-want +got):\n%s", diff)
+				}
+			},
+		},
+		{
+			name: "interfaces",
+			state: &system.TestState{
+				// TODO: parameterize this per interface.
+				Forwarding: true,
+			},
+			ifaces: []config.Interface{
+				// One interface in each advertising and non-advertising state.
+				{Name: "eth0", Advertise: true},
+				{Name: "eth1", Advertise: false},
+			},
+			path:   "/api/interfaces",
+			status: http.StatusOK,
+			check: func(t *testing.T, b []byte) {
+				var body tempBody
+				if err := json.Unmarshal(b, &body); err != nil {
+					t.Fatalf("failed to unmarshal JSON: %v", err)
+				}
+
+				if diff := cmp.Diff(2, len(body.Interfaces)); diff != "" {
+					t.Fatalf("unexpected number of interfaces in HTTP body (-want +got):\n%s", diff)
+				}
+
+				names := make([]string, 0, len(body.Interfaces))
+				for _, ifi := range body.Interfaces {
+					names = append(names, ifi.Interface)
+				}
+
+				if diff := cmp.Diff([]string{"eth0", "eth1"}, names); diff != "" {
+					t.Fatalf("unexpected interface names (-want +got):\n%s", diff)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,9 +160,9 @@ func TestHandlerRoutes(t *testing.T) {
 
 			srv := httptest.NewServer(
 				crhttp.NewHandler(
-					// TODO: parameterize.
-					nil,
-					nil,
+					log.New(ioutil.Discard, "", 0),
+					tt.state,
+					tt.ifaces,
 					tt.prometheus,
 					tt.pprof,
 					reg,
