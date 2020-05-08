@@ -31,6 +31,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/crtest"
+	"github.com/mdlayher/corerad/internal/metrics"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
@@ -417,6 +418,25 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 				if diff := cmp.Diff(&want, got); diff != "" {
 					t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
 				}
+
+				series, ok := cctx.mm.Series()
+				if !ok {
+					t.Fatalf("metrics node does not support Series output: %T", cctx.mm)
+				}
+
+				for name, ts := range series {
+					// Filter by the inconsistencies detection metric.
+					if name != raInconsistencies {
+						continue
+					}
+
+					// Verify that a metric was produced indicating an RA
+					// inconsistency detected by this interface.
+					label := fmt.Sprintf("interface=%s", cctx.router.Name)
+					if diff := cmp.Diff(1., ts.Samples[label]); diff != "" {
+						t.Fatalf("unexpected value for interface inconsistencies (-want +got):\n%s", diff)
+					}
+				}
 			})
 			defer done()
 		})
@@ -491,7 +511,7 @@ func testSimulatedAdvertiserClient(
 	defer cancel()
 
 	// Set up metrics node so we can inspect its contents at a later time.
-	mm := NewMetrics(nil)
+	mm := NewMetrics(metrics.NewMemory())
 	ad := NewAdvertiser(
 		cfg.Name,
 		*cfg,
@@ -698,7 +718,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	}
 
 	// Set up metrics node so we can inspect its contents at a later time.
-	mm := NewMetrics(nil)
+	mm := NewMetrics(metrics.NewMemory())
 	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), mm)
 
 	if tcfg != nil && tcfg.onInconsistentRA != nil {

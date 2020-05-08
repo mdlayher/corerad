@@ -21,6 +21,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Names of metrics which are referenced here and in tests.
+const (
+	raInconsistencies = "corerad_advertiser_router_advertisement_inconsistencies_total"
+)
+
 // Metrics contains metrics for a CoreRAD instance.
 type Metrics struct {
 	Info metrics.Gauge
@@ -34,6 +39,9 @@ type Metrics struct {
 	RouterAdvertisementInconsistenciesTotal metrics.Counter
 	RouterAdvertisementsTotal               metrics.Counter
 	ErrorsTotal                             metrics.Counter
+
+	// The underlying metrics storage.
+	m metrics.Interface
 }
 
 // NewMetrics produces a Metrics structure which will register its metrics to
@@ -44,6 +52,8 @@ func NewMetrics(m metrics.Interface) *Metrics {
 	}
 
 	mm := &Metrics{
+		m: m,
+
 		Info: m.Gauge(
 			"corerad_build_info",
 			"Metadata about this build of CoreRAD.",
@@ -74,7 +84,7 @@ func NewMetrics(m metrics.Interface) *Metrics {
 		),
 
 		RouterAdvertisementInconsistenciesTotal: m.Counter(
-			"corerad_advertiser_router_advertisement_inconsistencies_total",
+			raInconsistencies,
 			"The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration.",
 			"interface",
 		),
@@ -98,6 +108,23 @@ func NewMetrics(m metrics.Interface) *Metrics {
 	mm.Time(float64(build.Time().Unix()))
 
 	return mm
+}
+
+// Series produces a set of output timeseries from the Metrics, assuming the
+// Metrics were initialized with a compatible metrics.Interface. If not, Series
+// will return nil, false.
+func (m *Metrics) Series() (map[string]metrics.Series, bool) {
+	type series interface {
+		Series() map[string]metrics.Series
+	}
+
+	sm, ok := m.m.(series)
+	if !ok {
+		// Type does not support Series output.
+		return nil, false
+	}
+
+	return sm.Series(), true
 }
 
 // An interfaceCollector collects Prometheus metrics for a network interface.
