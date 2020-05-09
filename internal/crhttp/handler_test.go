@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -99,7 +100,6 @@ func TestHandlerRoutes(t *testing.T) {
 		{
 			name: "no interfaces",
 			state: system.TestState{
-				// TODO: parameterize this per interface.
 				Forwarding: true,
 			},
 			path:   "/api/interfaces",
@@ -118,7 +118,6 @@ func TestHandlerRoutes(t *testing.T) {
 		{
 			name: "interfaces",
 			state: system.TestState{
-				// TODO: parameterize this per interface.
 				Forwarding: true,
 			},
 			ifaces: []config.Interface{
@@ -145,6 +144,23 @@ func TestHandlerRoutes(t *testing.T) {
 
 				if diff := cmp.Diff([]string{"eth0", "eth1"}, names); diff != "" {
 					t.Fatalf("unexpected interface names (-want +got):\n%s", diff)
+				}
+			},
+		},
+		{
+			name: "error fetching forwarding",
+			state: system.TestState{
+				Forwarding: true,
+				Error:      os.ErrPermission,
+			},
+			ifaces: []config.Interface{
+				{Name: "eth0", Advertise: true},
+			},
+			path:   "/api/interfaces",
+			status: http.StatusInternalServerError,
+			check: func(t *testing.T, b []byte) {
+				if !bytes.HasPrefix(b, []byte(`failed to check interface "eth0" forwarding`)) {
+					t.Fatalf("unexpected body output: %s", string(b))
 				}
 			},
 		},
