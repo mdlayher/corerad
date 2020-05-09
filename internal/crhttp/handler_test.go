@@ -98,7 +98,7 @@ func TestHandlerRoutes(t *testing.T) {
 		},
 		{
 			name: "no interfaces",
-			state: &system.TestState{
+			state: system.TestState{
 				// TODO: parameterize this per interface.
 				Forwarding: true,
 			},
@@ -117,7 +117,7 @@ func TestHandlerRoutes(t *testing.T) {
 		},
 		{
 			name: "interfaces",
-			state: &system.TestState{
+			state: system.TestState{
 				// TODO: parameterize this per interface.
 				Forwarding: true,
 			},

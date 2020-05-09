@@ -33,13 +33,41 @@ func (systemState) IPv6Forwarding(iface string) (bool, error) { return getIPv6Fo
 
 // A TestState is a State which is primarily useful in tests.
 type TestState struct {
+	// Global settings for any interface name.
+	Autoconf, Forwarding bool
+	Error                error
+
+	// Alternatively, you may configure parameters individually on a
+	// per-interface basis. Note that these configurations will override any
+	// global configurations set above.
+	Interfaces map[string]TestStateInterface
+}
+
+// A TestStateInterface sets the State configuration for a simulated network interface.
+type TestStateInterface struct {
 	Autoconf, Forwarding bool
 }
 
-var _ State = &TestState{}
+var _ State = TestState{}
 
 // IPv6Autoconf implements State.
-func (ts *TestState) IPv6Autoconf(_ string) (bool, error) { return ts.Autoconf, nil }
+func (ts TestState) IPv6Autoconf(iface string) (bool, error) {
+	tsi, ok := ts.Interfaces[iface]
+	if ok {
+		return tsi.Autoconf, ts.Error
+	}
+
+	// Fall back to global configuration.
+	return ts.Autoconf, ts.Error
+}
 
 // IPv6Forwarding implements State.
-func (ts *TestState) IPv6Forwarding(_ string) (bool, error) { return ts.Forwarding, nil }
+func (ts TestState) IPv6Forwarding(iface string) (bool, error) {
+	tsi, ok := ts.Interfaces[iface]
+	if ok {
+		return tsi.Forwarding, ts.Error
+	}
+
+	// Fall back to global configuration.
+	return ts.Forwarding, ts.Error
+}

@@ -603,7 +603,7 @@ func testSimulatedAdvertiserClient(
 
 	// Swap out the underlying connections for a UDP socket pair.
 	sc, cc, cDone := testConnPair(t)
-	ad.state = &system.TestState{Forwarding: true}
+	ad.state = system.TestState{Forwarding: true}
 
 	ad.dialer = &system.Dialer{
 		DialFunc: func() *system.DialContext {
