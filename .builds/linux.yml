@@ -8,16 +8,14 @@ environment:
 tasks:
   - build: |
       go version
-      go get golang.org/x/lint/golint
       go get honnef.co/go/tools/cmd/staticcheck
       cd corerad/
-      ./.cibuild.sh
+      ./scripts/cibuild.sh
       go vet -mod vendor ./...
       /home/build/go/bin/staticcheck ./...
-      /home/build/go/bin/golint -set_exit_status . ./cmd/... ./internal/...
-      go test -mod vendor -v -race ./...
+      go test -mod vendor -race ./...
       go test -c -mod vendor -race ./internal/corerad/
-      sudo ./corerad.test -test.v -test.run TestAdvertiser
+      sudo ./corerad.test -test.run TestAdvertiser
       # Ensure a valid and sane configuration can be generated.
       go build -mod vendor ./cmd/corerad/
       go get github.com/BurntSushi/toml/cmd/tomlv
