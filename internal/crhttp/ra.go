@@ -36,16 +36,16 @@ type interfaceBody struct {
 
 // A routerAdvertisement represents an unpacked NDP router advertisement.
 type routerAdvertisement struct {
-	CurrentHopLimit             int      `json:"current_hop_limit"`
-	ManagedConfiguration        bool     `json:"managed_configuration"`
-	OtherConfiguration          bool     `json:"other_configuration"`
-	MobileIPv6HomeAgent         bool     `json:"mobile_ipv6_home_agent"`
-	RouterSelectionPreference   string   `json:"router_selection_preference"`
-	NeighborDiscoveryProxy      bool     `json:"neighbor_discovery_proxy"`
-	RouterLifetimeSeconds       int      `json:"router_lifetime_seconds"`
-	ReachableTimeMilliseconds   int      `json:"reachable_time_milliseconds"`
-	RetransmitTimerMilliseconds int      `json:"retransmit_timer_milliseconds"`
-	Options                     []option `json:"options"`
+	CurrentHopLimit             int     `json:"current_hop_limit"`
+	ManagedConfiguration        bool    `json:"managed_configuration"`
+	OtherConfiguration          bool    `json:"other_configuration"`
+	MobileIPv6HomeAgent         bool    `json:"mobile_ipv6_home_agent"`
+	RouterSelectionPreference   string  `json:"router_selection_preference"`
+	NeighborDiscoveryProxy      bool    `json:"neighbor_discovery_proxy"`
+	RouterLifetimeSeconds       int     `json:"router_lifetime_seconds"`
+	ReachableTimeMilliseconds   int     `json:"reachable_time_milliseconds"`
+	RetransmitTimerMilliseconds int     `json:"retransmit_timer_milliseconds"`
+	Options                     options `json:"options"`
 }
 
 // packRA packs the data from an RA into a routerAdvertisement structure.
@@ -60,6 +60,7 @@ func packRA(ra *ndp.RouterAdvertisement) *routerAdvertisement {
 		RouterLifetimeSeconds:       int(ra.RouterLifetime.Seconds()),
 		ReachableTimeMilliseconds:   int(ra.ReachableTime.Milliseconds()),
 		RetransmitTimerMilliseconds: int(ra.RetransmitTimer.Milliseconds()),
+		Options:                     packOptions(ra.Options),
 	}
 }
 
@@ -77,6 +78,23 @@ func preference(p ndp.Preference) string {
 	}
 }
 
-type option struct {
-	// TODO!
+// options represents the options unpacked from an NDP router advertisement.
+type options struct {
+	MTU                    int
+	SourceLinkLayerAddress string
+}
+
+// packOptions unpacks individual NDP options to produce an options structure.
+func packOptions(opts []ndp.Option) options {
+	var out options
+	for _, o := range opts {
+		switch o := o.(type) {
+		case *ndp.LinkLayerAddress:
+			out.SourceLinkLayerAddress = o.Addr.String()
+		case *ndp.MTU:
+			out.MTU = int(*o)
+		}
+	}
+
+	return out
 }

@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -125,6 +126,10 @@ func TestHandlerRoutes(t *testing.T) {
 					HopLimit:        64,
 					DefaultLifetime: 30 * time.Minute,
 					ReachableTime:   12345 * time.Millisecond,
+					Plugins: []plugin.Plugin{
+						&plugin.LLA{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+						plugin.NewMTU(1500),
+					},
 				},
 				{Name: "eth1", Advertise: false},
 			},
@@ -141,6 +146,10 @@ func TestHandlerRoutes(t *testing.T) {
 								RouterSelectionPreference: "medium",
 								RouterLifetimeSeconds:     60 * 30,
 								ReachableTimeMilliseconds: 12345,
+								Options: options{
+									MTU:                    1500,
+									SourceLinkLayerAddress: "de:ad:be:ef:de:ad",
+								},
 							},
 						},
 						{
