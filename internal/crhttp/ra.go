@@ -19,16 +19,22 @@ import (
 	"github.com/mdlayher/ndp"
 )
 
-type raBody struct {
+// An interfacesBody is the top-level structure returned by the debug API's
+// interfaces route.
+type interfacesBody struct {
 	Interfaces []interfaceBody `json:"interfaces"`
 }
 
+// An interfaceBody represents an individual advertising interface.
 type interfaceBody struct {
-	Interface     string               `json:"interface"`
-	Advertising   bool                 `json:"advertise"`
+	Interface   string `json:"interface"`
+	Advertising bool   `json:"advertise"`
+
+	// Nil if Advertising is false.
 	Advertisement *routerAdvertisement `json:"advertisement"`
 }
 
+// A routerAdvertisement represents an unpacked NDP router advertisement.
 type routerAdvertisement struct {
 	CurrentHopLimit             int      `json:"current_hop_limit"`
 	ManagedConfiguration        bool     `json:"managed_configuration"`
@@ -42,6 +48,7 @@ type routerAdvertisement struct {
 	Options                     []option `json:"options"`
 }
 
+// packRA packs the data from an RA into a routerAdvertisement structure.
 func packRA(ra *ndp.RouterAdvertisement) *routerAdvertisement {
 	return &routerAdvertisement{
 		CurrentHopLimit:             int(ra.CurrentHopLimit),
@@ -56,6 +63,7 @@ func packRA(ra *ndp.RouterAdvertisement) *routerAdvertisement {
 	}
 }
 
+// preference returns a stringified preference value for p.
 func preference(p ndp.Preference) string {
 	switch p {
 	case ndp.Low:

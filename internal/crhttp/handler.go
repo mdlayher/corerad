@@ -88,7 +88,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // interfaces returns a JSON representation of the advertising state of each
 // configured interface.
 func (h *Handler) interfaces(w http.ResponseWriter, r *http.Request) {
-	body := raBody{
+	body := interfacesBody{
 		Interfaces: make([]interfaceBody, 0, len(h.ifaces)),
 	}
 

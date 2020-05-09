@@ -131,7 +131,7 @@ func TestHandlerRoutes(t *testing.T) {
 			path:   "/api/interfaces",
 			status: http.StatusOK,
 			check: func(t *testing.T, b []byte) {
-				want := raBody{
+				want := interfacesBody{
 					Interfaces: []interfaceBody{
 						{
 							Interface:   "eth0",
@@ -229,8 +229,8 @@ func TestHandlerRoutes(t *testing.T) {
 	}
 }
 
-func parseJSONBody(b []byte) raBody {
-	var body raBody
+func parseJSONBody(b []byte) interfacesBody {
+	var body interfacesBody
 	if err := json.Unmarshal(b, &body); err != nil {
 		panicf("failed to unmarshal JSON: %v", err)
 	}
