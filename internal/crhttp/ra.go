@@ -15,6 +15,7 @@ package crhttp
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/mdlayher/ndp"
 )
@@ -80,8 +81,18 @@ func preference(p ndp.Preference) string {
 
 // options represents the options unpacked from an NDP router advertisement.
 type options struct {
-	MTU                    int
-	SourceLinkLayerAddress string
+	MTU                    int      `json:"mtu"`
+	Prefixes               []prefix `json:"prefixes"`
+	SourceLinkLayerAddress string   `json:"source_link_layer_address"`
+}
+
+// A prefix represents an NDP Prefix Information option.
+type prefix struct {
+	Prefix                             string `json:"prefix"`
+	OnLink                             bool   `json:"on_link"`
+	AutonomousAddressAutoconfiguration bool   `json:"autonomous_address_autoconfiguration"`
+	ValidLifetimeSeconds               int    `json:"valid_lifetime_seconds"`
+	PreferredLifetimeSeconds           int    `json:"preferred_lifetime_seconds"`
 }
 
 // packOptions unpacks individual NDP options to produce an options structure.
@@ -93,6 +104,18 @@ func packOptions(opts []ndp.Option) options {
 			out.SourceLinkLayerAddress = o.Addr.String()
 		case *ndp.MTU:
 			out.MTU = int(*o)
+		case *ndp.PrefixInformation:
+			out.Prefixes = append(out.Prefixes, prefix{
+				// Pack prefix and mask into a combined CIDR notation string.
+				Prefix: (&net.IPNet{
+					IP:   o.Prefix,
+					Mask: net.CIDRMask(int(o.PrefixLength), 128),
+				}).String(),
+				OnLink:                             o.OnLink,
+				AutonomousAddressAutoconfiguration: o.AutonomousAddressConfiguration,
+				ValidLifetimeSeconds:               int(o.ValidLifetime.Seconds()),
+				PreferredLifetimeSeconds:           int(o.PreferredLifetime.Seconds()),
+			})
 		}
 	}
 

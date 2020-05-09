@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/prometheus/client_golang/prometheus"
@@ -129,9 +130,25 @@ func TestHandlerRoutes(t *testing.T) {
 					Plugins: []plugin.Plugin{
 						&plugin.LLA{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 						plugin.NewMTU(1500),
+						&plugin.Prefix{
+							Autonomous:        true,
+							ValidLifetime:     10 * time.Minute,
+							PreferredLifetime: 5 * time.Minute,
+							Prefix:            crtest.MustIPPrefix("2001:db8::/64"),
+						},
+						&plugin.Prefix{
+							OnLink:            true,
+							Autonomous:        true,
+							ValidLifetime:     10 * time.Minute,
+							PreferredLifetime: 5 * time.Minute,
+							Prefix:            crtest.MustIPPrefix("fdff:dead:beef:dead::/64"),
+						},
 					},
 				},
-				{Name: "eth1", Advertise: false},
+				{
+					Name:      "eth1",
+					Advertise: false,
+				},
 			},
 			path:   "/api/interfaces",
 			status: http.StatusOK,
@@ -147,7 +164,22 @@ func TestHandlerRoutes(t *testing.T) {
 								RouterLifetimeSeconds:     60 * 30,
 								ReachableTimeMilliseconds: 12345,
 								Options: options{
-									MTU:                    1500,
+									MTU: 1500,
+									Prefixes: []prefix{
+										{
+											Prefix:                             "2001:db8::/64",
+											AutonomousAddressAutoconfiguration: true,
+											ValidLifetimeSeconds:               60 * 10,
+											PreferredLifetimeSeconds:           60 * 5,
+										},
+										{
+											Prefix:                             "fdff:dead:beef:dead::/64",
+											OnLink:                             true,
+											AutonomousAddressAutoconfiguration: true,
+											ValidLifetimeSeconds:               60 * 10,
+											PreferredLifetimeSeconds:           60 * 5,
+										},
+									},
 									SourceLinkLayerAddress: "de:ad:be:ef:de:ad",
 								},
 							},
