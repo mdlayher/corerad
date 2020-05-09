@@ -44,11 +44,15 @@ type routerAdvertisement struct {
 
 func packRA(ra *ndp.RouterAdvertisement) *routerAdvertisement {
 	return &routerAdvertisement{
-		CurrentHopLimit:           int(ra.CurrentHopLimit),
-		ManagedConfiguration:      ra.ManagedConfiguration,
-		OtherConfiguration:        ra.OtherConfiguration,
-		MobileIPv6HomeAgent:       ra.MobileIPv6HomeAgent,
-		RouterSelectionPreference: preference(ra.RouterSelectionPreference),
+		CurrentHopLimit:             int(ra.CurrentHopLimit),
+		ManagedConfiguration:        ra.ManagedConfiguration,
+		OtherConfiguration:          ra.OtherConfiguration,
+		MobileIPv6HomeAgent:         ra.MobileIPv6HomeAgent,
+		RouterSelectionPreference:   preference(ra.RouterSelectionPreference),
+		NeighborDiscoveryProxy:      ra.NeighborDiscoveryProxy,
+		RouterLifetimeSeconds:       int(ra.RouterLifetime.Seconds()),
+		ReachableTimeMilliseconds:   int(ra.ReachableTime.Milliseconds()),
+		RetransmitTimerMilliseconds: int(ra.RetransmitTimer.Milliseconds()),
 	}
 }
 

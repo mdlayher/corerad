@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package crhttp_test
+package crhttp
 
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -28,7 +29,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
-	"github.com/mdlayher/corerad/internal/crhttp"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -105,10 +105,7 @@ func TestHandlerRoutes(t *testing.T) {
 			path:   "/api/interfaces",
 			status: http.StatusOK,
 			check: func(t *testing.T, b []byte) {
-				var body tempBody
-				if err := json.Unmarshal(b, &body); err != nil {
-					t.Fatalf("failed to unmarshal JSON: %v", err)
-				}
+				body := parseJSONBody(b)
 
 				if diff := cmp.Diff(0, len(body.Interfaces)); diff != "" {
 					t.Fatalf("unexpected number of interfaces in HTTP body (-want +got):\n%s", diff)
@@ -122,28 +119,39 @@ func TestHandlerRoutes(t *testing.T) {
 			},
 			ifaces: []config.Interface{
 				// One interface in each advertising and non-advertising state.
-				{Name: "eth0", Advertise: true},
+				{
+					Name:            "eth0",
+					Advertise:       true,
+					HopLimit:        64,
+					DefaultLifetime: 30 * time.Minute,
+					ReachableTime:   12345 * time.Millisecond,
+				},
 				{Name: "eth1", Advertise: false},
 			},
 			path:   "/api/interfaces",
 			status: http.StatusOK,
 			check: func(t *testing.T, b []byte) {
-				var body tempBody
-				if err := json.Unmarshal(b, &body); err != nil {
-					t.Fatalf("failed to unmarshal JSON: %v", err)
+				want := raBody{
+					Interfaces: []interfaceBody{
+						{
+							Interface:   "eth0",
+							Advertising: true,
+							Advertisement: &routerAdvertisement{
+								CurrentHopLimit:           64,
+								RouterSelectionPreference: "medium",
+								RouterLifetimeSeconds:     60 * 30,
+								ReachableTimeMilliseconds: 12345,
+							},
+						},
+						{
+							Interface:   "eth1",
+							Advertising: false,
+						},
+					},
 				}
 
-				if diff := cmp.Diff(2, len(body.Interfaces)); diff != "" {
-					t.Fatalf("unexpected number of interfaces in HTTP body (-want +got):\n%s", diff)
-				}
-
-				names := make([]string, 0, len(body.Interfaces))
-				for _, ifi := range body.Interfaces {
-					names = append(names, ifi.Interface)
-				}
-
-				if diff := cmp.Diff([]string{"eth0", "eth1"}, names); diff != "" {
-					t.Fatalf("unexpected interface names (-want +got):\n%s", diff)
+				if diff := cmp.Diff(want, parseJSONBody(b)); diff != "" {
+					t.Fatalf("unexpected raBody (-want +got):\n%s", diff)
 				}
 			},
 		},
@@ -175,7 +183,7 @@ func TestHandlerRoutes(t *testing.T) {
 			reg.MustRegister(prometheus.NewGoCollector())
 
 			srv := httptest.NewServer(
-				crhttp.NewHandler(
+				NewHandler(
 					log.New(ioutil.Discard, "", 0),
 					tt.state,
 					tt.ifaces,
@@ -219,4 +227,17 @@ func TestHandlerRoutes(t *testing.T) {
 			tt.check(t, body)
 		})
 	}
+}
+
+func parseJSONBody(b []byte) raBody {
+	var body raBody
+	if err := json.Unmarshal(b, &body); err != nil {
+		panicf("failed to unmarshal JSON: %v", err)
+	}
+
+	return body
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }
