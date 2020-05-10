@@ -5,7 +5,6 @@ BUILDPKG := github.com/mdlayher/corerad/internal/build
 
 make:
 	go build \
-		-mod=vendor \
 		-ldflags=" \
 			-X $(BUILDPKG).linkTimestamp=$(TIMESTAMP) \
 			-X $(BUILDPKG).linkVersion=$(VERSION) \

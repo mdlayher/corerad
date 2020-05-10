@@ -11,13 +11,13 @@ tasks:
       go get honnef.co/go/tools/cmd/staticcheck
       cd corerad/
       ./scripts/cibuild.sh
-      go vet -mod vendor ./...
+      go vet ./...
       /home/build/go/bin/staticcheck ./...
-      go test -mod vendor -race ./...
-      go test -c -mod vendor -race ./internal/corerad/
+      go test -race ./...
+      go test -c -race ./internal/corerad/
       sudo ./corerad.test -test.run TestAdvertiser
       # Ensure a valid and sane configuration can be generated.
-      go build -mod vendor ./cmd/corerad/
+      go build ./cmd/corerad/
       go get github.com/BurntSushi/toml/cmd/tomlv
       ./corerad -init
       /home/build/go/bin/tomlv ./corerad.toml
