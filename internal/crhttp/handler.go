@@ -28,6 +28,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Common HTTP content types.
+const (
+	contentText = "text/plain; charset=utf-8"
+	contentJSON = "application/json; charset=utf-8"
+)
+
 // A Handler provides the HTTP debug API handler for CoreRAD.
 type Handler struct {
 	h      http.Handler
@@ -118,6 +124,9 @@ func (h *Handler) interfaces(w http.ResponseWriter, r *http.Request) {
 
 		body.Interfaces[i].Advertisement = packRA(ra)
 	}
+
+	// TODO: factor out JSON serving middleware.
+	w.Header().Set("Content-Type", contentJSON)
 
 	_ = json.NewEncoder(w).Encode(body)
 }

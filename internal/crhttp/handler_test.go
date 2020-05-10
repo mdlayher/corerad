@@ -44,13 +44,17 @@ func TestHandlerRoutes(t *testing.T) {
 		prometheus, pprof bool
 		path              string
 		status            int
-		check             func(t *testing.T, body []byte)
+		check             func(t *testing.T, header http.Header, body []byte)
 	}{
 		{
 			name:   "index",
 			path:   "/",
 			status: http.StatusOK,
-			check: func(t *testing.T, body []byte) {
+			check: func(t *testing.T, h http.Header, body []byte) {
+				if diff := cmp.Diff(contentText, h.Get("Content-Type")); diff != "" {
+					t.Fatalf("unexpected Content-Type (-want +got):\n%s", diff)
+				}
+
 				if !bytes.HasPrefix(body, []byte("CoreRAD")) {
 					t.Fatal("CoreRAD banner was not found")
 				}
@@ -71,7 +75,7 @@ func TestHandlerRoutes(t *testing.T) {
 			prometheus: true,
 			path:       "/metrics",
 			status:     http.StatusOK,
-			check: func(t *testing.T, body []byte) {
+			check: func(t *testing.T, _ http.Header, body []byte) {
 				if !bytes.HasPrefix(body, []byte("# HELP go_")) {
 					t.Fatal("Prometheus Go collector metric was not found")
 				}
@@ -87,7 +91,7 @@ func TestHandlerRoutes(t *testing.T) {
 			pprof:  true,
 			path:   "/debug/pprof/goroutine?debug=1",
 			status: http.StatusOK,
-			check: func(t *testing.T, body []byte) {
+			check: func(t *testing.T, _ http.Header, body []byte) {
 				if !bytes.HasPrefix(body, []byte("goroutine profile:")) {
 					t.Fatal("goroutine profile was not found")
 				}
@@ -100,7 +104,7 @@ func TestHandlerRoutes(t *testing.T) {
 			},
 			path:   "/api/interfaces",
 			status: http.StatusOK,
-			check: func(t *testing.T, b []byte) {
+			check: func(t *testing.T, h http.Header, b []byte) {
 				body := parseJSONBody(b)
 
 				if diff := cmp.Diff(0, len(body.Interfaces)); diff != "" {
@@ -163,7 +167,7 @@ func TestHandlerRoutes(t *testing.T) {
 			},
 			path:   "/api/interfaces",
 			status: http.StatusOK,
-			check: func(t *testing.T, b []byte) {
+			check: func(t *testing.T, h http.Header, b []byte) {
 				want := interfacesBody{
 					Interfaces: []interfaceBody{
 						{
@@ -215,6 +219,10 @@ func TestHandlerRoutes(t *testing.T) {
 					},
 				}
 
+				if diff := cmp.Diff(contentJSON, h.Get("Content-Type")); diff != "" {
+					t.Fatalf("unexpected Content-Type (-want +got):\n%s", diff)
+				}
+
 				if diff := cmp.Diff(want, parseJSONBody(b)); diff != "" {
 					t.Fatalf("unexpected raBody (-want +got):\n%s", diff)
 				}
@@ -231,7 +239,7 @@ func TestHandlerRoutes(t *testing.T) {
 			},
 			path:   "/api/interfaces",
 			status: http.StatusInternalServerError,
-			check: func(t *testing.T, b []byte) {
+			check: func(t *testing.T, _ http.Header, b []byte) {
 				if !bytes.HasPrefix(b, []byte(`failed to check interface "eth0" forwarding`)) {
 					t.Fatalf("unexpected body output: %s", string(b))
 				}
@@ -289,7 +297,7 @@ func TestHandlerRoutes(t *testing.T) {
 				t.Fatalf("failed to read HTTP body: %v", err)
 			}
 
-			tt.check(t, body)
+			tt.check(t, res.Header, body)
 		})
 	}
 }
