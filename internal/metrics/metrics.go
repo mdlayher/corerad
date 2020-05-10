@@ -99,7 +99,7 @@ func (discard) Gauge(_, _ string, _ ...string) Gauge { return func(_ float64, _ 
 type Memory struct {
 	// Records stores a record of each operation performed on the Recorder.
 	mu     sync.Mutex
-	series map[string]*Series
+	series map[string]*series
 }
 
 // Series produces a copy of all of the timeseries and samples stored by
@@ -110,21 +110,29 @@ func (m *Memory) Series() map[string]Series {
 
 	out := make(map[string]Series, len(m.series))
 	for k, v := range m.series {
-		// Make an explicit copy to store in the output.
-		v := *v
-		out[k] = v
+		out[k] = Series{
+			Name:    v.Name,
+			Help:    v.Help,
+			Samples: v.Samples.Clone(),
+		}
 	}
 
 	return out
 }
 
 // NewMemory creates an initialized Memory.
-func NewMemory() *Memory { return &Memory{series: make(map[string]*Series)} }
+func NewMemory() *Memory { return &Memory{series: make(map[string]*series)} }
 
 // A Series is a timeseries with metadata and samples partitioned by labels.
 type Series struct {
 	Name, Help string
 	Samples    map[string]float64
+}
+
+// A series is a concurrency safe representation of Series for internal use.
+type series struct {
+	Name, Help string
+	Samples    *sampleMap
 }
 
 // Counter implements Interface.
@@ -139,7 +147,7 @@ func (m *Memory) Counter(name, help string, labelNames ...string) Counter {
 		defer m.mu.Unlock()
 
 		// Counter always increment.
-		samples[sampleKVs(name, labelNames, labels)]++
+		samples.Inc(sampleKVs(name, labelNames, labels))
 	}
 }
 
@@ -155,25 +163,59 @@ func (m *Memory) Gauge(name, help string, labelNames ...string) Gauge {
 		defer m.mu.Unlock()
 
 		// Gauges set an arbitrary value.
-		samples[sampleKVs(name, labelNames, labels)] = value
+		samples.Set(sampleKVs(name, labelNames, labels), value)
 	}
 }
 
 // register registers a timeseries and produces a samples map for that series.
-func (m *Memory) register(name, help string, labelNames ...string) map[string]float64 {
+func (m *Memory) register(name, help string, labelNames ...string) *sampleMap {
 	if _, ok := m.series[name]; ok {
 		panicf("metrics: timeseries %q already registered", name)
 	}
 
-	samples := make(map[string]float64)
+	samples := &sampleMap{m: make(map[string]float64)}
 
-	m.series[name] = &Series{
+	m.series[name] = &series{
 		Name:    name,
 		Help:    help,
 		Samples: samples,
 	}
 
 	return samples
+}
+
+// A sampleMap is a concurrency-safe map of label combinations to samples.
+type sampleMap struct {
+	mu sync.Mutex
+	m  map[string]float64
+}
+
+// Clone creates a copy of the underlying map from the sampleMap.
+func (sm *sampleMap) Clone() map[string]float64 {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	// Create an output map that contains all of the data from sm.m.
+	samples := make(map[string]float64, len(sm.m))
+	for k, v := range sm.m {
+		samples[k] = v
+	}
+
+	return samples
+}
+
+// Inc increments the value of k by 1.
+func (sm *sampleMap) Inc(k string) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.m[k]++
+}
+
+// Set stores k=v in the map.
+func (sm *sampleMap) Set(k string, v float64) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.m[k] = v
 }
 
 // sampleKVs produces a map key for Memory series output.

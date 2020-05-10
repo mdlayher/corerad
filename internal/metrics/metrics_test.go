@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -207,6 +208,38 @@ func TestMemoryPanics(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMemoryConcurrent(t *testing.T) {
+	// TODO: check concurrency safety of other metrics.Interface implementations.
+
+	var (
+		m = metrics.NewMemory()
+		g = m.Gauge("foo", "", "foo")
+	)
+
+	const n = 8
+
+	var wg sync.WaitGroup
+	wg.Add(n)
+	defer wg.Wait()
+
+	waitC := make(chan struct{})
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			<-waitC
+
+			for j := 0; j < 1000; j++ {
+				g(float64(j), "bar")
+				for _, v := range m.Series() {
+					_ = v.Samples["foo"]
+				}
+			}
+		}()
+	}
+
+	close(waitC)
 }
 
 func TestDiscardDoesNotPanic(t *testing.T) {
