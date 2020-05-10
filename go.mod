@@ -7,7 +7,7 @@ require (
 	github.com/golang/protobuf v1.4.1 // indirect
 	github.com/google/go-cmp v0.4.0
 	github.com/jsimonetti/rtnetlink v0.0.0-20200505065535-3ee32e7e21a4
-	github.com/mdlayher/ndp v0.0.0-20200208214239-6af7d78093a1
+	github.com/mdlayher/ndp v0.0.0-20200509194142-8a50b5ef8b52
 	github.com/mdlayher/netstate v0.0.0-20200128183539-95bdfedbb6a3
 	github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
 	github.com/mdlayher/schedgroup v0.0.0-20200506182200-45678742bdc7
@@ -15,6 +15,6 @@ require (
 	github.com/prometheus/client_golang v1.6.0
 	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
-	golang.org/x/sys v0.0.0-20200501145240-bc7a7d42d5c3
+	golang.org/x/sys v0.0.0-20200509044756-6aff5f38e54f
 	inet.af/netaddr v0.0.0-20200509135536-73e67492853b
 )
