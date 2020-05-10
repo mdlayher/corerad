@@ -36,13 +36,6 @@ import (
 	"inet.af/netaddr"
 )
 
-// TODO: export from the package.
-type tempBody struct {
-	Interfaces []struct {
-		Interface string `json:"interface"`
-	} `json:"interfaces"`
-}
-
 func TestHandlerRoutes(t *testing.T) {
 	tests := []struct {
 		name              string
