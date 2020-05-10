@@ -110,7 +110,9 @@ func (m *Memory) Series() map[string]Series {
 
 	out := make(map[string]Series, len(m.series))
 	for k, v := range m.series {
-		out[k] = *v
+		// Make an explicit copy to store in the output.
+		v := *v
+		out[k] = v
 	}
 
 	return out
