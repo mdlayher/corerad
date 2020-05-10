@@ -32,6 +32,7 @@ import (
 	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
+	"github.com/mdlayher/ndp"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -143,6 +144,11 @@ func TestHandlerRoutes(t *testing.T) {
 							PreferredLifetime: 5 * time.Minute,
 							Prefix:            crtest.MustIPPrefix("fdff:dead:beef:dead::/64"),
 						},
+						&plugin.Route{
+							Prefix:     crtest.MustIPPrefix("2001:db8:ffff::/48"),
+							Preference: ndp.High,
+							Lifetime:   10 * time.Minute,
+						},
 					},
 				},
 				{
@@ -180,6 +186,11 @@ func TestHandlerRoutes(t *testing.T) {
 											PreferredLifetimeSeconds:           60 * 5,
 										},
 									},
+									Routes: []route{{
+										Prefix:               "2001:db8:ffff::/48",
+										Preference:           "high",
+										RouteLifetimeSeconds: 60 * 10,
+									}},
 									SourceLinkLayerAddress: "de:ad:be:ef:de:ad",
 								},
 							},

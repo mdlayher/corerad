@@ -83,6 +83,7 @@ func preference(p ndp.Preference) string {
 type options struct {
 	MTU                    int      `json:"mtu"`
 	Prefixes               []prefix `json:"prefixes"`
+	Routes                 []route  `json:"routes"`
 	SourceLinkLayerAddress string   `json:"source_link_layer_address"`
 }
 
@@ -93,6 +94,13 @@ type prefix struct {
 	AutonomousAddressAutoconfiguration bool   `json:"autonomous_address_autoconfiguration"`
 	ValidLifetimeSeconds               int    `json:"valid_lifetime_seconds"`
 	PreferredLifetimeSeconds           int    `json:"preferred_lifetime_seconds"`
+}
+
+// A route represents an NDP Prefix Information option.
+type route struct {
+	Prefix               string `json:"prefix"`
+	Preference           string `json:"preference"`
+	RouteLifetimeSeconds int    `json:"route_lifetime_seconds"`
 }
 
 // packOptions unpacks individual NDP options to produce an options structure.
@@ -106,18 +114,29 @@ func packOptions(opts []ndp.Option) options {
 			out.MTU = int(*o)
 		case *ndp.PrefixInformation:
 			out.Prefixes = append(out.Prefixes, prefix{
-				// Pack prefix and mask into a combined CIDR notation string.
-				Prefix: (&net.IPNet{
-					IP:   o.Prefix,
-					Mask: net.CIDRMask(int(o.PrefixLength), 128),
-				}).String(),
+				Prefix:                             prefixString(o.Prefix, o.PrefixLength),
 				OnLink:                             o.OnLink,
 				AutonomousAddressAutoconfiguration: o.AutonomousAddressConfiguration,
 				ValidLifetimeSeconds:               int(o.ValidLifetime.Seconds()),
 				PreferredLifetimeSeconds:           int(o.PreferredLifetime.Seconds()),
 			})
+		case *ndp.RouteInformation:
+			out.Routes = append(out.Routes, route{
+				// Pack prefix and mask into a combined CIDR notation string.
+				Prefix:               prefixString(o.Prefix, o.PrefixLength),
+				Preference:           preference(o.Preference),
+				RouteLifetimeSeconds: int(o.RouteLifetime.Seconds()),
+			})
 		}
 	}
 
 	return out
+}
+
+// prefixString combines prefix and length into a CIDR notation string.
+func prefixString(prefix net.IP, length uint8) string {
+	return (&net.IPNet{
+		IP:   prefix,
+		Mask: net.CIDRMask(int(length), 128),
+	}).String()
 }
