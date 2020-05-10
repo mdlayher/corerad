@@ -81,10 +81,18 @@ func preference(p ndp.Preference) string {
 
 // options represents the options unpacked from an NDP router advertisement.
 type options struct {
+	DNSSL                  []dnssl  `json:"dnssl"`
 	MTU                    int      `json:"mtu"`
 	Prefixes               []prefix `json:"prefixes"`
+	RDNSS                  []rdnss  `json:"rdnss"`
 	Routes                 []route  `json:"routes"`
 	SourceLinkLayerAddress string   `json:"source_link_layer_address"`
+}
+
+// A dnssl represents an NDP DNS Search List option.
+type dnssl struct {
+	LifetimeSeconds int      `json:"lifetime_seconds"`
+	DomainNames     []string `json:"domain_names"`
 }
 
 // A prefix represents an NDP Prefix Information option.
@@ -94,6 +102,12 @@ type prefix struct {
 	AutonomousAddressAutoconfiguration bool   `json:"autonomous_address_autoconfiguration"`
 	ValidLifetimeSeconds               int    `json:"valid_lifetime_seconds"`
 	PreferredLifetimeSeconds           int    `json:"preferred_lifetime_seconds"`
+}
+
+// A RDNSS represents an NDP Recursive DNS Servers option.
+type rdnss struct {
+	LifetimeSeconds int      `json:"lifetime_seconds"`
+	Servers         []string `json:"servers"`
 }
 
 // A route represents an NDP Prefix Information option.
@@ -108,6 +122,11 @@ func packOptions(opts []ndp.Option) options {
 	var out options
 	for _, o := range opts {
 		switch o := o.(type) {
+		case *ndp.DNSSearchList:
+			out.DNSSL = append(out.DNSSL, dnssl{
+				LifetimeSeconds: int(o.Lifetime.Seconds()),
+				DomainNames:     o.DomainNames,
+			})
 		case *ndp.LinkLayerAddress:
 			out.SourceLinkLayerAddress = o.Addr.String()
 		case *ndp.MTU:
@@ -120,6 +139,16 @@ func packOptions(opts []ndp.Option) options {
 				ValidLifetimeSeconds:               int(o.ValidLifetime.Seconds()),
 				PreferredLifetimeSeconds:           int(o.PreferredLifetime.Seconds()),
 			})
+		case *ndp.RecursiveDNSServer:
+			servers := make([]string, 0, len(o.Servers))
+			for _, s := range o.Servers {
+				servers = append(servers, s.String())
+			}
+
+			out.RDNSS = append(out.RDNSS, rdnss{
+				LifetimeSeconds: int(o.Lifetime.Seconds()),
+				Servers:         servers,
+			})
 		case *ndp.RouteInformation:
 			out.Routes = append(out.Routes, route{
 				// Pack prefix and mask into a combined CIDR notation string.
@@ -127,6 +156,8 @@ func packOptions(opts []ndp.Option) options {
 				Preference:           preference(o.Preference),
 				RouteLifetimeSeconds: int(o.RouteLifetime.Seconds()),
 			})
+		default:
+			panicf("crhttp: unhandled NDP option: %#v", o)
 		}
 	}
 
@@ -139,4 +170,8 @@ func prefixString(prefix net.IP, length uint8) string {
 		IP:   prefix,
 		Mask: net.CIDRMask(int(length), 128),
 	}).String()
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }

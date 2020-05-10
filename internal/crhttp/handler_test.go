@@ -16,7 +16,6 @@ package crhttp
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -34,6 +33,7 @@ import (
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"github.com/prometheus/client_golang/prometheus"
+	"inet.af/netaddr"
 )
 
 // TODO: export from the package.
@@ -129,6 +129,7 @@ func TestHandlerRoutes(t *testing.T) {
 					DefaultLifetime: 30 * time.Minute,
 					ReachableTime:   12345 * time.Millisecond,
 					Plugins: []plugin.Plugin{
+
 						&plugin.LLA{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 						plugin.NewMTU(1500),
 						&plugin.Prefix{
@@ -143,6 +144,17 @@ func TestHandlerRoutes(t *testing.T) {
 							ValidLifetime:     10 * time.Minute,
 							PreferredLifetime: 5 * time.Minute,
 							Prefix:            crtest.MustIPPrefix("fdff:dead:beef:dead::/64"),
+						},
+						&plugin.DNSSL{
+							Lifetime:    1 * time.Hour,
+							DomainNames: []string{"lan.example.com"},
+						},
+						&plugin.RDNSS{
+							Lifetime: 1 * time.Hour,
+							Servers: []netaddr.IP{
+								crtest.MustIP("2001:db8::1"),
+								crtest.MustIP("2001:db8::2"),
+							},
 						},
 						&plugin.Route{
 							Prefix:     crtest.MustIPPrefix("2001:db8:ffff::/48"),
@@ -170,6 +182,10 @@ func TestHandlerRoutes(t *testing.T) {
 								RouterLifetimeSeconds:     60 * 30,
 								ReachableTimeMilliseconds: 12345,
 								Options: options{
+									DNSSL: []dnssl{{
+										LifetimeSeconds: 60 * 60,
+										DomainNames:     []string{"lan.example.com"},
+									}},
 									MTU: 1500,
 									Prefixes: []prefix{
 										{
@@ -186,6 +202,10 @@ func TestHandlerRoutes(t *testing.T) {
 											PreferredLifetimeSeconds:           60 * 5,
 										},
 									},
+									RDNSS: []rdnss{{
+										LifetimeSeconds: 60 * 60,
+										Servers:         []string{"2001:db8::1", "2001:db8::2"},
+									}},
 									Routes: []route{{
 										Prefix:               "2001:db8:ffff::/48",
 										Preference:           "high",
@@ -288,8 +308,4 @@ func parseJSONBody(b []byte) interfacesBody {
 	}
 
 	return body
-}
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
 }
