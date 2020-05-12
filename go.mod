@@ -15,6 +15,6 @@ require (
 	github.com/prometheus/client_golang v1.6.0
 	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
-	golang.org/x/sys v0.0.0-20200509044756-6aff5f38e54f
-	inet.af/netaddr v0.0.0-20200509135536-73e67492853b
+	golang.org/x/sys v0.0.0-20200511232937-7e40ca221e25
+	inet.af/netaddr v0.0.0-20200512172314-cd0ea2431dcd
 )
