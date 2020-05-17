@@ -31,9 +31,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/crtest"
-	"github.com/mdlayher/corerad/internal/metrics"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
+	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
@@ -473,7 +473,7 @@ func TestAdvertiserPrometheusMetrics(t *testing.T) {
 
 			var (
 				ra                 *ndp.RouterAdvertisement
-				pfxAuto, pfxOnLink metrics.Series
+				pfxAuto, pfxOnLink metricslite.Series
 				iface              string
 			)
 
@@ -589,7 +589,7 @@ func testSimulatedAdvertiserClient(
 	defer cancel()
 
 	// Set up metrics node so we can inspect its contents at a later time.
-	mm := NewMetrics(metrics.NewMemory())
+	mm := NewMetrics(metricslite.NewMemory())
 	ad := NewAdvertiser(
 		cfg.Name,
 		*cfg,
@@ -787,7 +787,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	}
 
 	// Set up metrics node so we can inspect its contents at a later time.
-	mm := NewMetrics(metrics.NewMemory())
+	mm := NewMetrics(metricslite.NewMemory())
 	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), mm)
 
 	if tcfg != nil && tcfg.onInconsistentRA != nil {
@@ -978,7 +978,7 @@ func mustNetIP(s string) net.IP {
 	return ip
 }
 
-func findMetric(t *testing.T, mm *Metrics, name string) metrics.Series {
+func findMetric(t *testing.T, mm *Metrics, name string) metricslite.Series {
 	t.Helper()
 
 	series, ok := mm.Series()

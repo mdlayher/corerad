@@ -27,8 +27,8 @@ import (
 
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/crhttp"
-	"github.com/mdlayher/corerad/internal/metrics"
 	"github.com/mdlayher/corerad/internal/system"
+	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/netstate"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
@@ -89,7 +89,7 @@ func (s *Server) Run(ctx context.Context) error {
 	s.eg = eg
 	defer close(s.ready)
 
-	mm := NewMetrics(metrics.NewPrometheus(s.reg))
+	mm := NewMetrics(metricslite.NewPrometheus(s.reg))
 
 	// Watch for interface state changes. May or may not be supported depending
 	// on the OS, but functionality should gracefully degrade.

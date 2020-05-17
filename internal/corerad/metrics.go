@@ -16,8 +16,8 @@ package corerad
 import (
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
-	"github.com/mdlayher/corerad/internal/metrics"
 	"github.com/mdlayher/corerad/internal/system"
+	"github.com/mdlayher/metricslite"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -30,28 +30,28 @@ const (
 
 // Metrics contains metrics for a CoreRAD instance.
 type Metrics struct {
-	Info metrics.Gauge
-	Time metrics.Gauge
+	Info metricslite.Gauge
+	Time metricslite.Gauge
 
 	// Per-advertiser metrics.
-	LastMulticastTime                       metrics.Gauge
-	MessagesReceivedTotal                   metrics.Counter
-	MessagesReceivedInvalidTotal            metrics.Counter
-	RouterAdvertisementPrefixAutonomous     metrics.Gauge
-	RouterAdvertisementPrefixOnLink         metrics.Gauge
-	RouterAdvertisementInconsistenciesTotal metrics.Counter
-	RouterAdvertisementsTotal               metrics.Counter
-	ErrorsTotal                             metrics.Counter
+	LastMulticastTime                       metricslite.Gauge
+	MessagesReceivedTotal                   metricslite.Counter
+	MessagesReceivedInvalidTotal            metricslite.Counter
+	RouterAdvertisementPrefixAutonomous     metricslite.Gauge
+	RouterAdvertisementPrefixOnLink         metricslite.Gauge
+	RouterAdvertisementInconsistenciesTotal metricslite.Counter
+	RouterAdvertisementsTotal               metricslite.Counter
+	ErrorsTotal                             metricslite.Counter
 
 	// The underlying metrics storage.
-	m metrics.Interface
+	m metricslite.Interface
 }
 
 // NewMetrics produces a Metrics structure which will register its metrics to
-// the specified metrics.Interface. If m is nil, metrics are discarded.
-func NewMetrics(m metrics.Interface) *Metrics {
+// the specified metricslite.Interface. If m is nil, metrics are discarded.
+func NewMetrics(m metricslite.Interface) *Metrics {
 	if m == nil {
-		m = metrics.Discard()
+		m = metricslite.Discard()
 	}
 
 	mm := &Metrics{
@@ -128,11 +128,11 @@ func NewMetrics(m metrics.Interface) *Metrics {
 }
 
 // Series produces a set of output timeseries from the Metrics, assuming the
-// Metrics were initialized with a compatible metrics.Interface. If not, Series
+// Metrics were initialized with a compatible metricslite.Interface. If not, Series
 // will return nil, false.
-func (m *Metrics) Series() (map[string]metrics.Series, bool) {
+func (m *Metrics) Series() (map[string]metricslite.Series, bool) {
 	type series interface {
-		Series() map[string]metrics.Series
+		Series() map[string]metricslite.Series
 	}
 
 	sm, ok := m.m.(series)
