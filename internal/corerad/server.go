@@ -62,6 +62,7 @@ func NewServer(cfg config.Config, ll *log.Logger) *Server {
 	// Set up Prometheus instrumentation using the typical Go collectors.
 	reg := prometheus.NewPedanticRegistry()
 	reg.MustRegister(
+		prometheus.NewBuildInfoCollector(),
 		prometheus.NewGoCollector(),
 		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
 		newInterfaceCollector(state, cfg.Interfaces),
