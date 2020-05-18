@@ -17,3 +17,9 @@ CoreRAD is inspired by the [CoreDNS](https://coredns.io/) and
 [CoreDHCP](https://coredhcp.io/) projects.
 
 To learn more about CoreRAD, check out [my introductory blog post](https://mdlayher.com/blog/corerad-a-new-ipv6-router-advertisement-daemon/).
+
+## Dashboard
+
+A sample Grafana + Prometheus dashboard for CoreRAD can be found at [`corerad-grafana.json`](https://github.com/mdlayher/corerad/blob/master/corerad-grafana.json).
+
+![CoreRAD Grafana + Prometheus dashboard](https://user-images.githubusercontent.com/1926905/82170147-9ecaeb80-9891-11ea-869d-3da4d1e1358a.png)
