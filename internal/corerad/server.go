@@ -65,7 +65,6 @@ func NewServer(cfg config.Config, ll *log.Logger) *Server {
 		prometheus.NewBuildInfoCollector(),
 		prometheus.NewGoCollector(),
 		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
-		newInterfaceCollector(state, cfg.Interfaces),
 	)
 
 	return &Server{

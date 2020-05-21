@@ -16,20 +16,26 @@ package corerad
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/ndp"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Names of metrics which are referenced here and in tests.
 const (
-	raPrefixAutonomous = "corerad_advertiser_router_advertisement_prefix_autonomous"
-	raPrefixOnLink     = "corerad_advertiser_router_advertisement_prefix_on_link"
-	raInconsistencies  = "corerad_advertiser_router_advertisement_inconsistencies_total"
+	// Const metrics.
+	ifiAdvertising       = "corerad_interface_advertising"
+	ifiAutoconfiguration = "corerad_interface_autoconfiguration"
+	ifiForwarding        = "corerad_interface_forwarding"
+	raPrefixAutonomous   = "corerad_advertiser_router_advertisement_prefix_autonomous"
+	raPrefixOnLink       = "corerad_advertiser_router_advertisement_prefix_on_link"
+
+	// Non-const metrics.
+	raInconsistencies = "corerad_advertiser_router_advertisement_inconsistencies_total"
 )
 
 // Metrics contains metrics for a CoreRAD instance.
@@ -116,9 +122,32 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 	// Initialize any info metrics which are static throughout the lifetime of
 	// the program.
 	mm.Info(1, build.Version())
-	mm.Time(float64(build.Time().Unix()))
+
+	bt := build.Time()
+	if bt.IsZero() {
+		// Report UNIX time 0 if no build time set.
+		bt = time.Unix(0, 0)
+	}
+	mm.Time(float64(bt.Unix()))
 
 	// Initialize const metrics.
+	m.ConstGauge(
+		ifiAdvertising,
+		"Indicates whether or not NDP router advertisements will be sent from this interface.",
+		"interface",
+	)
+
+	m.ConstGauge(
+		ifiAutoconfiguration,
+		"Indicates whether or not IPv6 autoconfiguration is enabled on this interface.",
+		"interface",
+	)
+
+	m.ConstGauge(ifiForwarding,
+		"Indicates whether or not IPv6 forwarding is enabled on this interface.",
+		"interface",
+	)
+
 	m.ConstGauge(
 		raPrefixAutonomous,
 		"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
@@ -146,53 +175,88 @@ func (m *Metrics) constScrape(metrics map[string]func(float64, ...string)) error
 	// all information for metrics reporting before collecting metrics.
 	errorf := func(format string, v ...interface{}) *metricslite.ScrapeError {
 		return &metricslite.ScrapeError{
-			Metric: raPrefixAutonomous,
+			Metric: ifiForwarding,
 			Err:    fmt.Errorf(format, v...),
 		}
 	}
 
 	for _, ifi := range m.ifis {
-		// Generate a current RA for each interface and report on it.
+		auto, err := m.state.IPv6Autoconf(ifi.Name)
+		if err != nil {
+			return errorf("failed to check IPv6 autoconfiguration for %q: %v", ifi.Name, err)
+		}
+
 		fwd, err := m.state.IPv6Forwarding(ifi.Name)
 		if err != nil {
 			return errorf("failed to check IPv6 forwarding for %q: %v", ifi.Name, err)
 		}
 
-		ra, err := ifi.RouterAdvertisement(fwd)
-		if err != nil {
-			return errorf("failed to generate router advertisement for metrics for %q: %v", ifi.Name, err)
+		var ra *ndp.RouterAdvertisement
+		if ifi.Advertise {
+			// Generate a current RA advertising interfaces and report on it.
+			ra, err = ifi.RouterAdvertisement(fwd)
+			if err != nil {
+				return errorf("failed to generate router advertisement for metrics for %q: %v", ifi.Name, err)
+			}
 		}
 
-		collectRA(metrics, ra, ifi.Name)
+		collectMetrics(metrics, metricsContext{
+			Interface:         ifi.Name,
+			Advertising:       ifi.Advertise,
+			Autoconfiguration: auto,
+			Forwarding:        fwd,
+			Advertisement:     ra,
+		})
 	}
 
 	return nil
 }
 
-// collectRA sets const metrics for the input router advertisement served from
-// the specified interface.
-func collectRA(metrics map[string]func(float64, ...string), ra *ndp.RouterAdvertisement, iface string) {
-	for _, o := range ra.Options {
-		// TODO(mdlayher): metrics for other options and base RA info, like
-		// default lifetime.
-		switch o := o.(type) {
-		case *ndp.PrefixInformation:
-			// Combine the prefix and prefix length fields into a proper CIDR
-			// subnet for the label.
-			pfx := &net.IPNet{
-				IP:   o.Prefix,
-				Mask: net.CIDRMask(int(o.PrefixLength), 128),
-			}
+// A metricsContext contains arguments used to populate metrics in collectMetrics.
+type metricsContext struct {
+	Interface                                  string
+	Advertising, Autoconfiguration, Forwarding bool
+	Advertisement                              *ndp.RouterAdvertisement
+}
 
-			// Collect const metrics specific to an individual RA.
-			for metric, collect := range metrics {
-				switch metric {
+// collectMetrics sets const metrics using the input data for the specified
+// interface.
+func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsContext) {
+	var prefixes []*ndp.PrefixInformation
+	if mctx.Advertisement != nil {
+		// Gather prefix information options for metrics reporting since a
+		// non-nil advertisement was passed.
+		prefixes = pickPrefixes(mctx.Advertisement.Options)
+	}
+
+	for m, c := range metrics {
+		switch m {
+		case ifiAdvertising:
+			c(boolFloat(mctx.Advertising), mctx.Interface)
+		case ifiAutoconfiguration:
+			c(boolFloat(mctx.Autoconfiguration), mctx.Interface)
+		case ifiForwarding:
+			c(boolFloat(mctx.Forwarding), mctx.Interface)
+		case raPrefixAutonomous, raPrefixOnLink:
+			for _, p := range prefixes {
+				// Combine the prefix and prefix length fields into a proper CIDR
+				// subnet for the label.
+				pfx := &net.IPNet{
+					IP:   p.Prefix,
+					Mask: net.CIDRMask(int(p.PrefixLength), 128),
+				}
+
+				switch m {
 				case raPrefixAutonomous:
-					collect(boolFloat(o.AutonomousAddressConfiguration), iface, pfx.String())
+					c(boolFloat(p.AutonomousAddressConfiguration), mctx.Interface, pfx.String())
 				case raPrefixOnLink:
-					collect(boolFloat(o.OnLink), iface, pfx.String())
+					c(boolFloat(p.OnLink), mctx.Interface, pfx.String())
+				default:
+					panicf("corerad: prefix metrics collection for %q is not handled", m)
 				}
 			}
+		default:
+			panicf("corerad: metrics collection for %q is not handled", m)
 		}
 	}
 }
@@ -212,104 +276,6 @@ func (m *Metrics) Series() (map[string]metricslite.Series, bool) {
 	}
 
 	return sm.Series(), true
-}
-
-// TODO(mdlayher): use metricslite.
-
-// An interfaceCollector collects Prometheus metrics for a network interface.
-type interfaceCollector struct {
-	Autoconfiguration *prometheus.Desc
-	Forwarding        *prometheus.Desc
-	Advertise         *prometheus.Desc
-
-	state system.State
-	ifis  []config.Interface
-}
-
-// newInterfaceCollector creates an interfaceCollector.
-func newInterfaceCollector(state system.State, ifis []config.Interface) prometheus.Collector {
-	const subsystem = "interface"
-
-	labels := []string{"interface"}
-
-	return &interfaceCollector{
-		Autoconfiguration: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "autoconfiguration"),
-			"Indicates whether or not IPv6 autoconfiguration is enabled on this interface.",
-			labels,
-			nil,
-		),
-
-		Forwarding: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "forwarding"),
-			"Indicates whether or not IPv6 forwarding is enabled on this interface.",
-			labels,
-			nil,
-		),
-
-		Advertise: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "advertising"),
-			"Indicates whether or not NDP router advertisements will be sent from this interface.",
-			labels,
-			nil,
-		),
-
-		state: state,
-		ifis:  ifis,
-	}
-}
-
-// Describe implements prometheus.Collector.
-func (c *interfaceCollector) Describe(ch chan<- *prometheus.Desc) {
-	ds := []*prometheus.Desc{
-		c.Autoconfiguration,
-		c.Forwarding,
-		c.Advertise,
-	}
-
-	for _, d := range ds {
-		ch <- d
-	}
-
-}
-
-// Collect implements prometheus.Collector.
-func (c *interfaceCollector) Collect(ch chan<- prometheus.Metric) {
-	for _, ifi := range c.ifis {
-		auto, err := c.state.IPv6Autoconf(ifi.Name)
-		if err != nil {
-			ch <- prometheus.NewInvalidMetric(c.Autoconfiguration, err)
-			return
-		}
-
-		fwd, err := c.state.IPv6Forwarding(ifi.Name)
-		if err != nil {
-			ch <- prometheus.NewInvalidMetric(c.Forwarding, err)
-			return
-		}
-
-		ch <- prometheus.MustNewConstMetric(
-			c.Autoconfiguration,
-			prometheus.GaugeValue,
-			boolFloat(auto),
-			ifi.Name,
-		)
-
-		ch <- prometheus.MustNewConstMetric(
-			c.Forwarding,
-			prometheus.GaugeValue,
-			boolFloat(fwd),
-			ifi.Name,
-		)
-
-		ch <- prometheus.MustNewConstMetric(
-			c.Advertise,
-			prometheus.GaugeValue,
-			boolFloat(ifi.Advertise),
-			ifi.Name,
-		)
-
-	}
 }
 
 func boolFloat(b bool) float64 {

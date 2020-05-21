@@ -453,6 +453,7 @@ func TestAdvertiserPrometheusMetrics(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Interface{
+				Advertise: true,
 				Plugins: []plugin.Plugin{
 					// Expose two prefixes with differing flags to verify
 					// against the metrics output.

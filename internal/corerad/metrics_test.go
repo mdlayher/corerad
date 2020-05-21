@@ -14,53 +14,148 @@
 package corerad
 
 import (
-	"net"
+	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/crtest"
+	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
-	"github.com/mdlayher/promtest"
+	"github.com/mdlayher/metricslite"
 )
 
-func Test_interfaceCollector(t *testing.T) {
-	// This test probably only works on Linux, so skip early if need be.
-	loop, err := net.InterfaceByName("lo")
-	if err != nil {
-		t.Skipf("skipping, failed to get loopback interface: %v", err)
-	}
+func TestMetrics(t *testing.T) {
+	var (
+		// Server-wide timeseries which are always set regardless of configuration.
+		//
+		// These series would normally be affected by linker flags but these defaults
+		// should be sufficient for tests.
+		base = map[string]metricslite.Series{
+			"corerad_build_info": {Samples: map[string]float64{"version=development": 1}},
+			"corerad_build_time": {Samples: map[string]float64{"": 0}},
+		}
 
-	// Fake public keys used to identify devices and peers.
+		// All interfaces are assumed to be forwarding traffic.
+		state = system.TestState{Forwarding: true}
+
+		// A WAN interface which is configured but not advertising.
+		wan = map[string]metricslite.Series{
+			ifiAdvertising:       {Samples: map[string]float64{"interface=eth0": 0}},
+			ifiAutoconfiguration: {Samples: map[string]float64{"interface=eth0": 0}},
+			ifiForwarding:        {Samples: map[string]float64{"interface=eth0": 1}},
+		}
+
+		// A LAN interface which is configured and advertising.
+		lan = map[string]metricslite.Series{
+			ifiAdvertising:       {Samples: map[string]float64{"interface=eth1": 1}},
+			ifiAutoconfiguration: {Samples: map[string]float64{"interface=eth1": 0}},
+			ifiForwarding:        {Samples: map[string]float64{"interface=eth1": 1}},
+		}
+	)
+
 	tests := []struct {
-		name    string
-		ifis    []config.Interface
-		metrics []string
+		name   string
+		ts     system.TestState
+		ifis   []config.Interface
+		series map[string]metricslite.Series
 	}{
 		{
-			name: "ok",
-			ifis: []config.Interface{{
-				Name:      loop.Name,
-				Advertise: true,
-			}},
-			metrics: []string{
-				`corerad_interface_autoconfiguration{interface="lo"} 1`,
-				`corerad_interface_forwarding{interface="lo"} 0`,
-				`corerad_interface_advertising{interface="lo"} 1`,
+			name:   "no interfaces",
+			series: base,
+		},
+		{
+			name: "interface with errors",
+			ifis: []config.Interface{{Name: "eth0"}},
+			ts:   system.TestState{Error: errors.New("some error")},
+			series: mergeSeries(base, map[string]metricslite.Series{
+				ifiForwarding: {Samples: map[string]float64{"": -1}},
+			}),
+		},
+		{
+			name:   "interface not advertising",
+			ts:     state,
+			ifis:   []config.Interface{{Name: "eth0"}},
+			series: mergeSeries(base, wan),
+		},
+		{
+			name: "interface advertising",
+			ts:   state,
+			ifis: []config.Interface{
+				{Name: "eth0"},
+				{
+					Name:      "eth1",
+					Advertise: true,
+					Plugins: []plugin.Plugin{
+						&plugin.Prefix{Prefix: crtest.MustIPPrefix("2001:db8::/64")},
+						&plugin.Prefix{
+							Prefix:     crtest.MustIPPrefix("fdff:dead:beef:dead::/64"),
+							Autonomous: true,
+							OnLink:     true,
+						},
+					},
+				},
 			},
+			series: mergeSeries(base, wan, lan, map[string]metricslite.Series{
+				raPrefixAutonomous: {
+					Samples: map[string]float64{
+						"interface=eth1,prefix=2001:db8::/64":            0,
+						"interface=eth1,prefix=fdff:dead:beef:dead::/64": 1,
+					},
+				},
+				raPrefixOnLink: {
+					Samples: map[string]float64{
+						"interface=eth1,prefix=2001:db8::/64":            0,
+						"interface=eth1,prefix=fdff:dead:beef:dead::/64": 1,
+					},
+				},
+			}),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: parameterize.
-			body := promtest.Collect(t, newInterfaceCollector(system.NewState(), tt.ifis))
+			mm := NewMetrics(metricslite.NewMemory(), tt.ts, tt.ifis)
 
-			if !promtest.Lint(t, body) {
-				t.Fatal("one or more promlint errors found")
+			raw, ok := mm.Series()
+			if !ok {
+				t.Fatalf("type %T does not support fetching timeseries", mm)
 			}
 
-			if !promtest.Match(t, body, tt.metrics) {
-				t.Fatal("metrics did not match whitelist")
+			// Skip empty timeseries for output comparison, and remove name
+			// (redundant with key) and help text to make fixtures more concise.
+			series := make(map[string]metricslite.Series)
+			for k, v := range raw {
+				if len(v.Samples) > 0 {
+					v.Name = ""
+					v.Help = ""
+					series[k] = v
+				}
+			}
+
+			if diff := cmp.Diff(tt.series, series); diff != "" {
+				t.Fatalf("unexpected timeseries (-want +got):\n%s", diff)
 			}
 		})
 	}
+}
+
+// mergeSeries allows merging multiple timeseries maps into a single one.
+func mergeSeries(series ...map[string]metricslite.Series) map[string]metricslite.Series {
+	out := make(map[string]metricslite.Series)
+	for _, s := range series {
+		for k, v := range s {
+			if _, ok := out[k]; !ok {
+				// New timeseries, prepare the output map.
+				out[k] = metricslite.Series{Samples: make(map[string]float64)}
+			}
+
+			// Skip name and help since they're ignored, just merge samples.
+			for kk, vv := range v.Samples {
+				out[k].Samples[kk] = vv
+			}
+		}
+	}
+
+	return out
 }
