@@ -589,7 +589,8 @@ func testSimulatedAdvertiserClient(
 	defer cancel()
 
 	// Set up metrics node so we can inspect its contents at a later time.
-	mm := NewMetrics(metricslite.NewMemory())
+	ts := system.TestState{Forwarding: true}
+	mm := NewMetrics(metricslite.NewMemory(), ts, []config.Interface{*cfg})
 	ad := NewAdvertiser(
 		cfg.Name,
 		*cfg,
@@ -603,7 +604,7 @@ func testSimulatedAdvertiserClient(
 
 	// Swap out the underlying connections for a UDP socket pair.
 	sc, cc, cDone := testConnPair(t)
-	ad.state = system.TestState{Forwarding: true}
+	ad.state = ts
 
 	ad.dialer = &system.Dialer{
 		DialFunc: func() *system.DialContext {
@@ -787,7 +788,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	}
 
 	// Set up metrics node so we can inspect its contents at a later time.
-	mm := NewMetrics(metricslite.NewMemory())
+	mm := NewMetrics(metricslite.NewMemory(), system.NewState(), []config.Interface{*cfg})
 	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), mm)
 
 	if tcfg != nil && tcfg.onInconsistentRA != nil {

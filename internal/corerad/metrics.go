@@ -14,10 +14,14 @@
 package corerad
 
 import (
+	"fmt"
+	"net"
+
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
+	"github.com/mdlayher/ndp"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -30,6 +34,7 @@ const (
 
 // Metrics contains metrics for a CoreRAD instance.
 type Metrics struct {
+	// General server metrics.
 	Info metricslite.Gauge
 	Time metricslite.Gauge
 
@@ -37,25 +42,28 @@ type Metrics struct {
 	LastMulticastTime                       metricslite.Gauge
 	MessagesReceivedTotal                   metricslite.Counter
 	MessagesReceivedInvalidTotal            metricslite.Counter
-	RouterAdvertisementPrefixAutonomous     metricslite.Gauge
-	RouterAdvertisementPrefixOnLink         metricslite.Gauge
 	RouterAdvertisementInconsistenciesTotal metricslite.Counter
 	RouterAdvertisementsTotal               metricslite.Counter
 	ErrorsTotal                             metricslite.Counter
 
 	// The underlying metrics storage.
 	m metricslite.Interface
+
+	state system.State
+	ifis  []config.Interface
 }
 
 // NewMetrics produces a Metrics structure which will register its metrics to
 // the specified metricslite.Interface. If m is nil, metrics are discarded.
-func NewMetrics(m metricslite.Interface) *Metrics {
+func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Interface) *Metrics {
 	if m == nil {
 		m = metricslite.Discard()
 	}
 
 	mm := &Metrics{
-		m: m,
+		m:     m,
+		state: state,
+		ifis:  ifis,
 
 		Info: m.Gauge(
 			"corerad_build_info",
@@ -86,20 +94,6 @@ func NewMetrics(m metricslite.Interface) *Metrics {
 			"interface", "message",
 		),
 
-		RouterAdvertisementPrefixAutonomous: m.Gauge(
-			raPrefixAutonomous,
-			"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
-			// TODO: verify uniqueness of prefixes per interface.
-			"interface", "prefix",
-		),
-
-		RouterAdvertisementPrefixOnLink: m.Gauge(
-			raPrefixOnLink,
-			"Indicates whether or not the On-Link flag is enabled for a given prefix.",
-			// TODO: verify uniqueness of prefixes per interface.
-			"interface", "prefix",
-		),
-
 		RouterAdvertisementInconsistenciesTotal: m.Counter(
 			raInconsistencies,
 			"The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration.",
@@ -124,7 +118,83 @@ func NewMetrics(m metricslite.Interface) *Metrics {
 	mm.Info(1, build.Version())
 	mm.Time(float64(build.Time().Unix()))
 
+	// Initialize const metrics.
+	m.ConstGauge(
+		raPrefixAutonomous,
+		"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
+		// TODO: verify uniqueness of prefixes per interface.
+		"interface", "prefix",
+	)
+
+	m.ConstGauge(
+		raPrefixOnLink,
+		"Indicates whether or not the On-Link flag is enabled for a given prefix.",
+		// TODO: verify uniqueness of prefixes per interface.
+		"interface", "prefix",
+	)
+
+	// Enable const metrics collection.
+	m.OnConstScrape(mm.constScrape)
+
 	return mm
+}
+
+// constScrape is a metricslite.ScrapeFunc which gathers const metrics related
+// to current interface and RA state.
+func (m *Metrics) constScrape(metrics map[string]func(float64, ...string)) error {
+	// Report errors for a fixed const metric throughout, since we generate
+	// all information for metrics reporting before collecting metrics.
+	errorf := func(format string, v ...interface{}) *metricslite.ScrapeError {
+		return &metricslite.ScrapeError{
+			Metric: raPrefixAutonomous,
+			Err:    fmt.Errorf(format, v...),
+		}
+	}
+
+	for _, ifi := range m.ifis {
+		// Generate a current RA for each interface and report on it.
+		fwd, err := m.state.IPv6Forwarding(ifi.Name)
+		if err != nil {
+			return errorf("failed to check IPv6 forwarding for %q: %v", ifi.Name, err)
+		}
+
+		ra, err := ifi.RouterAdvertisement(fwd)
+		if err != nil {
+			return errorf("failed to generate router advertisement for metrics for %q: %v", ifi.Name, err)
+		}
+
+		collectRA(metrics, ra, ifi.Name)
+	}
+
+	return nil
+}
+
+// collectRA sets const metrics for the input router advertisement served from
+// the specified interface.
+func collectRA(metrics map[string]func(float64, ...string), ra *ndp.RouterAdvertisement, iface string) {
+	for _, o := range ra.Options {
+		// TODO(mdlayher): metrics for other options and base RA info, like
+		// default lifetime.
+		switch o := o.(type) {
+		case *ndp.PrefixInformation:
+			// Combine the prefix and prefix length fields into a proper CIDR
+			// subnet for the label.
+			pfx := &net.IPNet{
+				IP:   o.Prefix,
+				Mask: net.CIDRMask(int(o.PrefixLength), 128),
+			}
+
+			// Collect const metrics specific to an individual RA.
+			for metric, collect := range metrics {
+				switch metric {
+				case raPrefixAutonomous:
+					collect(boolFloat(o.AutonomousAddressConfiguration), iface, pfx.String())
+				case raPrefixOnLink:
+					collect(boolFloat(o.OnLink), iface, pfx.String())
+				}
+			}
+		}
+	}
 }
 
 // Series produces a set of output timeseries from the Metrics, assuming the
@@ -143,6 +213,8 @@ func (m *Metrics) Series() (map[string]metricslite.Series, bool) {
 
 	return sm.Series(), true
 }
+
+// TODO(mdlayher): use metricslite.
 
 // An interfaceCollector collects Prometheus metrics for a network interface.
 type interfaceCollector struct {

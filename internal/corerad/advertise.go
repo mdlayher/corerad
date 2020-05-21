@@ -60,7 +60,7 @@ func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Metri
 		ll = log.New(ioutil.Discard, "", 0)
 	}
 	if mm == nil {
-		mm = NewMetrics(nil)
+		mm = NewMetrics(nil, nil, nil)
 	}
 
 	return &Advertiser{
@@ -452,8 +452,7 @@ func (a *Advertiser) send(conn system.Conn, dst netaddr.IP, cfg config.Interface
 	return nil
 }
 
-// buildRA builds a router advertisement from configuration and updates any
-// necessary metrics.
+// buildRA builds a router advertisement from configuration.
 func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, error) {
 	// Check for any system state changes which could impact the router
 	// advertisement, and then build it using an interface configuration.
@@ -465,34 +464,6 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 	ra, err := ifi.RouterAdvertisement(forwarding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate router advertisement: %v", err)
-	}
-
-	// Finally, update Prometheus metrics to provide a consistent view of the
-	// router advertisement state.
-
-	for _, o := range ra.Options {
-		// TODO(mdlayher): consider extracting this logic if it grows unwieldy.
-		// TODO(mdlayher): metrics for other options and base RA info, like
-		// default lifetime.
-		switch o := o.(type) {
-		case *ndp.PrefixInformation:
-			// Combine the prefix and prefix length fields into a proper CIDR
-			// subnet for the label.
-			pfx := &net.IPNet{
-				IP:   o.Prefix,
-				Mask: net.CIDRMask(int(o.PrefixLength), 128),
-			}
-
-			a.mm.RouterAdvertisementPrefixAutonomous(
-				boolFloat(o.AutonomousAddressConfiguration),
-				ifi.Name, pfx.String(),
-			)
-
-			a.mm.RouterAdvertisementPrefixOnLink(
-				boolFloat(o.OnLink),
-				ifi.Name, pfx.String(),
-			)
-		}
 	}
 
 	return ra, nil

@@ -90,7 +90,7 @@ func (s *Server) Run(ctx context.Context) error {
 	s.eg = eg
 	defer close(s.ready)
 
-	mm := NewMetrics(metricslite.NewPrometheus(s.reg))
+	mm := NewMetrics(metricslite.NewPrometheus(s.reg), s.state, s.cfg.Interfaces)
 
 	// Watch for interface state changes. May or may not be supported depending
 	// on the OS, but functionality should gracefully degrade.

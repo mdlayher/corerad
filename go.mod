@@ -7,7 +7,7 @@ require (
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/google/go-cmp v0.4.1
 	github.com/jsimonetti/rtnetlink v0.0.0-20200505065535-3ee32e7e21a4
-	github.com/mdlayher/metricslite v0.0.0-20200517182829-ff7726748d45
+	github.com/mdlayher/metricslite v0.0.0-20200521135643-31a06ae2423d
 	github.com/mdlayher/ndp v0.0.0-20200519150916-8a30eebc3b7b
 	github.com/mdlayher/netstate v0.0.0-20200128183539-95bdfedbb6a3
 	github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
