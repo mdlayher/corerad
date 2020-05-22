@@ -14,7 +14,7 @@ require (
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/prometheus/client_golang v1.6.0
 	github.com/prometheus/common v0.10.0 // indirect
-	golang.org/x/net v0.0.0-20200519113804-d87ec0cfa476
+	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
 	inet.af/netaddr v0.0.0-20200513162223-787f13e36cbe
