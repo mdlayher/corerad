@@ -34,8 +34,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const namespace = "corerad"
-
 // A Server coordinates the goroutines that handle various pieces of the
 // CoreRAD server.
 type Server struct {
