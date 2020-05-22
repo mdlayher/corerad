@@ -31,6 +31,7 @@ const (
 	ifiAdvertising       = "corerad_interface_advertising"
 	ifiAutoconfiguration = "corerad_interface_autoconfiguration"
 	ifiForwarding        = "corerad_interface_forwarding"
+	raPrefixInfo         = "corerad_advertiser_router_advertisement_prefix_info"
 	raPrefixAutonomous   = "corerad_advertiser_router_advertisement_prefix_autonomous"
 	raPrefixOnLink       = "corerad_advertiser_router_advertisement_prefix_on_link"
 
@@ -149,6 +150,13 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 	)
 
 	m.ConstGauge(
+		raPrefixInfo,
+		"Metadata about a prefix being advertised via IPv6 router advertisement.",
+		// TODO: verify uniqueness of prefixes per interface.
+		"interface", "prefix",
+	)
+
+	m.ConstGauge(
 		raPrefixAutonomous,
 		"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
 		// TODO: verify uniqueness of prefixes per interface.
@@ -237,7 +245,7 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 			c(boolFloat(mctx.Autoconfiguration), mctx.Interface)
 		case ifiForwarding:
 			c(boolFloat(mctx.Forwarding), mctx.Interface)
-		case raPrefixAutonomous, raPrefixOnLink:
+		case raPrefixInfo, raPrefixAutonomous, raPrefixOnLink:
 			for _, p := range prefixes {
 				// Combine the prefix and prefix length fields into a proper CIDR
 				// subnet for the label.
@@ -247,6 +255,8 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 				}
 
 				switch m {
+				case raPrefixInfo:
+					c(1, mctx.Interface, pfx.String())
 				case raPrefixAutonomous:
 					c(boolFloat(p.AutonomousAddressConfiguration), mctx.Interface, pfx.String())
 				case raPrefixOnLink:
