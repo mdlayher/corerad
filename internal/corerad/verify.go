@@ -32,6 +32,7 @@ func verifyRAs(a, b *ndp.RouterAdvertisement) bool {
 		durationsConsistent(a.RetransmitTimer, b.RetransmitTimer) &&
 		mtuConsistent(a.Options, b.Options) &&
 		prefixesConsistent(a.Options, b.Options) &&
+		routesConsistent(a.Options, b.Options) &&
 		rdnssConsistent(a.Options, b.Options) &&
 		dnsslConsistent(a.Options, b.Options)
 }
@@ -83,6 +84,42 @@ func prefixesConsistent(want, got []ndp.Option) bool {
 			// TODO: deal with decrementing lifetimes? CoreRAD doesn't support
 			// them at the moment so we can't verify them either.
 			if a.PreferredLifetime != b.PreferredLifetime || a.ValidLifetime != b.ValidLifetime {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// routesConsistent reports whether two NDP route information option values
+// exist, and if so, if they are consistent.
+func routesConsistent(want, got []ndp.Option) bool {
+	pfxA := pickRoutes(want)
+	pfxB := pickRoutes(got)
+
+	if len(pfxA) == 0 || len(pfxB) == 0 {
+		// If either are advertising no routes, nothing to do.
+		return true
+	}
+
+	for _, a := range pfxA {
+		for _, b := range pfxB {
+			if !a.Prefix.Equal(b.Prefix) || a.PrefixLength != b.PrefixLength {
+				// a and b don't match, don't compare them.
+				continue
+			}
+
+			// Matching prefix, verify its lifetimes assuming that the preference
+			// values are the same. This would indicate a potential flapping
+			// configuration, where different preferences would cause the client
+			// to resolve that conflict on its own.
+			//
+			// TODO: check that this logic is sound.
+			//
+			// TODO: deal with decrementing lifetimes? CoreRAD doesn't support
+			// them at the moment so we can't verify them either.
+			if a.Preference == b.Preference && a.RouteLifetime != b.RouteLifetime {
 				return false
 			}
 		}
@@ -185,6 +222,18 @@ func pickPrefixes(options []ndp.Option) []*ndp.PrefixInformation {
 	}
 
 	return prefixes
+}
+
+// pickRoutes selects all ndp.RouteInformation options from the input options.
+func pickRoutes(options []ndp.Option) []*ndp.RouteInformation {
+	var routes []*ndp.RouteInformation
+	for _, o := range options {
+		if r, ok := o.(*ndp.RouteInformation); ok {
+			routes = append(routes, r)
+		}
+	}
+
+	return routes
 }
 
 // pickRDNSS selects all ndp.RDNSS options from the input options.

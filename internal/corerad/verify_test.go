@@ -23,49 +23,66 @@ import (
 )
 
 func Test_verifyRAs(t *testing.T) {
-	prefix := []ndp.Option{
-		&ndp.PrefixInformation{
-			Prefix:            mustNetIP("2001:db8::"),
-			PrefixLength:      64,
-			PreferredLifetime: 1 * time.Second,
-			ValidLifetime:     2 * time.Second,
-		},
-	}
-
-	rdnss := []ndp.Option{
-		&ndp.RecursiveDNSServer{
-			Servers: []net.IP{mustNetIP("2001:db8::1")},
-		},
-	}
-
-	dnssl := []ndp.Option{
-		&ndp.DNSSearchList{
-			Lifetime:    10 * time.Second,
-			DomainNames: []string{"foo.example.com"},
-		},
-	}
-
-	full := &ndp.RouterAdvertisement{
-		CurrentHopLimit:      64,
-		ManagedConfiguration: true,
-		OtherConfiguration:   true,
-		ReachableTime:        30 * time.Minute,
-		RetransmitTimer:      60 * time.Minute,
-		Options: []ndp.Option{
-			// Use some options from above.
-			prefix[0],
+	var (
+		prefix = []ndp.Option{
 			&ndp.PrefixInformation{
-				PrefixLength:      32,
-				OnLink:            true,
-				PreferredLifetime: 10 * time.Second,
-				ValidLifetime:     20 * time.Second,
-				Prefix:            mustNetIP("fdff:dead:beef::"),
+				Prefix:            mustNetIP("2001:db8::"),
+				PrefixLength:      64,
+				PreferredLifetime: 1 * time.Second,
+				ValidLifetime:     2 * time.Second,
 			},
-			rdnss[0],
-			dnssl[0],
-			ndp.NewMTU(1500),
-		},
-	}
+		}
+
+		route = []ndp.Option{
+			&ndp.RouteInformation{
+				Prefix:        mustNetIP("2001:db8:ffff::"),
+				PrefixLength:  64,
+				RouteLifetime: 1 * time.Second,
+				Preference:    ndp.High,
+			},
+		}
+
+		rdnss = []ndp.Option{
+			&ndp.RecursiveDNSServer{
+				Servers: []net.IP{mustNetIP("2001:db8::1")},
+			},
+		}
+
+		dnssl = []ndp.Option{
+			&ndp.DNSSearchList{
+				Lifetime:    10 * time.Second,
+				DomainNames: []string{"foo.example.com"},
+			},
+		}
+
+		full = &ndp.RouterAdvertisement{
+			CurrentHopLimit:      64,
+			ManagedConfiguration: true,
+			OtherConfiguration:   true,
+			ReachableTime:        30 * time.Minute,
+			RetransmitTimer:      60 * time.Minute,
+			Options: []ndp.Option{
+				// Use some options from above.
+				prefix[0],
+				&ndp.PrefixInformation{
+					PrefixLength:      32,
+					OnLink:            true,
+					PreferredLifetime: 10 * time.Second,
+					ValidLifetime:     20 * time.Second,
+					Prefix:            mustNetIP("fdff:dead:beef::"),
+				},
+				route[0],
+				&ndp.RouteInformation{
+					PrefixLength:  96,
+					RouteLifetime: 10 * time.Second,
+					Prefix:        mustNetIP("fdff:dead:beef::"),
+				},
+				rdnss[0],
+				dnssl[0],
+				ndp.NewMTU(1500),
+			},
+		}
+	)
 
 	tests := []struct {
 		name string
@@ -118,6 +135,22 @@ func Test_verifyRAs(t *testing.T) {
 						PrefixLength:      64,
 						PreferredLifetime: 3 * time.Second,
 						ValidLifetime:     4 * time.Second,
+					},
+				},
+			},
+		},
+		{
+			name: "route, same preference different lifetime",
+			a: &ndp.RouterAdvertisement{
+				Options: route,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						Prefix:        mustNetIP("2001:db8:ffff::"),
+						PrefixLength:  64,
+						RouteLifetime: 3 * time.Second,
+						Preference:    ndp.High,
 					},
 				},
 			},
@@ -266,6 +299,47 @@ func Test_verifyRAs(t *testing.T) {
 						PrefixLength:      64,
 						PreferredLifetime: 3 * time.Second,
 						ValidLifetime:     4 * time.Second,
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "OK, route unspecified",
+			a: &ndp.RouterAdvertisement{
+				Options: route,
+			},
+			b:  &ndp.RouterAdvertisement{},
+			ok: true,
+		},
+		{
+			name: "OK, route different",
+			a: &ndp.RouterAdvertisement{
+				Options: route,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						Prefix:        mustNetIP("fdff:dead:beef::"),
+						PrefixLength:  64,
+						RouteLifetime: 3 * time.Second,
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "OK, route preference different",
+			a: &ndp.RouterAdvertisement{
+				Options: route,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						Prefix:        mustNetIP("2001:db8:ffff::"),
+						PrefixLength:  64,
+						RouteLifetime: 1 * time.Second,
+						Preference:    ndp.Low,
 					},
 				},
 			},
