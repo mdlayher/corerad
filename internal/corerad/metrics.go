@@ -34,6 +34,8 @@ const (
 	raPrefixInfo         = "corerad_advertiser_router_advertisement_prefix_info"
 	raPrefixAutonomous   = "corerad_advertiser_router_advertisement_prefix_autonomous"
 	raPrefixOnLink       = "corerad_advertiser_router_advertisement_prefix_on_link"
+	raPrefixValid        = "corerad_advertiser_router_advertisement_prefix_valid_lifetime_seconds"
+	raPrefixPreferred    = "corerad_advertiser_router_advertisement_prefix_preferred_lifetime_seconds"
 
 	// Non-const metrics.
 	raInconsistencies = "corerad_advertiser_router_advertisement_inconsistencies_total"
@@ -170,6 +172,20 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 		"interface", "prefix",
 	)
 
+	m.ConstGauge(
+		raPrefixValid,
+		"The amount of time in seconds that clients should consider this prefix valid for on-link determination.",
+		// TODO: verify uniqueness of prefixes per interface.
+		"interface", "prefix",
+	)
+
+	m.ConstGauge(
+		raPrefixPreferred,
+		"The amount of time in seconds that addresses generated via SLAAC by clients should remain preferred.",
+		// TODO: verify uniqueness of prefixes per interface.
+		"interface", "prefix",
+	)
+
 	// Enable const metrics collection.
 	m.OnConstScrape(mm.constScrape)
 
@@ -245,7 +261,7 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 			c(boolFloat(mctx.Autoconfiguration), mctx.Interface)
 		case ifiForwarding:
 			c(boolFloat(mctx.Forwarding), mctx.Interface)
-		case raPrefixInfo, raPrefixAutonomous, raPrefixOnLink:
+		case raPrefixInfo, raPrefixAutonomous, raPrefixOnLink, raPrefixValid, raPrefixPreferred:
 			for _, p := range prefixes {
 				// Combine the prefix and prefix length fields into a proper CIDR
 				// subnet for the label.
@@ -261,6 +277,10 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 					c(boolFloat(p.AutonomousAddressConfiguration), mctx.Interface, pfx.String())
 				case raPrefixOnLink:
 					c(boolFloat(p.OnLink), mctx.Interface, pfx.String())
+				case raPrefixValid:
+					c(p.ValidLifetime.Seconds(), mctx.Interface, pfx.String())
+				case raPrefixPreferred:
+					c(p.PreferredLifetime.Seconds(), mctx.Interface, pfx.String())
 				default:
 					panicf("corerad: prefix metrics collection for %q is not handled", m)
 				}

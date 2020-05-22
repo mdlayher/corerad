@@ -16,6 +16,7 @@ package corerad
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
@@ -89,15 +90,17 @@ func TestMetrics(t *testing.T) {
 					Plugins: []plugin.Plugin{
 						&plugin.Prefix{Prefix: crtest.MustIPPrefix("2001:db8::/64")},
 						&plugin.Prefix{
-							Prefix:     crtest.MustIPPrefix("fdff:dead:beef:dead::/64"),
-							Autonomous: true,
-							OnLink:     true,
+							Prefix:            crtest.MustIPPrefix("fdff:dead:beef:dead::/64"),
+							Autonomous:        true,
+							OnLink:            true,
+							ValidLifetime:     20 * time.Minute,
+							PreferredLifetime: 10 * time.Minute,
 						},
 					},
 				},
 			},
 			series: mergeSeries(base, wan, lan, map[string]metricslite.Series{
-				"corerad_advertiser_router_advertisement_prefix_info": {
+				raPrefixInfo: {
 					Samples: map[string]float64{
 						"interface=eth1,prefix=2001:db8::/64":            1,
 						"interface=eth1,prefix=fdff:dead:beef:dead::/64": 1,
@@ -113,6 +116,18 @@ func TestMetrics(t *testing.T) {
 					Samples: map[string]float64{
 						"interface=eth1,prefix=2001:db8::/64":            0,
 						"interface=eth1,prefix=fdff:dead:beef:dead::/64": 1,
+					},
+				},
+				raPrefixValid: {
+					Samples: map[string]float64{
+						"interface=eth1,prefix=2001:db8::/64":            0,
+						"interface=eth1,prefix=fdff:dead:beef:dead::/64": 1200,
+					},
+				},
+				raPrefixPreferred: {
+					Samples: map[string]float64{
+						"interface=eth1,prefix=2001:db8::/64":            0,
+						"interface=eth1,prefix=fdff:dead:beef:dead::/64": 600,
 					},
 				},
 			}),
