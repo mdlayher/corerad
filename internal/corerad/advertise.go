@@ -316,19 +316,26 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr
 		}
 
 		// Ensure the RAs are consistent.
-		if !verifyRAs(want, m) {
-			// RAs are not consistent, report this per the RFC.
-			//
-			// Report and increment metrics before the caller hook is invoked,
-			// to ensure that the output is visible to callers if they request
-			// it, such as in the tests.
-			a.logf("inconsistencies detected in router advertisement from router with IP %q, source link-layer address %q",
-				host, sourceLLA(m.Options))
-			a.mm.RouterAdvertisementInconsistenciesTotal(a.cfg.Name)
+		problems := verifyRAs(want, m)
+		if len(problems) == 0 {
+			break
+		}
 
-			if a.OnInconsistentRA != nil {
-				a.OnInconsistentRA(want, m)
-			}
+		// RAs are not consistent, report this per the RFC.
+		//
+		// Report and increment metrics before the caller hook is invoked,
+		// to ensure that the output is visible to callers if they request
+		// it, such as in the tests.
+		a.logf("inconsistencies detected in router advertisement from router with IP %q, source link-layer address %q",
+			host, sourceLLA(m.Options))
+
+		for i, p := range problems {
+			a.logf("inconsistency %d: %q: %s", i, p.Field, p.Details)
+			a.mm.RouterAdvertisementInconsistenciesTotal(a.cfg.Name, p.Field)
+		}
+
+		if a.OnInconsistentRA != nil {
+			a.OnInconsistentRA(want, m)
 		}
 	default:
 		a.logf("received NDP message of type %T from %s, ignoring", m, host)

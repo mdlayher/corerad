@@ -85,34 +85,39 @@ func Test_verifyRAs(t *testing.T) {
 	)
 
 	tests := []struct {
-		name string
-		a, b *ndp.RouterAdvertisement
-		ok   bool
+		name     string
+		a, b     *ndp.RouterAdvertisement
+		problems []problem
 	}{
 		{
-			name: "hop limit",
-			a:    &ndp.RouterAdvertisement{CurrentHopLimit: 1},
-			b:    &ndp.RouterAdvertisement{CurrentHopLimit: 2},
+			name:     "hop limit",
+			a:        &ndp.RouterAdvertisement{CurrentHopLimit: 1},
+			b:        &ndp.RouterAdvertisement{CurrentHopLimit: 2},
+			problems: []problem{*newProblem("hop_limit", 1, 2)},
 		},
 		{
-			name: "managed",
-			a:    &ndp.RouterAdvertisement{ManagedConfiguration: true},
-			b:    &ndp.RouterAdvertisement{ManagedConfiguration: false},
+			name:     "managed",
+			a:        &ndp.RouterAdvertisement{ManagedConfiguration: true},
+			b:        &ndp.RouterAdvertisement{ManagedConfiguration: false},
+			problems: []problem{*newProblem("managed_configuration", true, false)},
 		},
 		{
-			name: "other",
-			a:    &ndp.RouterAdvertisement{OtherConfiguration: true},
-			b:    &ndp.RouterAdvertisement{OtherConfiguration: false},
+			name:     "other",
+			a:        &ndp.RouterAdvertisement{OtherConfiguration: true},
+			b:        &ndp.RouterAdvertisement{OtherConfiguration: false},
+			problems: []problem{*newProblem("other_configuration", true, false)},
 		},
 		{
-			name: "reachable time",
-			a:    &ndp.RouterAdvertisement{ReachableTime: 1 * time.Second},
-			b:    &ndp.RouterAdvertisement{ReachableTime: 2 * time.Second},
+			name:     "reachable time",
+			a:        &ndp.RouterAdvertisement{ReachableTime: 1 * time.Second},
+			b:        &ndp.RouterAdvertisement{ReachableTime: 2 * time.Second},
+			problems: []problem{*newProblem("reachable_time", 1*time.Second, 2*time.Second)},
 		},
 		{
-			name: "retransmit timer",
-			a:    &ndp.RouterAdvertisement{RetransmitTimer: 1 * time.Second},
-			b:    &ndp.RouterAdvertisement{RetransmitTimer: 2 * time.Second},
+			name:     "retransmit timer",
+			a:        &ndp.RouterAdvertisement{RetransmitTimer: 1 * time.Second},
+			b:        &ndp.RouterAdvertisement{RetransmitTimer: 2 * time.Second},
+			problems: []problem{*newProblem("retransmit_timer", 1*time.Second, 2*time.Second)},
 		},
 		{
 			name: "MTU",
@@ -122,9 +127,10 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{ndp.NewMTU(9000)},
 			},
+			problems: []problem{*newProblem("mtu", 1500, 9000)},
 		},
 		{
-			name: "prefix",
+			name: "prefix lifetimes",
 			a: &ndp.RouterAdvertisement{
 				Options: prefix,
 			},
@@ -137,6 +143,10 @@ func Test_verifyRAs(t *testing.T) {
 						ValidLifetime:     4 * time.Second,
 					},
 				},
+			},
+			problems: []problem{
+				*newProblem("prefix_information_preferred_lifetime", 1*time.Second, 3*time.Second),
+				*newProblem("prefix_information_valid_lifetime", 2*time.Second, 4*time.Second),
 			},
 		},
 		{
@@ -154,6 +164,7 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
+			problems: []problem{*newProblem("route_information_lifetime", 1*time.Second, 3*time.Second)},
 		},
 		{
 			name: "RDNSS length",
@@ -168,30 +179,7 @@ func Test_verifyRAs(t *testing.T) {
 					&ndp.RecursiveDNSServer{},
 				},
 			},
-		},
-		{
-			name: "RDNSS server length",
-			a: &ndp.RouterAdvertisement{
-				Options: []ndp.Option{
-					&ndp.RecursiveDNSServer{},
-				},
-			},
-			b: &ndp.RouterAdvertisement{
-				Options: rdnss,
-			},
-		},
-		{
-			name: "RDNSS server IPs",
-			a: &ndp.RouterAdvertisement{
-				Options: rdnss,
-			},
-			b: &ndp.RouterAdvertisement{
-				Options: []ndp.Option{
-					&ndp.RecursiveDNSServer{
-						Servers: []net.IP{mustNetIP("2001:db8::2")},
-					},
-				},
-			},
+			problems: []problem{*newProblem("rdnss_count", 1, 2)},
 		},
 		{
 			name: "RDNSS lifetime",
@@ -206,6 +194,33 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
+			problems: []problem{*newProblem("rdnss_lifetime", 0*time.Second, 2*time.Second)},
+		},
+		{
+			name: "RDNSS server length",
+			a: &ndp.RouterAdvertisement{
+				Options: rdnss,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{},
+				},
+			},
+			problems: []problem{*newProblem("rdnss_servers_count", 1, 0)},
+		},
+		{
+			name: "RDNSS server IPs",
+			a: &ndp.RouterAdvertisement{
+				Options: rdnss,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{
+						Servers: []net.IP{mustNetIP("2001:db8::2")},
+					},
+				},
+			},
+			problems: []problem{*newProblem("rdnss_servers", "2001:db8::1", "2001:db8::2")},
 		},
 		{
 			name: "DNSSL length",
@@ -220,30 +235,7 @@ func Test_verifyRAs(t *testing.T) {
 					&ndp.DNSSearchList{},
 				},
 			},
-		},
-		{
-			name: "DNSSL domains length",
-			a: &ndp.RouterAdvertisement{
-				Options: []ndp.Option{
-					&ndp.DNSSearchList{},
-				},
-			},
-			b: &ndp.RouterAdvertisement{
-				Options: dnssl,
-			},
-		},
-		{
-			name: "DNSSL domains",
-			a: &ndp.RouterAdvertisement{
-				Options: dnssl,
-			},
-			b: &ndp.RouterAdvertisement{
-				Options: []ndp.Option{
-					&ndp.DNSSearchList{
-						DomainNames: []string{"bar.example.com"},
-					},
-				},
-			},
+			problems: []problem{*newProblem("dnssl_count", 1, 2)},
 		},
 		{
 			name: "DNSSL lifetime",
@@ -258,34 +250,58 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
+			problems: []problem{*newProblem("dnssl_lifetime", 10*time.Second, 2*time.Second)},
+		},
+		{
+			name: "DNSSL domains length",
+			a: &ndp.RouterAdvertisement{
+				Options: dnssl,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{Lifetime: 10 * time.Second},
+				},
+			},
+			problems: []problem{*newProblem("dnssl_domain_names_count", 1, 0)},
+		},
+		{
+			name: "DNSSL domains",
+			a: &ndp.RouterAdvertisement{
+				Options: dnssl,
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.DNSSearchList{
+						Lifetime:    10 * time.Second,
+						DomainNames: []string{"bar.example.com"},
+					},
+				},
+			},
+			problems: []problem{*newProblem("dnssl_domain_names", "foo.example.com", "bar.example.com")},
 		},
 		{
 			name: "OK, reachable time unspecified",
 			a:    &ndp.RouterAdvertisement{},
 			b:    &ndp.RouterAdvertisement{ReachableTime: 1 * time.Second},
-			ok:   true,
 		},
 		{
 			name: "OK, retransmit timer unspecified",
 			a:    &ndp.RouterAdvertisement{},
 			b:    &ndp.RouterAdvertisement{RetransmitTimer: 1 * time.Second},
-			ok:   true,
 		},
 		{
 			name: "OK, MTU unspecified",
 			a: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{ndp.NewMTU(1500)},
 			},
-			b:  &ndp.RouterAdvertisement{},
-			ok: true,
+			b: &ndp.RouterAdvertisement{},
 		},
 		{
 			name: "OK, prefix unspecified",
 			a: &ndp.RouterAdvertisement{
 				Options: prefix,
 			},
-			b:  &ndp.RouterAdvertisement{},
-			ok: true,
+			b: &ndp.RouterAdvertisement{},
 		},
 		{
 			name: "OK, prefix different",
@@ -302,15 +318,13 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			ok: true,
 		},
 		{
 			name: "OK, route unspecified",
 			a: &ndp.RouterAdvertisement{
 				Options: route,
 			},
-			b:  &ndp.RouterAdvertisement{},
-			ok: true,
+			b: &ndp.RouterAdvertisement{},
 		},
 		{
 			name: "OK, route different",
@@ -326,7 +340,6 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			ok: true,
 		},
 		{
 			name: "OK, route preference different",
@@ -343,36 +356,32 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			ok: true,
 		},
 		{
 			name: "OK, RDNSS unspecified",
 			a: &ndp.RouterAdvertisement{
 				Options: rdnss,
 			},
-			b:  &ndp.RouterAdvertisement{},
-			ok: true,
+			b: &ndp.RouterAdvertisement{},
 		},
 		{
 			name: "OK, DNSSL unspecified",
 			a: &ndp.RouterAdvertisement{
 				Options: dnssl,
 			},
-			b:  &ndp.RouterAdvertisement{},
-			ok: true,
+			b: &ndp.RouterAdvertisement{},
 		},
 		{
 			name: "OK, all",
 			a:    full,
 			b:    full,
-			ok:   true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if diff := cmp.Diff(tt.ok, verifyRAs(tt.a, tt.b)); diff != "" {
-				t.Fatalf("unexpected router advertisement consistency (-want +got):\n%s", diff)
+			if diff := cmp.Diff(tt.problems, verifyRAs(tt.a, tt.b)); diff != "" {
+				t.Fatalf("unexpected router advertisement problems (-want +got):\n%s", diff)
 			}
 		})
 	}

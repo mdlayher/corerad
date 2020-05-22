@@ -105,8 +105,8 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 
 		RouterAdvertisementInconsistenciesTotal: m.Counter(
 			raInconsistencies,
-			"The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration.",
-			"interface",
+			"The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration, partitioned by the problematic field.",
+			"interface", "field",
 		),
 
 		RouterAdvertisementsTotal: m.Counter(

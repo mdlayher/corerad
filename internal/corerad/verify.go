@@ -14,27 +14,105 @@
 package corerad
 
 import (
+	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/mdlayher/ndp"
 )
 
+// problems is a slice of problems with helper methods.
+type problems []problem
+
+// push adds a problem with the input data.
+func (ps *problems) push(field string, want, got interface{}) {
+	*ps = append(*ps, *newProblem(field, want, got))
+}
+
+// merge merges another problems slice with this one.
+func (ps *problems) merge(pss problems) {
+	*ps = append(*ps, pss...)
+}
+
+// A problem is an inconsistency detected in another router's RA.
+type problem struct {
+	Field, Details string
+}
+
+// newProblem constructs a problem with the input fields.
+func newProblem(field string, want, got interface{}) *problem {
+	// Sanity check: any code using this API must pass identical types for
+	// any sort of sane output.
+	if reflect.TypeOf(want) != reflect.TypeOf(got) {
+		panicf("corerad: newProblem types must match: %T != %T", want, got)
+	}
+
+	// If want and got are strings or can be stringified, we quote them for
+	// easier reading.
+	ws, okW := want.(string)
+	gs, okG := got.(string)
+	if okW && okG {
+		return &problem{
+			Field:   field,
+			Details: fmt.Sprintf("want: %q, got: %q", ws, gs),
+		}
+	}
+
+	wStr, okW := want.(fmt.Stringer)
+	gStr, okG := got.(fmt.Stringer)
+	if okW && okG {
+		return &problem{
+			Field:   field,
+			Details: fmt.Sprintf("want: %q, got: %q", wStr.String(), gStr.String()),
+		}
+	}
+
+	// Fall back to normal formatting.
+	return &problem{
+		Field:   field,
+		Details: fmt.Sprintf("want: %v, got: %v", want, got),
+	}
+}
+
 // verifyRAs checks for consistency between two router advertisements.
-func verifyRAs(a, b *ndp.RouterAdvertisement) bool {
-	// Verify using the rules established in:
+func verifyRAs(a, b *ndp.RouterAdvertisement) []problem {
+	// Verify the RA and its options using the rules established in:
 	// https://tools.ietf.org/html/rfc4861#section-6.2.7.
-	//
-	// TODO: more verbose error reporting? Individual fields?
-	return a.CurrentHopLimit == b.CurrentHopLimit &&
-		a.ManagedConfiguration == b.ManagedConfiguration &&
-		a.OtherConfiguration == b.OtherConfiguration &&
-		durationsConsistent(a.ReachableTime, b.ReachableTime) &&
-		durationsConsistent(a.RetransmitTimer, b.RetransmitTimer) &&
-		mtuConsistent(a.Options, b.Options) &&
-		prefixesConsistent(a.Options, b.Options) &&
-		routesConsistent(a.Options, b.Options) &&
-		rdnssConsistent(a.Options, b.Options) &&
-		dnsslConsistent(a.Options, b.Options)
+
+	ps := checkRAs(a, b)
+	ps.merge(checkMTUs(a.Options, b.Options))
+	ps.merge(checkPrefixes(a.Options, b.Options))
+	ps.merge(checkRoutes(a.Options, b.Options))
+	ps.merge(checkRDNSS(a.Options, b.Options))
+	ps.merge(checkDNSSL(a.Options, b.Options))
+
+	return ps
+}
+
+// raConsistent verifies the base non-option fields of a and b for consistency.
+func checkRAs(a, b *ndp.RouterAdvertisement) problems {
+	var ps problems
+	if a.CurrentHopLimit != b.CurrentHopLimit {
+		ps.push("hop_limit", a.CurrentHopLimit, b.CurrentHopLimit)
+	}
+
+	if a.ManagedConfiguration != b.ManagedConfiguration {
+		ps.push("managed_configuration", a.ManagedConfiguration, b.ManagedConfiguration)
+	}
+
+	if a.OtherConfiguration != b.OtherConfiguration {
+		ps.push("other_configuration", a.OtherConfiguration, b.OtherConfiguration)
+	}
+
+	if !durationsConsistent(a.ReachableTime, b.ReachableTime) {
+		ps.push("reachable_time", a.ReachableTime, b.ReachableTime)
+	}
+
+	if !durationsConsistent(a.RetransmitTimer, b.RetransmitTimer) {
+		ps.push("retransmit_timer", a.RetransmitTimer, b.RetransmitTimer)
+	}
+
+	return ps
 }
 
 // durationsConsistent reports whether two time.Duration values are consistent.
@@ -47,31 +125,38 @@ func durationsConsistent(want, got time.Duration) bool {
 	return want == got
 }
 
-// mtuConsistent reports whether two NDP MTU option values exist, and if so,
-// if they are consistent.
-func mtuConsistent(want, got []ndp.Option) bool {
+// checkMTUs reports whether two NDP MTU option values are consistent, or
+// returns non-empty problems if not.
+func checkMTUs(want, got []ndp.Option) problems {
 	mtuA, okA := pickMTU(want)
 	mtuB, okB := pickMTU(got)
 
 	if !okA || !okB {
-		// If either are not advertising MTU, nothing to do.
-		return true
+		// If either are not advertising MTUs, nothing to do.
+		return nil
 	}
 
-	return mtuA == mtuB
+	if mtuA == mtuB {
+		return nil
+	}
+
+	var ps problems
+	ps.push("mtu", mtuA, mtuB)
+	return ps
 }
 
-// prefixesConsistent reports whether two NDP prefix information option values
-// exist, and if so, if they are consistent.
-func prefixesConsistent(want, got []ndp.Option) bool {
+// checkPrefixes reports whether two NDP PrefixInformation option values
+// are consistent, or returns non-empty problems if not.
+func checkPrefixes(want, got []ndp.Option) problems {
 	pfxA := pickPrefixes(want)
 	pfxB := pickPrefixes(got)
 
 	if len(pfxA) == 0 || len(pfxB) == 0 {
 		// If either are advertising no prefixes, nothing to do.
-		return true
+		return nil
 	}
 
+	var ps problems
 	for _, a := range pfxA {
 		for _, b := range pfxB {
 			if !a.Prefix.Equal(b.Prefix) || a.PrefixLength != b.PrefixLength {
@@ -83,26 +168,30 @@ func prefixesConsistent(want, got []ndp.Option) bool {
 			//
 			// TODO: deal with decrementing lifetimes? CoreRAD doesn't support
 			// them at the moment so we can't verify them either.
-			if a.PreferredLifetime != b.PreferredLifetime || a.ValidLifetime != b.ValidLifetime {
-				return false
+			if a.PreferredLifetime != b.PreferredLifetime {
+				ps.push("prefix_information_preferred_lifetime", a.PreferredLifetime, b.PreferredLifetime)
+			}
+			if a.ValidLifetime != b.ValidLifetime {
+				ps.push("prefix_information_valid_lifetime", a.ValidLifetime, b.ValidLifetime)
 			}
 		}
 	}
 
-	return true
+	return ps
 }
 
-// routesConsistent reports whether two NDP route information option values
-// exist, and if so, if they are consistent.
-func routesConsistent(want, got []ndp.Option) bool {
+// checkRoutes reports whether two NDP Route Information option values are
+// consistent, or returns non-empty problems if not.
+func checkRoutes(want, got []ndp.Option) problems {
 	pfxA := pickRoutes(want)
 	pfxB := pickRoutes(got)
 
 	if len(pfxA) == 0 || len(pfxB) == 0 {
 		// If either are advertising no routes, nothing to do.
-		return true
+		return nil
 	}
 
+	var ps problems
 	for _, a := range pfxA {
 		for _, b := range pfxB {
 			if !a.Prefix.Equal(b.Prefix) || a.PrefixLength != b.PrefixLength {
@@ -120,84 +209,93 @@ func routesConsistent(want, got []ndp.Option) bool {
 			// TODO: deal with decrementing lifetimes? CoreRAD doesn't support
 			// them at the moment so we can't verify them either.
 			if a.Preference == b.Preference && a.RouteLifetime != b.RouteLifetime {
-				return false
+				ps.push("route_information_lifetime", a.RouteLifetime, b.RouteLifetime)
 			}
 		}
 	}
 
-	return true
+	return ps
 }
 
-// rdnssConsistent reports whether two NDP RDNSS option values exist, and if so,
-// if they are consistent.
-func rdnssConsistent(want, got []ndp.Option) bool {
+// checkRDNSS reports whether two NDP Recursive DNS Servers option values are
+// consistent, or returns non-empty problems if not.
+func checkRDNSS(want, got []ndp.Option) problems {
 	a := pickRDNSS(want)
 	b := pickRDNSS(got)
 
 	if len(a) == 0 || len(b) == 0 {
 		// If either are advertising no RDNSS, nothing to do.
-		return true
+		return nil
 	}
 
+	var ps problems
 	if len(a) != len(b) {
-		// Inconsistent number of servers.
-		return false
+		// Inconsistent number of options, so we can perform no further checks.
+		ps.push("rdnss_count", len(a), len(b))
+		return ps
 	}
 
 	// Assuming both are advertising RDNSS, the options must be identical.
 	for i := range a {
-		if len(a[i].Servers) != len(b[i].Servers) {
-			return false
+		if a, b := a[i].Lifetime, b[i].Lifetime; a != b {
+			ps.push("rdnss_lifetime", a, b)
+		}
+
+		if a, b := len(a[i].Servers), len(b[i].Servers); a != b {
+			// Inconsistent number of servers, so we can perform no further checks.
+			ps.push("rdnss_servers_count", a, b)
+			continue
 		}
 
 		for j := range a[i].Servers {
-			if !a[i].Servers[j].Equal(b[i].Servers[j]) {
-				return false
+			if a, b := a[i].Servers[j], b[i].Servers[j]; !a.Equal(b) {
+				ps.push("rdnss_servers", a, b)
 			}
-		}
-
-		if a[i].Lifetime != b[i].Lifetime {
-			return false
 		}
 	}
 
-	return true
+	return ps
 }
 
-// dnsslConsistent reports whether two NDP DNSSL option values exist, and if so,
-// if they are consistent.
-func dnsslConsistent(want, got []ndp.Option) bool {
+// checkDNSSL reports whether two NDP DNS Search List option values are
+// consistent, or returns non-empty problems if not.
+func checkDNSSL(want, got []ndp.Option) problems {
 	a := pickDNSSL(want)
 	b := pickDNSSL(got)
 
 	if len(a) == 0 || len(b) == 0 {
 		// If either are advertising no DNSSL, nothing to do.
-		return true
+		return nil
 	}
 
+	var ps problems
 	if len(a) != len(b) {
-		// Inconsistent number of domains.
-		return false
+		// Inconsistent number of domains, so we can perform no further checks.
+		ps.push("dnssl_count", len(a), len(b))
+		return ps
 	}
 
 	// Assuming both are advertising DNSSL, the options must be identical.
 	for i := range a {
-		if len(a[i].DomainNames) != len(b[i].DomainNames) {
-			return false
+		if a, b := a[i].Lifetime, b[i].Lifetime; a != b {
+			ps.push("dnssl_lifetime", a, b)
+		}
+
+		if a, b := len(a[i].DomainNames), len(b[i].DomainNames); a != b {
+			ps.push("dnssl_domain_names_count", a, b)
+			// Inconsistent number of domain names, so we can perform no
+			// further checks.
+			continue
 		}
 
 		for j := range a[i].DomainNames {
-			if a[i].DomainNames[j] != b[i].DomainNames[j] {
-				return false
+			if a, b := a[i].DomainNames[j], b[i].DomainNames[j]; a != b {
+				ps.push("dnssl_domain_names", a, b)
 			}
-		}
-
-		if a[i].Lifetime != b[i].Lifetime {
-			return false
 		}
 	}
 
-	return true
+	return ps
 }
 
 // pickMTU selects a ndp.MTU option from the input options, reporting whether
