@@ -14,6 +14,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,6 +23,19 @@ import (
 
 // parseInterfaces parses a rawInterface into an Interface.
 func parseInterface(ifi rawInterface) (*Interface, error) {
+	// monitor and advertise are mutually exclusive.
+	if ifi.Monitor && ifi.Advertise {
+		return nil, errors.New("monitor and advertise mode are mutually exclusive")
+	}
+
+	// monitor short-circuits all advertising configuration.
+	if ifi.Monitor {
+		return &Interface{
+			Name:    ifi.Name,
+			Monitor: ifi.Monitor,
+		}, nil
+	}
+
 	// The RFC and radvd have different defaults for some values. Where they
 	// differ, we will mimic radvd's defaults as many users will likely be
 	// migrating their configurations directly from radvd:
@@ -100,6 +114,7 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 
 	return &Interface{
 		Name:            ifi.Name,
+		Monitor:         ifi.Monitor,
 		Advertise:       ifi.Advertise,
 		MinInterval:     minInterval,
 		MaxInterval:     maxInterval,

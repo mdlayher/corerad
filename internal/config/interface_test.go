@@ -21,6 +21,13 @@ func Test_parseInterfaceErrors(t *testing.T) {
 		ifi  rawInterface
 	}{
 		{
+			name: "monitor and advertise",
+			ifi: rawInterface{
+				Monitor:   true,
+				Advertise: true,
+			},
+		},
+		{
 			name: "max interval duration",
 			ifi: rawInterface{
 				MaxInterval: "foo",

@@ -7,10 +7,22 @@
 [[interfaces]]
 name = "eth0"
 
+# Indicates whether or not this interface will be used exclusively for
+# monitoring incoming NDP traffic. monitor provides limited functionality in
+# comparison to advertise and is mostly useful for verifying the status and
+# health of upstream network links where it would not be appropriate to send
+# router advertisements.
+#
+# This option is mutually exclusive with advertise, and both must not be set to
+# true on the same interface.
+monitor = false
+
 # AdvSendAdvertisements: indicates whether or not this interface will send
 # periodic router advertisements and respond to router solicitations.
 #
-# Must be set to true to enable serving on this interface.
+# Must be set to true to enable serving on this interface. This option is
+# mutually exclusive with monitor, and both must not be set to true on the same
+# interface.
 advertise = false
 
 # All other interface parameters in this section can be removed to simplify

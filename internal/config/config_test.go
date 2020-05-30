@@ -75,6 +75,7 @@ func TestParse(t *testing.T) {
 			c: &config.Config{
 				Interfaces: []config.Interface{{
 					Name:            "eth0",
+					Monitor:         false,
 					Advertise:       false,
 					MinInterval:     3*time.Minute + 18*time.Second,
 					MaxInterval:     10 * time.Minute,
@@ -137,6 +138,10 @@ func TestParse(t *testing.T) {
 			unicast_only = true
 			source_lla = false
 			preference = "high"
+
+			[[interfaces]]
+			name = "eth3"
+			monitor = true
 
 			[debug]
 			address = "localhost:9430"
@@ -210,6 +215,10 @@ func TestParse(t *testing.T) {
 						UnicastOnly:     true,
 						Preference:      ndp.High,
 						Plugins:         []plugin.Plugin{},
+					},
+					{
+						Name:    "eth3",
+						Monitor: true,
 					},
 				},
 				Debug: config.Debug{
