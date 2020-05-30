@@ -20,7 +20,6 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"net"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
@@ -222,53 +221,18 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 	}
 }
 
-// deadlineNow causes connection deadlines to trigger immediately.
-var deadlineNow = time.Unix(1, 0)
-
 // listen issues unicast router advertisements in response to router
 // solicitations, until ctx is canceled.
 func (a *Advertiser) listen(ctx context.Context, conn system.Conn, ipC chan<- netaddr.IP) error {
 	// Wait for cancelation and then force any pending reads to time out.
 	var eg errgroup.Group
-	eg.Go(func() error {
-		<-ctx.Done()
-
-		if err := conn.SetReadDeadline(deadlineNow); err != nil {
-			return fmt.Errorf("failed to interrupt listener: %w", err)
-		}
-
-		return nil
-	})
+	eg.Go(interruptContext(ctx, conn))
 
 	for {
-		// Enable cancelation before sending any messages, if necessary.
-		if ctx.Err() != nil {
-			return eg.Wait()
-		}
-
-		m, cm, from, err := conn.ReadFrom()
+		// Receive and handle various NDP messages.
+		m, cm, host, err := receiveRetry(ctx, conn)
 		if err != nil {
-			if ctx.Err() != nil {
-				// Context canceled.
-				return eg.Wait()
-			}
-
-			a.mm.ErrorsTotal(a.cfg.Name, "receive")
-
-			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-				// Temporary error or timeout, just continue.
-				// TODO: smarter backoff/retry.
-				time.Sleep(50 * time.Millisecond)
-				continue
-			}
-
 			return fmt.Errorf("failed to read NDP messages: %w", err)
-		}
-
-		// Handle the incoming message and send a response if one is needed.
-		host, ok := netaddr.FromStdIP(from)
-		if !ok {
-			panicf("netaddr: invalid IP address: %q", from)
 		}
 
 		ip, err := a.handle(m, cm, host)
