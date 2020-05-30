@@ -78,9 +78,6 @@ func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Metri
 // Advertise initializes the configured interface and begins router solicitation
 // and advertisement handling. Advertise will block until ctx is canceled or an
 // error occurs.
-//
-// Before calling Advertise, call Events and ensure that the returned channel is
-// being drained, or Advertiser will stop processing.
 func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Change) error {
 	return a.dialer.Dial(ctx, func(ctx context.Context, dctx *system.DialContext) error {
 		// We can now initialize any plugins that rely on dynamic information
