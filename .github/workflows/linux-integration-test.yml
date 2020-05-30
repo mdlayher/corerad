@@ -1,0 +1,32 @@
+name: Linux Integration Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        go-version: [1.14]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go-version }}
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Build CoreRAD test binary
+      run: go test -c -race ./internal/corerad/
+
+    - name: Run integration tests
+      run: sudo ./corerad.test -test.run TestAdvertiser
