@@ -92,6 +92,7 @@ func (s *Server) Run(ctx context.Context) error {
 	// Watch for interface state changes. May or may not be supported depending
 	// on the OS, but functionality should gracefully degrade.
 	w := netstate.NewWatcher()
+	state := system.NewState()
 
 	// Serve on each specified interface.
 	for _, iface := range s.cfg.Interfaces {
@@ -103,8 +104,8 @@ func (s *Server) Run(ctx context.Context) error {
 			s.ll.Println(iface.Name + ": " + fmt.Sprintf(format, v...))
 		}
 
-		if !iface.Advertise {
-			logf("advertise is false, skipping initialization")
+		if !iface.Advertise && !iface.Monitor {
+			logf("interface is not advertising or monitoring, skipping initialization")
 			continue
 		}
 
@@ -118,16 +119,32 @@ func (s *Server) Run(ctx context.Context) error {
 		// Advertiser to flap.
 		watchC := w.Subscribe(iface.Name, netstate.LinkDown)
 
-		ad := NewAdvertiser(iface.Name, iface, s.ll, mm)
+		dialer := system.NewDialer(s.ll, iface.Name)
 
-		// Begin advertising on this interface until the context is canceled.
-		s.eg.Go(func() error {
-			if err := ad.Advertise(ctx, watchC); err != nil {
-				return fmt.Errorf("failed to advertise NDP: %v", err)
-			}
+		switch {
+		case iface.Advertise:
+			// Begin advertising on this interface until the context is canceled.
+			s.eg.Go(func() error {
+				ad := NewAdvertiser(iface.Name, iface, dialer, state, s.ll, mm)
+				if err := ad.Advertise(ctx, watchC); err != nil {
+					return fmt.Errorf("failed to advertise NDP: %v", err)
+				}
 
-			return nil
-		})
+				return nil
+			})
+		case iface.Monitor:
+			// Begin monitoring on this interface until the context is canceled.
+			s.eg.Go(func() error {
+				mon := NewMonitor(iface.Name, dialer, state, s.ll, mm)
+				if err := mon.Monitor(ctx, watchC); err != nil {
+					return fmt.Errorf("failed to monitor NDP: %v", err)
+				}
+
+				return nil
+			})
+		default:
+			panicf("corerad: Server interface %q is not advertising or monitoring", iface.Name)
+		}
 	}
 
 	// Configure the HTTP debug server, if applicable.

@@ -50,11 +50,22 @@ type Advertiser struct {
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
 	state  system.State
+
+	// Parameters which have defaults but may be explicitly overridden to speed
+	// up tests.
+	minDelayBetweenRAs time.Duration
 }
 
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded. If mm is nil, metrics are discarded.
-func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Metrics) *Advertiser {
+func NewAdvertiser(
+	iface string,
+	cfg config.Interface,
+	dialer *system.Dialer,
+	state system.State,
+	ll *log.Logger,
+	mm *Metrics,
+) *Advertiser {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
@@ -63,14 +74,15 @@ func NewAdvertiser(iface string, cfg config.Interface, ll *log.Logger, mm *Metri
 	}
 
 	return &Advertiser{
-		iface: iface,
-		cfg:   cfg,
-		ll:    ll,
-		mm:    mm,
+		iface:  iface,
+		cfg:    cfg,
+		ll:     ll,
+		mm:     mm,
+		dialer: dialer,
+		state:  state,
 
-		// By default, directly manipulate the system.
-		dialer: system.NewDialer(ll, iface),
-		state:  system.NewState(),
+		// RFC defaults which can be overridden.
+		minDelayBetweenRAs: minDelayBetweenRAs,
 	}
 }
 
@@ -366,8 +378,8 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 
 		// Ensure that we space out multicast RAs as required by the RFC.
 		var delay time.Duration
-		if time.Since(lastMulticast) < minDelayBetweenRAs {
-			delay = minDelayBetweenRAs
+		if time.Since(lastMulticast) < a.minDelayBetweenRAs {
+			delay = a.minDelayBetweenRAs
 		}
 
 		// Ready to send this multicast RA.

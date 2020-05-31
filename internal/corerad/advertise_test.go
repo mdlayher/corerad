@@ -243,6 +243,10 @@ func TestAdvertiserUnsolicitedShutdown(t *testing.T) {
 	}
 }
 
+// testMinDelayBetweenRAs overrides the RFC minDelayBetweenRAs for tests to
+// reduce the wait times for each test run.
+const testMinDelayBetweenRAs = 250 * time.Millisecond
+
 func TestAdvertiserUnsolicitedDelay(t *testing.T) {
 	skipShort(t)
 	t.Parallel()
@@ -272,7 +276,7 @@ func TestAdvertiserUnsolicitedDelay(t *testing.T) {
 					}
 				}
 
-				if d := time.Since(start); d < minDelayBetweenRAs {
+				if d := time.Since(start); d < testMinDelayBetweenRAs {
 					t.Fatalf("delay too short between multicast RAs: %s", d)
 				}
 			})
@@ -590,35 +594,37 @@ func testSimulatedAdvertiserClient(
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Swap out the underlying connections for a UDP socket pair.
+	sc, cc, cDone := testConnPair(t)
+
 	// Set up metrics node so we can inspect its contents at a later time.
 	ts := system.TestState{Forwarding: true}
 	mm := NewMetrics(metricslite.NewMemory(), ts, []config.Interface{*cfg})
 	ad := NewAdvertiser(
 		cfg.Name,
 		*cfg,
+		&system.Dialer{
+			DialFunc: func() *system.DialContext {
+				return &system.DialContext{
+					Conn: sc,
+					Interface: &net.Interface{
+						Name:         cfg.Name,
+						HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+					},
+					IP: net.IPv6loopback,
+				}
+			},
+		},
+		ts,
 		log.New(os.Stderr, "", 0),
 		mm,
 	)
 
+	// Override RFC parameters to speed up tests.
+	ad.minDelayBetweenRAs = testMinDelayBetweenRAs
+
 	if tcfg != nil && tcfg.onInconsistentRA != nil {
 		ad.OnInconsistentRA = tcfg.onInconsistentRA
-	}
-
-	// Swap out the underlying connections for a UDP socket pair.
-	sc, cc, cDone := testConnPair(t)
-	ad.state = ts
-
-	ad.dialer = &system.Dialer{
-		DialFunc: func() *system.DialContext {
-			return &system.DialContext{
-				Conn: sc,
-				Interface: &net.Interface{
-					Name:         "test0",
-					HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
-				},
-				IP: net.IPv6loopback,
-			}
-		},
 	}
 
 	var eg errgroup.Group
@@ -789,9 +795,21 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		t.Fatalf("failed to look up client veth: %v", err)
 	}
 
+	ll := log.New(os.Stderr, "", 0)
+
 	// Set up metrics node so we can inspect its contents at a later time.
 	mm := NewMetrics(metricslite.NewMemory(), system.NewState(), []config.Interface{*cfg})
-	ad := NewAdvertiser(router.Name, *cfg, log.New(os.Stderr, "", 0), mm)
+	ad := NewAdvertiser(
+		router.Name,
+		*cfg,
+		system.NewDialer(ll, router.Name),
+		system.NewState(),
+		ll,
+		mm,
+	)
+
+	// Override RFC parameters to speed up tests.
+	ad.minDelayBetweenRAs = testMinDelayBetweenRAs
 
 	if tcfg != nil && tcfg.onInconsistentRA != nil {
 		ad.OnInconsistentRA = tcfg.onInconsistentRA
@@ -995,6 +1013,8 @@ func findMetric(t *testing.T, mm *Metrics, name string) metricslite.Series {
 			continue
 		}
 
+		// Remove the help string for easier diffing.
+		ts.Help = ""
 		return ts
 	}
 

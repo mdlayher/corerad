@@ -39,6 +39,7 @@ const (
 
 	// Non-const metrics.
 	raInconsistencies = "corerad_advertiser_router_advertisement_inconsistencies_total"
+	monReceived       = "corerad_monitor_messages_received_total"
 )
 
 // Metrics contains metrics for a CoreRAD instance.
@@ -54,6 +55,9 @@ type Metrics struct {
 	RouterAdvertisementInconsistenciesTotal metricslite.Counter
 	RouterAdvertisementsTotal               metricslite.Counter
 	ErrorsTotal                             metricslite.Counter
+
+	// Per-monitor metrics.
+	MonitorMessagesReceivedTotal metricslite.Counter
 
 	// The underlying metrics storage.
 	m metricslite.Interface
@@ -119,6 +123,12 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 			"corerad_advertiser_errors_total",
 			"The total number and type of errors that occurred while advertising.",
 			"interface", "error",
+		),
+
+		MonitorMessagesReceivedTotal: m.Counter(
+			monReceived,
+			"The total number of valid NDP messages received on a monitoring interface.",
+			"interface", "host", "message",
 		),
 	}
 
