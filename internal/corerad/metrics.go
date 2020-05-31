@@ -40,6 +40,7 @@ const (
 	// Non-const metrics.
 	raInconsistencies = "corerad_advertiser_router_advertisement_inconsistencies_total"
 	monReceived       = "corerad_monitor_messages_received_total"
+	monDefaultRoute   = "corerad_monitor_default_route_expiration_time"
 )
 
 // Metrics contains metrics for a CoreRAD instance.
@@ -57,7 +58,8 @@ type Metrics struct {
 	ErrorsTotal                             metricslite.Counter
 
 	// Per-monitor metrics.
-	MonitorMessagesReceivedTotal metricslite.Counter
+	MonitorMessagesReceivedTotal      metricslite.Counter
+	MonitorDefaultRouteExpirationTime metricslite.Gauge
 
 	// The underlying metrics storage.
 	m metricslite.Interface
@@ -129,6 +131,12 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 			monReceived,
 			"The total number of valid NDP messages received on a monitoring interface.",
 			"interface", "host", "message",
+		),
+
+		MonitorDefaultRouteExpirationTime: m.Gauge(
+			monDefaultRoute,
+			"The UNIX timestamp of when the route provided by a default router will expire.",
+			"interface", "router",
 		),
 	}
 

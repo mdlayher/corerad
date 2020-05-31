@@ -19,11 +19,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"time"
 
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netstate"
 	"golang.org/x/sync/errgroup"
+	"inet.af/netaddr"
 )
 
 // A Monitor listens and reports on NDP traffic.
@@ -40,6 +42,9 @@ type Monitor struct {
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
 	state  system.State
+
+	// now allows overriding the current time.
+	now func() time.Time
 }
 
 // NewMonitor creates a Monitor for the specified interface. If ll is nil, logs
@@ -64,6 +69,9 @@ func NewMonitor(
 		mm:     mm,
 		dialer: dialer,
 		state:  state,
+
+		// By default use real time.
+		now: time.Now,
 	}
 }
 
@@ -152,12 +160,34 @@ func (m *Monitor) listen(ctx context.Context, conn system.Conn) error {
 
 		m.mm.MonitorMessagesReceivedTotal(m.iface, host.String(), msg.Type().String())
 
+		// TODO(mdlayher): expand type switch.
+		switch msg := msg.(type) {
+		case *ndp.RouterAdvertisement:
+			m.raMetrics(msg, host)
+		}
+
 		// Callback must fire after logging/metrics to ensure they are consistent
 		// in tests.
 		if m.OnMessage != nil {
 			m.OnMessage(msg)
 		}
 	}
+}
+
+// raMetrics produces metrics for a given router advertisement.
+func (m *Monitor) raMetrics(ra *ndp.RouterAdvertisement, router netaddr.IP) {
+	if ra.RouterLifetime == 0 {
+		// Not a default router, do nothing.
+		return
+	}
+
+	// This is an advertisement from a default router.
+
+	// Calculate the UNIX timestamp of when the default route will expire.
+	m.mm.MonitorDefaultRouteExpirationTime(
+		float64(m.now().Add(ra.RouterLifetime).Unix()),
+		m.iface, router.String(),
+	)
 }
 
 // logf prints a formatted log with the Monitor's interface name.

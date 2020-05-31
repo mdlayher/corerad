@@ -29,13 +29,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func makeReady() (<-chan struct{}, func(ndp.Message)) {
-	readyC := make(chan struct{})
-	return readyC, func(m ndp.Message) {
-		readyC <- struct{}{}
-	}
-}
-
 func TestMonitorMetrics(t *testing.T) {
 	readyC, onMessage := makeReady()
 	cctx := testSimulatedMonitorClient(t, onMessage)
@@ -46,9 +39,15 @@ func TestMonitorMetrics(t *testing.T) {
 			Addr:      net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 		}
 
+		routerLifetime = 30 * time.Second
+
 		// TODO(mdlayher): expand with other fields.
 		rs = &ndp.RouterSolicitation{Options: []ndp.Option{sll}}
-		ra = &ndp.RouterAdvertisement{Options: []ndp.Option{sll}}
+		ra = &ndp.RouterAdvertisement{
+			// Pretend to be a default router.
+			RouterLifetime: routerLifetime,
+			Options:        []ndp.Option{sll},
+		}
 	)
 
 	// Continue sending messages to the monitor and waiting for it to
@@ -69,9 +68,9 @@ func TestMonitorMetrics(t *testing.T) {
 
 	// Now that we've sent our messages, verify the output of the monitor
 	// messages received time series.
-	got := findMetric(t, cctx.mm, monReceived)
+	gotReceived := findMetric(t, cctx.mm, monReceived)
 
-	want := metricslite.Series{
+	wantReceived := metricslite.Series{
 		Name: monReceived,
 		Samples: map[string]float64{
 			"interface=test0,host=::1,message=router advertisement": 2,
@@ -79,8 +78,33 @@ func TestMonitorMetrics(t *testing.T) {
 		},
 	}
 
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("unexpected timeseries (-want +got):\n%s", diff)
+	if diff := cmp.Diff(wantReceived, gotReceived); diff != "" {
+		t.Fatalf("unexpected monitor received values (-want +got):\n%s", diff)
+	}
+
+	gotDefault := findMetric(t, cctx.mm, monDefaultRoute)
+
+	wantDefault := metricslite.Series{
+		Name: monDefaultRoute,
+		Samples: map[string]float64{
+			// Because the fixed time is UNIX 0, we can use router lifetime in
+			// seconds directly as the timestamp for when the default route
+			// would actually expire.
+			"interface=test0,router=::1": routerLifetime.Seconds(),
+		},
+	}
+
+	if diff := cmp.Diff(wantDefault, gotDefault); diff != "" {
+		t.Fatalf("unexpected monitor default route values (-want +got):\n%s", diff)
+	}
+}
+
+func fixedNow() time.Time { return time.Unix(0, 0) }
+
+func makeReady() (<-chan struct{}, func(ndp.Message)) {
+	readyC := make(chan struct{})
+	return readyC, func(m ndp.Message) {
+		readyC <- struct{}{}
 	}
 }
 
@@ -115,6 +139,9 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 	)
 
 	mon.OnMessage = onMessage
+
+	// Always use a fixed time.
+	mon.now = fixedNow
 
 	readyC := make(chan struct{})
 
