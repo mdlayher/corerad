@@ -68,8 +68,8 @@ func receiveRetry(ctx context.Context, conn system.Conn) (ndp.Message, *ipv6.Con
 				return nil, nil, netaddr.IP{}, cerr
 			}
 
-			// TODO: use errors.As?
-			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+			var nerr net.Error
+			if errors.As(err, &nerr) && nerr.Temporary() {
 				// Temporary error or timeout, either back off and retry or
 				// return if the context is canceled.
 				select {
