@@ -46,7 +46,7 @@ func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 		}
 
 		// Expect a timeout due to bad hop limit.
-		if err := cctx.c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
+		if err := cctx.c.SetReadDeadline(time.Now().Add(10 * time.Millisecond)); err != nil {
 			t.Fatalf("failed to set client deadline: %v", err)
 		}
 
