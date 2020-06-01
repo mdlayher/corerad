@@ -31,6 +31,7 @@ const (
 	ifiAdvertising       = "corerad_interface_advertising"
 	ifiAutoconfiguration = "corerad_interface_autoconfiguration"
 	ifiForwarding        = "corerad_interface_forwarding"
+	ifiMonitoring        = "corerad_interface_monitoring"
 	raPrefixInfo         = "corerad_advertiser_router_advertisement_prefix_info"
 	raPrefixAutonomous   = "corerad_advertiser_router_advertisement_prefix_autonomous"
 	raPrefixOnLink       = "corerad_advertiser_router_advertisement_prefix_on_link"
@@ -170,6 +171,12 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 	)
 
 	m.ConstGauge(
+		ifiMonitoring,
+		"Indicates whether or not NDP messages will be monitored on this interface.",
+		"interface",
+	)
+
+	m.ConstGauge(
 		raPrefixInfo,
 		"Metadata about a prefix being advertised via IPv6 router advertisement.",
 		// TODO: verify uniqueness of prefixes per interface.
@@ -247,6 +254,7 @@ func (m *Metrics) constScrape(metrics map[string]func(float64, ...string)) error
 			Advertising:       ifi.Advertise,
 			Autoconfiguration: auto,
 			Forwarding:        fwd,
+			Monitoring:        ifi.Monitor,
 			Advertisement:     ra,
 		})
 	}
@@ -256,9 +264,9 @@ func (m *Metrics) constScrape(metrics map[string]func(float64, ...string)) error
 
 // A metricsContext contains arguments used to populate metrics in collectMetrics.
 type metricsContext struct {
-	Interface                                  string
-	Advertising, Autoconfiguration, Forwarding bool
-	Advertisement                              *ndp.RouterAdvertisement
+	Interface                                              string
+	Advertising, Autoconfiguration, Forwarding, Monitoring bool
+	Advertisement                                          *ndp.RouterAdvertisement
 }
 
 // collectMetrics sets const metrics using the input data for the specified
@@ -279,6 +287,8 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 			c(boolFloat(mctx.Autoconfiguration), mctx.Interface)
 		case ifiForwarding:
 			c(boolFloat(mctx.Forwarding), mctx.Interface)
+		case ifiMonitoring:
+			c(boolFloat(mctx.Monitoring), mctx.Interface)
 		case raPrefixInfo, raPrefixAutonomous, raPrefixOnLink, raPrefixValid, raPrefixPreferred:
 			for _, p := range prefixes {
 				// Combine the prefix and prefix length fields into a proper CIDR

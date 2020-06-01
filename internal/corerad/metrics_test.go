@@ -37,21 +37,37 @@ func TestMetrics(t *testing.T) {
 			"corerad_build_time": {Samples: map[string]float64{"": 0}},
 		}
 
-		// All interfaces are assumed to be forwarding traffic.
-		state = system.TestState{Forwarding: true}
+		// All interfaces except unused are assumed to be forwarding traffic.
+		state = system.TestState{
+			Forwarding: true,
+			Interfaces: map[string]system.TestStateInterface{
+				"eth2": {Forwarding: false},
+			},
+		}
 
-		// A WAN interface which is configured but not advertising.
+		// A WAN interface which is configured to monitor but not advertise.
 		wan = map[string]metricslite.Series{
 			ifiAdvertising:       {Samples: map[string]float64{"interface=eth0": 0}},
 			ifiAutoconfiguration: {Samples: map[string]float64{"interface=eth0": 0}},
 			ifiForwarding:        {Samples: map[string]float64{"interface=eth0": 1}},
+			ifiMonitoring:        {Samples: map[string]float64{"interface=eth0": 1}},
 		}
 
-		// A LAN interface which is configured and advertising.
+		// A LAN interface which is configured to advertise but not monitor.
 		lan = map[string]metricslite.Series{
 			ifiAdvertising:       {Samples: map[string]float64{"interface=eth1": 1}},
 			ifiAutoconfiguration: {Samples: map[string]float64{"interface=eth1": 0}},
 			ifiForwarding:        {Samples: map[string]float64{"interface=eth1": 1}},
+			ifiMonitoring:        {Samples: map[string]float64{"interface=eth1": 0}},
+		}
+
+		// An unused interface which is in the config but neither advertising
+		// nor monitoring.
+		unused = map[string]metricslite.Series{
+			ifiAdvertising:       {Samples: map[string]float64{"interface=eth2": 0}},
+			ifiAutoconfiguration: {Samples: map[string]float64{"interface=eth2": 0}},
+			ifiForwarding:        {Samples: map[string]float64{"interface=eth2": 0}},
+			ifiMonitoring:        {Samples: map[string]float64{"interface=eth2": 0}},
 		}
 	)
 
@@ -74,16 +90,19 @@ func TestMetrics(t *testing.T) {
 			}),
 		},
 		{
-			name:   "interface not advertising",
+			name:   "interface not configured",
 			ts:     state,
-			ifis:   []config.Interface{{Name: "eth0"}},
-			series: mergeSeries(base, wan),
+			ifis:   []config.Interface{{Name: "eth2"}},
+			series: mergeSeries(base, unused),
 		},
 		{
-			name: "interface advertising",
+			name: "interfaces monitoring and advertising",
 			ts:   state,
 			ifis: []config.Interface{
-				{Name: "eth0"},
+				{
+					Name:    "eth0",
+					Monitor: true,
+				},
 				{
 					Name:      "eth1",
 					Advertise: true,
