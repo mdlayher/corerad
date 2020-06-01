@@ -113,25 +113,7 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn, watchC <-chan n
 		return nil
 	})
 
-	// Link state watcher, unless no watch channel was specified.
-	if watchC != nil {
-		eg.Go(func() error {
-			select {
-			case <-ctx.Done():
-				return nil
-			case _, ok := <-watchC:
-				if !ok {
-					// Watcher halted or not available on this OS.
-					return nil
-				}
-
-				// TODO: inspect for specific state changes.
-
-				// Watcher indicated a state change.
-				return system.ErrLinkChange
-			}
-		})
-	}
+	eg.Go(linkStateWatcher(ctx, watchC))
 
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("failed to run Monitor: %w", err)

@@ -22,6 +22,7 @@ import (
 
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
+	"github.com/mdlayher/netstate"
 	"golang.org/x/net/ipv6"
 	"inet.af/netaddr"
 )
@@ -46,6 +47,32 @@ func interruptContext(ctx context.Context, conn system.Conn) func() error {
 		}
 
 		return nil
+	}
+}
+
+// linkStateWatcher returns a function meant for use with errgroup.Group.Go
+// which will watch for cancelation or changes on watchC.
+func linkStateWatcher(ctx context.Context, watchC <-chan netstate.Change) func() error {
+	return func() error {
+		if watchC == nil {
+			// Nothing to do.
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case _, ok := <-watchC:
+			if !ok {
+				// Watcher halted or not available on this OS.
+				return nil
+			}
+
+			// TODO: inspect for specific state changes.
+
+			// Watcher indicated a state change.
+			return system.ErrLinkChange
+		}
 	}
 }
 
