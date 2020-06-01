@@ -276,7 +276,10 @@ func TestAdvertiserUnsolicitedDelay(t *testing.T) {
 					}
 				}
 
-				if d := time.Since(start); d < testMinDelayBetweenRAs {
+				// Allow a bit of variance in the delay time due to the client
+				// and server using different timers.
+				delay := testMinDelayBetweenRAs - 10*time.Millisecond
+				if d := time.Since(start); d < delay {
 					t.Fatalf("delay too short between multicast RAs: %s", d)
 				}
 			})
