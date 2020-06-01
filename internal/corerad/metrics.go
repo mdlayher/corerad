@@ -51,22 +51,23 @@ type Metrics struct {
 	Time metricslite.Gauge
 
 	// Per-advertiser metrics.
-	LastMulticastTime                       metricslite.Gauge
-	MessagesReceivedTotal                   metricslite.Counter
-	MessagesReceivedInvalidTotal            metricslite.Counter
-	RouterAdvertisementInconsistenciesTotal metricslite.Counter
-	RouterAdvertisementsTotal               metricslite.Counter
-	ErrorsTotal                             metricslite.Counter
+	AdvLastMulticastTime                       metricslite.Gauge
+	AdvMessagesReceivedTotal                   metricslite.Counter
+	AdvMessagesReceivedInvalidTotal            metricslite.Counter
+	AdvRouterAdvertisementInconsistenciesTotal metricslite.Counter
+	AdvRouterAdvertisementsTotal               metricslite.Counter
+	AdvErrorsTotal                             metricslite.Counter
 
 	// Per-monitor metrics.
-	MonitorMessagesReceivedTotal      metricslite.Counter
-	MonitorDefaultRouteExpirationTime metricslite.Gauge
+	MonMessagesReceivedTotal      metricslite.Counter
+	MonDefaultRouteExpirationTime metricslite.Gauge
+
+	// Used to fetch interface states.
+	state system.State
+	ifis  []config.Interface
 
 	// The underlying metrics storage.
 	m metricslite.Interface
-
-	state system.State
-	ifis  []config.Interface
 }
 
 // NewMetrics produces a Metrics structure which will register its metrics to
@@ -92,49 +93,49 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 			"The UNIX timestamp of when this build of CoreRAD was produced.",
 		),
 
-		LastMulticastTime: m.Gauge(
+		AdvLastMulticastTime: m.Gauge(
 			"corerad_advertiser_last_multicast_time_seconds",
 			"The UNIX timestamp of when the last multicast router advertisement was sent.",
 			"interface",
 		),
 
-		MessagesReceivedTotal: m.Counter(
+		AdvMessagesReceivedTotal: m.Counter(
 			"corerad_advertiser_messages_received_total",
 			"The total number of valid NDP messages received on a listening interface.",
 			"interface", "message",
 		),
 
-		MessagesReceivedInvalidTotal: m.Counter(
+		AdvMessagesReceivedInvalidTotal: m.Counter(
 			"corerad_advertiser_messages_received_invalid_total",
 			"The total number of invalid NDP messages received on a listening interface.",
 			"interface", "message",
 		),
 
-		RouterAdvertisementInconsistenciesTotal: m.Counter(
+		AdvRouterAdvertisementInconsistenciesTotal: m.Counter(
 			raInconsistencies,
 			"The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration, partitioned by the problematic field.",
 			"interface", "field",
 		),
 
-		RouterAdvertisementsTotal: m.Counter(
+		AdvRouterAdvertisementsTotal: m.Counter(
 			"corerad_advertiser_router_advertisements_total",
 			"The total number of NDP router advertisements sent by the advertiser on an interface.",
 			"interface", "type",
 		),
 
-		ErrorsTotal: m.Counter(
+		AdvErrorsTotal: m.Counter(
 			"corerad_advertiser_errors_total",
 			"The total number and type of errors that occurred while advertising.",
 			"interface", "error",
 		),
 
-		MonitorMessagesReceivedTotal: m.Counter(
+		MonMessagesReceivedTotal: m.Counter(
 			monReceived,
 			"The total number of valid NDP messages received on a monitoring interface.",
 			"interface", "host", "message",
 		),
 
-		MonitorDefaultRouteExpirationTime: m.Gauge(
+		MonDefaultRouteExpirationTime: m.Gauge(
 			monDefaultRoute,
 			"The UNIX timestamp of when the route provided by a default router will expire.",
 			"interface", "router",

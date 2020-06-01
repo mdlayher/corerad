@@ -158,7 +158,7 @@ func (m *Monitor) listen(ctx context.Context, conn system.Conn) error {
 		// of these logs.
 		m.logf("monitor received %q from %s", msg.Type(), host)
 
-		m.mm.MonitorMessagesReceivedTotal(m.iface, host.String(), msg.Type().String())
+		m.mm.MonMessagesReceivedTotal(m.iface, host.String(), msg.Type().String())
 
 		// TODO(mdlayher): expand type switch.
 		switch msg := msg.(type) {
@@ -184,7 +184,7 @@ func (m *Monitor) raMetrics(ra *ndp.RouterAdvertisement, router netaddr.IP) {
 	// This is an advertisement from a default router.
 
 	// Calculate the UNIX timestamp of when the default route will expire.
-	m.mm.MonitorDefaultRouteExpirationTime(
+	m.mm.MonDefaultRouteExpirationTime(
 		float64(m.now().Add(ra.RouterLifetime).Unix()),
 		m.iface, router.String(),
 	)

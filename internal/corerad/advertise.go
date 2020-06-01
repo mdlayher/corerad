@@ -259,12 +259,12 @@ func (a *Advertiser) listen(ctx context.Context, conn system.Conn, ipC chan<- ne
 
 // handle handles an incoming NDP message from a remote host.
 func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr.IP) (*netaddr.IP, error) {
-	a.mm.MessagesReceivedTotal(a.cfg.Name, m.Type().String())
+	a.mm.AdvMessagesReceivedTotal(a.cfg.Name, m.Type().String())
 
 	// Ensure this message has a valid hop limit.
 	if cm.HopLimit != ndp.HopLimit {
 		a.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
-		a.mm.MessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
+		a.mm.AdvMessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
 		return nil, nil
 	}
 
@@ -304,7 +304,7 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr
 
 		for i, p := range problems {
 			a.logf("inconsistency %d: %q: %s", i, p.Field, p.Details)
-			a.mm.RouterAdvertisementInconsistenciesTotal(a.cfg.Name, p.Field)
+			a.mm.AdvRouterAdvertisementInconsistenciesTotal(a.cfg.Name, p.Field)
 		}
 
 		if a.OnInconsistentRA != nil {
@@ -312,7 +312,7 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr
 		}
 	default:
 		a.logf("received NDP message of type %T from %s, ignoring", m, host)
-		a.mm.MessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
+		a.mm.AdvMessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
 	}
 
 	// No response necessary.
@@ -396,17 +396,17 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
 	if err := a.send(conn, ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
-		a.mm.ErrorsTotal(a.cfg.Name, "transmit")
+		a.mm.AdvErrorsTotal(a.cfg.Name, "transmit")
 		return err
 	}
 
 	typ := "unicast"
 	if ip.IsMulticast() {
 		typ = "multicast"
-		a.mm.LastMulticastTime(float64(time.Now().Unix()), a.cfg.Name)
+		a.mm.AdvLastMulticastTime(float64(time.Now().Unix()), a.cfg.Name)
 	}
 
-	a.mm.RouterAdvertisementsTotal(a.cfg.Name, typ)
+	a.mm.AdvRouterAdvertisementsTotal(a.cfg.Name, typ)
 	return nil
 }
 
