@@ -30,6 +30,12 @@
     },
     {
       "type": "panel",
+      "id": "singlestat",
+      "name": "Singlestat",
+      "version": ""
+    },
+    {
+      "type": "panel",
       "id": "table",
       "name": "Table",
       "version": ""
@@ -54,7 +60,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1589770749867,
+  "iteration": 1591031946113,
   "links": [],
   "panels": [
     {
@@ -159,7 +165,310 @@
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Interface Prefix SLAAC",
+      "title": "Interface prefix SLAAC",
+      "transform": "timeseries_aggregations",
+      "type": "table"
+    },
+    {
+      "cacheTimeout": null,
+      "colorBackground": false,
+      "colorPostfix": false,
+      "colorPrefix": false,
+      "colorValue": false,
+      "colors": [
+        "#299c46",
+        "rgba(237, 129, 40, 0.89)",
+        "#d44a3a"
+      ],
+      "datasource": "${DS_PROMETHEUS}",
+      "decimals": 2,
+      "format": "s",
+      "gauge": {
+        "maxValue": 100,
+        "minValue": 0,
+        "show": false,
+        "thresholdLabels": false,
+        "thresholdMarkers": true
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 16,
+      "interval": null,
+      "links": [],
+      "mappingType": 1,
+      "mappingTypes": [
+        {
+          "$$hashKey": "object:1953",
+          "name": "value to text",
+          "value": 1
+        },
+        {
+          "$$hashKey": "object:1954",
+          "name": "range to text",
+          "value": 2
+        }
+      ],
+      "maxDataPoints": 100,
+      "nullPointMode": "connected",
+      "nullText": null,
+      "pluginVersion": "6.7.1",
+      "postfix": "",
+      "postfixFontSize": "50%",
+      "prefix": "",
+      "prefixFontSize": "50%",
+      "rangeMaps": [
+        {
+          "from": "null",
+          "text": "N/A",
+          "to": "null"
+        }
+      ],
+      "sparkline": {
+        "fillColor": "rgba(255, 255, 255, 0)",
+        "full": false,
+        "lineColor": "#73BF69",
+        "show": true,
+        "ymax": null,
+        "ymin": null
+      },
+      "tableColumn": "",
+      "targets": [
+        {
+          "expr": "corerad_monitor_default_route_expiration_time{instance=~\"$instance.*\"} - time()",
+          "interval": "",
+          "legendFormat": "{{interface}} : {{router}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": "",
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Default route lifetime",
+      "type": "singlestat",
+      "valueFontSize": "200%",
+      "valueMaps": [
+        {
+          "$$hashKey": "object:1956",
+          "op": "=",
+          "text": "N/A",
+          "value": "null"
+        }
+      ],
+      "valueName": "current"
+    },
+    {
+      "columns": [
+        {
+          "$$hashKey": "object:387",
+          "text": "Current",
+          "value": "current"
+        }
+      ],
+      "datasource": "${DS_PROMETHEUS}",
+      "fontSize": "100%",
+      "gridPos": {
+        "h": 9,
+        "w": 3,
+        "x": 12,
+        "y": 0
+      },
+      "id": 8,
+      "pageSize": null,
+      "showHeader": true,
+      "sort": {
+        "col": 0,
+        "desc": false
+      },
+      "styles": [
+        {
+          "$$hashKey": "object:389",
+          "alias": "Interface",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "#F2495C",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "decimals": 0,
+          "link": false,
+          "mappingType": 1,
+          "pattern": "Metric",
+          "thresholds": [
+            ""
+          ],
+          "type": "string",
+          "unit": "short",
+          "valueMaps": []
+        },
+        {
+          "$$hashKey": "object:390",
+          "alias": "Advertising",
+          "align": "auto",
+          "colorMode": "value",
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "#F2495C",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "Current",
+          "rangeMaps": [
+            {
+              "from": "0",
+              "text": "false",
+              "to": "0.99"
+            },
+            {
+              "from": "",
+              "text": "",
+              "to": ""
+            }
+          ],
+          "thresholds": [
+            "0",
+            " 1"
+          ],
+          "type": "string",
+          "unit": "short",
+          "valueMaps": [
+            {
+              "$$hashKey": "object:439",
+              "text": "false",
+              "value": "0"
+            },
+            {
+              "$$hashKey": "object:440",
+              "text": "true",
+              "value": "1"
+            }
+          ]
+        }
+      ],
+      "targets": [
+        {
+          "expr": "corerad_interface_advertising{instance=~\"$instance.*\"}",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{interface}}",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Interface advertising",
+      "transform": "timeseries_aggregations",
+      "type": "table"
+    },
+    {
+      "columns": [
+        {
+          "$$hashKey": "object:387",
+          "text": "Current",
+          "value": "current"
+        }
+      ],
+      "datasource": "${DS_PROMETHEUS}",
+      "fontSize": "100%",
+      "gridPos": {
+        "h": 9,
+        "w": 3,
+        "x": 15,
+        "y": 0
+      },
+      "id": 13,
+      "pageSize": null,
+      "showHeader": true,
+      "sort": {
+        "col": 0,
+        "desc": false
+      },
+      "styles": [
+        {
+          "$$hashKey": "object:389",
+          "alias": "Interface",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "#F2495C",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "decimals": 0,
+          "link": false,
+          "mappingType": 1,
+          "pattern": "Metric",
+          "thresholds": [
+            ""
+          ],
+          "type": "string",
+          "unit": "short",
+          "valueMaps": []
+        },
+        {
+          "$$hashKey": "object:390",
+          "alias": "Monitoring",
+          "align": "auto",
+          "colorMode": "value",
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "#F2495C",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "Current",
+          "rangeMaps": [
+            {
+              "from": "0",
+              "text": "false",
+              "to": "0.99"
+            },
+            {
+              "from": "",
+              "text": "",
+              "to": ""
+            }
+          ],
+          "thresholds": [
+            "0",
+            " 1"
+          ],
+          "type": "string",
+          "unit": "short",
+          "valueMaps": [
+            {
+              "$$hashKey": "object:439",
+              "text": "false",
+              "value": "0"
+            },
+            {
+              "$$hashKey": "object:440",
+              "text": "true",
+              "value": "1"
+            }
+          ]
+        }
+      ],
+      "targets": [
+        {
+          "expr": "corerad_interface_monitoring{instance=~\"$instance.*\"}",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{interface}}",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Interface monitoring",
       "transform": "timeseries_aggregations",
       "type": "table"
     },
@@ -175,8 +484,8 @@
       "fontSize": "100%",
       "gridPos": {
         "h": 9,
-        "w": 6,
-        "x": 6,
+        "w": 3,
+        "x": 18,
         "y": 0
       },
       "id": 9,
@@ -272,112 +581,6 @@
     {
       "columns": [
         {
-          "$$hashKey": "object:387",
-          "text": "Current",
-          "value": "current"
-        }
-      ],
-      "datasource": "${DS_PROMETHEUS}",
-      "fontSize": "100%",
-      "gridPos": {
-        "h": 9,
-        "w": 6,
-        "x": 12,
-        "y": 0
-      },
-      "id": 8,
-      "pageSize": null,
-      "showHeader": true,
-      "sort": {
-        "col": 0,
-        "desc": false
-      },
-      "styles": [
-        {
-          "$$hashKey": "object:389",
-          "alias": "Interface",
-          "align": "auto",
-          "colorMode": null,
-          "colors": [
-            "#F2495C",
-            "rgba(237, 129, 40, 0.89)",
-            "rgba(50, 172, 45, 0.97)"
-          ],
-          "decimals": 0,
-          "link": false,
-          "mappingType": 1,
-          "pattern": "Metric",
-          "thresholds": [
-            ""
-          ],
-          "type": "string",
-          "unit": "short",
-          "valueMaps": []
-        },
-        {
-          "$$hashKey": "object:390",
-          "alias": "Advertising",
-          "align": "auto",
-          "colorMode": "value",
-          "colors": [
-            "rgba(245, 54, 54, 0.9)",
-            "rgba(237, 129, 40, 0.89)",
-            "rgba(50, 172, 45, 0.97)"
-          ],
-          "dateFormat": "YYYY-MM-DD HH:mm:ss",
-          "decimals": 2,
-          "mappingType": 1,
-          "pattern": "Current",
-          "rangeMaps": [
-            {
-              "from": "0",
-              "text": "false",
-              "to": "0.99"
-            },
-            {
-              "from": "",
-              "text": "",
-              "to": ""
-            }
-          ],
-          "thresholds": [
-            "0",
-            " 1"
-          ],
-          "type": "string",
-          "unit": "short",
-          "valueMaps": [
-            {
-              "$$hashKey": "object:439",
-              "text": "false",
-              "value": "0"
-            },
-            {
-              "$$hashKey": "object:440",
-              "text": "true",
-              "value": "1"
-            }
-          ]
-        }
-      ],
-      "targets": [
-        {
-          "expr": "corerad_interface_advertising{instance=~\"$instance.*\"}",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "{{interface}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Interface advertising",
-      "transform": "timeseries_aggregations",
-      "type": "table"
-    },
-    {
-      "columns": [
-        {
           "$$hashKey": "object:557",
           "text": "Current",
           "value": "current"
@@ -387,8 +590,8 @@
       "fontSize": "100%",
       "gridPos": {
         "h": 9,
-        "w": 6,
-        "x": 18,
+        "w": 3,
+        "x": 21,
         "y": 0
       },
       "id": 11,
@@ -532,7 +735,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Router Advertisements per second",
+      "title": "Router Advertisements sent per second",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -612,7 +815,7 @@
         {
           "expr": "irate(corerad_advertiser_router_advertisement_inconsistencies_total{instance=~\"$instance.*\"}[5m])",
           "interval": "",
-          "legendFormat": "{{interface}}",
+          "legendFormat": "{{interface}}: {{field}}",
           "refId": "A"
         }
       ],
@@ -669,12 +872,100 @@
       "fillGradient": 0,
       "gridPos": {
         "h": 9,
-        "w": 18,
+        "w": 9,
         "x": 6,
         "y": 18
       },
       "hiddenSeries": false,
       "id": 4,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": false,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "irate(corerad_monitor_messages_received_total{instance=~\"$instance.*\"}[5m])",
+          "interval": "",
+          "legendFormat": "{{interface}}: {{host}}: {{message}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Monitor messages received per second",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "ops",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": true,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 9,
+        "w": 9,
+        "x": 15,
+        "y": 18
+      },
+      "hiddenSeries": false,
+      "id": 14,
       "legend": {
         "avg": false,
         "current": false,
@@ -710,7 +1001,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Received NDP messages per second",
+      "title": "Advertiser messages received per second",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -784,7 +1075,7 @@
     ]
   },
   "time": {
-    "from": "now-3h",
+    "from": "now-12h",
     "to": "now"
   },
   "timepicker": {
@@ -807,5 +1098,5 @@
   "variables": {
     "list": []
   },
-  "version": 10
+  "version": 18
 }
