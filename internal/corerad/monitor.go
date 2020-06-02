@@ -106,11 +106,18 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn, watchC <-chan n
 
 	// Listener which listens for and reports on NDP traffic.
 	eg.Go(func() error {
-		if err := m.listen(ctx, conn); err != nil {
-			return fmt.Errorf("failed to listen: %w", err)
-		}
+		l := newListener(m.iface, conn, m.ll, m.mm)
+		return l.Listen(ctx, func(msg message) error {
+			m.handle(msg.Message, msg.Host)
 
-		return nil
+			// Callback must fire after handle to ensure logs and metrics are
+			// consistent in tests.
+			if m.OnMessage != nil {
+				m.OnMessage(msg.Message)
+			}
+
+			return nil
+		})
 	})
 
 	eg.Go(linkStateWatcher(ctx, watchC))
@@ -123,53 +130,30 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn, watchC <-chan n
 	return ctx.Err()
 }
 
-// listen issues for incoming NDP messages until ctx is canceled.
-func (m *Monitor) listen(ctx context.Context, conn system.Conn) error {
-	// Wait for cancelation and then force any pending reads to time out.
-	var eg errgroup.Group
-	eg.Go(interruptContext(ctx, conn))
+// handle handles an incoming NDP message and reports on it.
+func (m *Monitor) handle(msg ndp.Message, host netaddr.IP) {
+	// TODO(mdlayher): consider adding a verbose mode and hiding some/all
+	// of these logs.
+	m.logf("monitor received %q from %s", msg.Type(), host)
 
-	for {
-		// Receive and analyze incoming NDP messages.
-		msg, _, host, err := receiveRetry(ctx, conn)
-		if err != nil {
-			return fmt.Errorf("failed to read NDP messages: %w", err)
+	m.mm.MonMessagesReceivedTotal(m.iface, host.String(), msg.Type().String())
+
+	// TODO(mdlayher): expand type switch.
+	switch msg := msg.(type) {
+	case *ndp.RouterAdvertisement:
+		if msg.RouterLifetime == 0 {
+			// Not a default router, do nothing.
+			return
 		}
 
-		// TODO(mdlayher): consider adding a verbose mode and hiding some/all
-		// of these logs.
-		m.logf("monitor received %q from %s", msg.Type(), host)
+		// This is an advertisement from a default router.
 
-		m.mm.MonMessagesReceivedTotal(m.iface, host.String(), msg.Type().String())
-
-		// TODO(mdlayher): expand type switch.
-		switch msg := msg.(type) {
-		case *ndp.RouterAdvertisement:
-			m.raMetrics(msg, host)
-		}
-
-		// Callback must fire after logging/metrics to ensure they are consistent
-		// in tests.
-		if m.OnMessage != nil {
-			m.OnMessage(msg)
-		}
+		// Calculate the UNIX timestamp of when the default route will expire.
+		m.mm.MonDefaultRouteExpirationTime(
+			float64(m.now().Add(msg.RouterLifetime).Unix()),
+			m.iface, host.String(),
+		)
 	}
-}
-
-// raMetrics produces metrics for a given router advertisement.
-func (m *Monitor) raMetrics(ra *ndp.RouterAdvertisement, router netaddr.IP) {
-	if ra.RouterLifetime == 0 {
-		// Not a default router, do nothing.
-		return
-	}
-
-	// This is an advertisement from a default router.
-
-	// Calculate the UNIX timestamp of when the default route will expire.
-	m.mm.MonDefaultRouteExpirationTime(
-		float64(m.now().Add(ra.RouterLifetime).Unix()),
-		m.iface, router.String(),
-	)
 }
 
 // logf prints a formatted log with the Monitor's interface name.

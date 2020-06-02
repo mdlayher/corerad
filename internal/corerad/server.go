@@ -269,3 +269,29 @@ func (s *Server) serve(ctx context.Context, fn func() error) error {
 
 	return errors.New("timed out starting HTTP debug server")
 }
+
+// linkStateWatcher returns a function meant for use with errgroup.Group.Go
+// which will watch for cancelation or changes on watchC.
+func linkStateWatcher(ctx context.Context, watchC <-chan netstate.Change) func() error {
+	return func() error {
+		if watchC == nil {
+			// Nothing to do.
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case _, ok := <-watchC:
+			if !ok {
+				// Watcher halted or not available on this OS.
+				return nil
+			}
+
+			// TODO: inspect for specific state changes.
+
+			// Watcher indicated a state change.
+			return system.ErrLinkChange
+		}
+	}
+}

@@ -25,14 +25,14 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
-func Test_receiveRetryErrors(t *testing.T) {
+func Test_listenerReceiveRetry(t *testing.T) {
 	t.Parallel()
 
 	var (
 		// Canned data that will be returned from Conn.ReadFrom, although we
 		// don't care about the contents for the purposes of this test.
 		ra = &ndp.RouterAdvertisement{}
-		cm = &ipv6.ControlMessage{}
+		cm = &ipv6.ControlMessage{HopLimit: ndp.HopLimit}
 		ip = net.ParseIP("::1")
 
 		errFatal = errors.New("fatal error")
@@ -114,7 +114,8 @@ func Test_receiveRetryErrors(t *testing.T) {
 			ctx, cancel := tt.mkCtx()
 			defer cancel()
 
-			if _, _, _, err := receiveRetry(ctx, tt.conn); !errors.Is(err, tt.err) {
+			l := newListener("test0", tt.conn, nil, nil)
+			if _, _, err := l.receiveRetry(ctx); !errors.Is(err, tt.err) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})

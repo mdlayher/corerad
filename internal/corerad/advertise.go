@@ -27,7 +27,6 @@ import (
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
-	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"inet.af/netaddr"
 )
@@ -162,11 +161,18 @@ func (a *Advertiser) advertise(ctx context.Context, conn system.Conn, watchC <-c
 
 	// Listener which issues RAs in response to RS messages.
 	eg.Go(func() error {
-		if err := a.listen(ctx, conn, ipC); err != nil {
-			return fmt.Errorf("failed to listen: %w", err)
-		}
+		l := newListener(a.iface, conn, a.ll, a.mm)
+		return l.Listen(ctx, func(msg message) error {
+			ip, err := a.handle(msg.Message, msg.Host)
+			if err != nil {
+				return fmt.Errorf("failed to handle NDP message: %w", err)
+			}
+			if ip != nil {
+				ipC <- *ip
+			}
 
-		return nil
+			return nil
+		})
 	})
 
 	eg.Go(linkStateWatcher(ctx, watchC))
@@ -215,40 +221,9 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 	}
 }
 
-// listen issues unicast router advertisements in response to router
-// solicitations, until ctx is canceled.
-func (a *Advertiser) listen(ctx context.Context, conn system.Conn, ipC chan<- netaddr.IP) error {
-	// Wait for cancelation and then force any pending reads to time out.
-	var eg errgroup.Group
-	eg.Go(interruptContext(ctx, conn))
-
-	for {
-		// Receive and handle various NDP messages.
-		m, cm, host, err := receiveRetry(ctx, conn)
-		if err != nil {
-			return fmt.Errorf("failed to read NDP messages: %w", err)
-		}
-
-		ip, err := a.handle(m, cm, host)
-		if err != nil {
-			return fmt.Errorf("failed to handle NDP message: %w", err)
-		}
-		if ip != nil {
-			ipC <- *ip
-		}
-	}
-}
-
 // handle handles an incoming NDP message from a remote host.
-func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr.IP) (*netaddr.IP, error) {
-	a.mm.AdvMessagesReceivedTotal(a.cfg.Name, m.Type().String())
-
-	// Ensure this message has a valid hop limit.
-	if cm.HopLimit != ndp.HopLimit {
-		a.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
-		a.mm.AdvMessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
-		return nil, nil
-	}
+func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error) {
+	a.mm.AdvMessagesReceivedTotal(a.iface, m.Type().String())
 
 	switch m := m.(type) {
 	case *ndp.RouterSolicitation:
@@ -286,15 +261,15 @@ func (a *Advertiser) handle(m ndp.Message, cm *ipv6.ControlMessage, host netaddr
 
 		for i, p := range problems {
 			a.logf("inconsistency %d: %q: %s", i, p.Field, p.Details)
-			a.mm.AdvRouterAdvertisementInconsistenciesTotal(a.cfg.Name, p.Field)
+			a.mm.AdvRouterAdvertisementInconsistenciesTotal(a.iface, p.Field)
 		}
 
 		if a.OnInconsistentRA != nil {
 			a.OnInconsistentRA(want, m)
 		}
 	default:
-		a.logf("received NDP message of type %T from %s, ignoring", m, host)
-		a.mm.AdvMessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
+		a.logf("advertiser received NDP message of type %T from %s, ignoring", m, host)
+		a.mm.MessagesReceivedInvalidTotal(a.iface, m.Type().String())
 	}
 
 	// No response necessary.
@@ -378,17 +353,17 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
 	if err := a.send(conn, ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
-		a.mm.AdvErrorsTotal(a.cfg.Name, "transmit")
+		a.mm.AdvErrorsTotal(a.iface, "transmit")
 		return err
 	}
 
 	typ := "unicast"
 	if ip.IsMulticast() {
 		typ = "multicast"
-		a.mm.AdvLastMulticastTime(float64(time.Now().Unix()), a.cfg.Name)
+		a.mm.AdvLastMulticastTime(float64(time.Now().Unix()), a.iface)
 	}
 
-	a.mm.AdvRouterAdvertisementsTotal(a.cfg.Name, typ)
+	a.mm.AdvRouterAdvertisementsTotal(a.iface, typ)
 	return nil
 }
 

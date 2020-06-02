@@ -50,10 +50,12 @@ type Metrics struct {
 	Info metricslite.Gauge
 	Time metricslite.Gauge
 
+	// Shared per-advertiser/monitor metrics.
+	MessagesReceivedInvalidTotal metricslite.Counter
+
 	// Per-advertiser metrics.
 	AdvLastMulticastTime                       metricslite.Gauge
 	AdvMessagesReceivedTotal                   metricslite.Counter
-	AdvMessagesReceivedInvalidTotal            metricslite.Counter
 	AdvRouterAdvertisementInconsistenciesTotal metricslite.Counter
 	AdvRouterAdvertisementsTotal               metricslite.Counter
 	AdvErrorsTotal                             metricslite.Counter
@@ -93,6 +95,12 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 			"The UNIX timestamp of when this build of CoreRAD was produced.",
 		),
 
+		MessagesReceivedInvalidTotal: m.Counter(
+			"corerad_messages_received_invalid_total",
+			"The total number of invalid NDP messages received on an advertising or monitoring interface.",
+			"interface", "message",
+		),
+
 		AdvLastMulticastTime: m.Gauge(
 			"corerad_advertiser_last_multicast_time_seconds",
 			"The UNIX timestamp of when the last multicast router advertisement was sent.",
@@ -101,13 +109,7 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 
 		AdvMessagesReceivedTotal: m.Counter(
 			"corerad_advertiser_messages_received_total",
-			"The total number of valid NDP messages received on a listening interface.",
-			"interface", "message",
-		),
-
-		AdvMessagesReceivedInvalidTotal: m.Counter(
-			"corerad_advertiser_messages_received_invalid_total",
-			"The total number of invalid NDP messages received on a listening interface.",
+			"The total number of valid NDP messages received on an advertising interface.",
 			"interface", "message",
 		),
 
