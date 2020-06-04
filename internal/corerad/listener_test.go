@@ -20,12 +20,51 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/system"
+	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
 )
 
-func Test_listenerReceiveRetry(t *testing.T) {
+func Test_listenerReceiveRetryMetrics(t *testing.T) {
+	const iface = "test0"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	conn := &testConn{
+		readFrom: func() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
+			// A read returns a message with a bad hop limit and immediately
+			// cancels the retry loop since this message would be ignored
+			// and the read would be retried.
+			defer cancel()
+			return &ndp.RouterAdvertisement{}, &ipv6.ControlMessage{HopLimit: 1}, net.IPv6loopback, nil
+		},
+	}
+
+	mm := NewMetrics(metricslite.NewMemory(), nil, nil)
+
+	l := newListener(iface, conn, nil, mm)
+	if _, _, err := l.receiveRetry(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatalf("failed to receive: %v", err)
+	}
+
+	invalid := findMetric(t, mm, msgInvalid)
+
+	want := metricslite.Series{
+		Name: msgInvalid,
+		Samples: map[string]float64{
+			"interface=test0,message=router advertisement": 1,
+		},
+	}
+
+	if diff := cmp.Diff(want, invalid); diff != "" {
+		t.Fatalf("unexpected invalid message metric (-want +got):\n%s", diff)
+	}
+}
+
+func Test_listenerReceiveRetryErrors(t *testing.T) {
 	t.Parallel()
 
 	var (
