@@ -47,7 +47,9 @@ func main() {
 
 	flag.Parse()
 
-	ll := log.New(os.Stderr, "", log.LstdFlags)
+	// Assume we are running under systemd or similar and don't print time/date
+	// in the logs.
+	ll := log.New(os.Stderr, "", 0)
 
 	if *initFlag {
 		err := ioutil.WriteFile(
