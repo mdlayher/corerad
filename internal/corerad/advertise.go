@@ -260,8 +260,13 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 			host, sourceLLA(m.Options))
 
 		for i, p := range problems {
-			a.logf("inconsistency %d: %q: %s", i, p.Field, p.Details)
-			a.mm.AdvRouterAdvertisementInconsistenciesTotal(a.iface, p.Field)
+			var details string
+			if p.Details != "" {
+				details = fmt.Sprintf("(%s) ", p.Details)
+			}
+
+			a.logf("inconsistency %d: %q: %s%s", i, p.Field, details, p.Message)
+			a.mm.AdvRouterAdvertisementInconsistenciesTotal(a.iface, p.Details, p.Field)
 		}
 
 		if a.OnInconsistentRA != nil {

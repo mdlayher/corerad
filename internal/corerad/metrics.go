@@ -116,7 +116,7 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 		AdvRouterAdvertisementInconsistenciesTotal: m.Counter(
 			raInconsistencies,
 			"The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration, partitioned by the problematic field.",
-			"interface", "field",
+			"interface", "details", "field",
 		),
 
 		AdvRouterAdvertisementsTotal: m.Counter(
@@ -294,24 +294,17 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 			c(boolFloat(mctx.Monitoring), mctx.Interface)
 		case raPrefixInfo, raPrefixAutonomous, raPrefixOnLink, raPrefixValid, raPrefixPreferred:
 			for _, p := range prefixes {
-				// Combine the prefix and prefix length fields into a proper CIDR
-				// subnet for the label.
-				pfx := &net.IPNet{
-					IP:   p.Prefix,
-					Mask: net.CIDRMask(int(p.PrefixLength), 128),
-				}
-
 				switch m {
 				case raPrefixInfo:
-					c(1, mctx.Interface, pfx.String())
+					c(1, mctx.Interface, prefixStr(p))
 				case raPrefixAutonomous:
-					c(boolFloat(p.AutonomousAddressConfiguration), mctx.Interface, pfx.String())
+					c(boolFloat(p.AutonomousAddressConfiguration), mctx.Interface, prefixStr(p))
 				case raPrefixOnLink:
-					c(boolFloat(p.OnLink), mctx.Interface, pfx.String())
+					c(boolFloat(p.OnLink), mctx.Interface, prefixStr(p))
 				case raPrefixValid:
-					c(p.ValidLifetime.Seconds(), mctx.Interface, pfx.String())
+					c(p.ValidLifetime.Seconds(), mctx.Interface, prefixStr(p))
 				case raPrefixPreferred:
-					c(p.PreferredLifetime.Seconds(), mctx.Interface, pfx.String())
+					c(p.PreferredLifetime.Seconds(), mctx.Interface, prefixStr(p))
 				default:
 					panicf("corerad: prefix metrics collection for %q is not handled", m)
 				}
@@ -337,6 +330,16 @@ func (m *Metrics) Series() (map[string]metricslite.Series, bool) {
 	}
 
 	return sm.Series(), true
+}
+
+func prefixStr(p *ndp.PrefixInformation) string { return cidrStr(p.Prefix, p.PrefixLength) }
+func routeStr(r *ndp.RouteInformation) string   { return cidrStr(r.Prefix, r.PrefixLength) }
+
+func cidrStr(prefix net.IP, length uint8) string {
+	return (&net.IPNet{
+		IP:   prefix,
+		Mask: net.CIDRMask(int(length), 128),
+	}).String()
 }
 
 func boolFloat(b bool) float64 {

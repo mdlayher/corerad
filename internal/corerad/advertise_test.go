@@ -431,7 +431,7 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 				// by this interface.
 				ts := findMetric(t, cctx.mm, raInconsistencies)
 
-				label := fmt.Sprintf("interface=%s,field=managed_configuration", cctx.router.Name)
+				label := fmt.Sprintf("interface=%s,details=,field=managed_configuration", cctx.router.Name)
 				if diff := cmp.Diff(1., ts.Samples[label]); diff != "" {
 					t.Fatalf("unexpected value for interface inconsistencies (-want +got):\n%s", diff)
 				}

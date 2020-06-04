@@ -15,7 +15,9 @@ package corerad
 
 import (
 	"fmt"
+	"net"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/mdlayher/ndp"
@@ -25,8 +27,8 @@ import (
 type problems []problem
 
 // push adds a problem with the input data.
-func (ps *problems) push(field string, want, got interface{}) {
-	*ps = append(*ps, *newProblem(field, want, got))
+func (ps *problems) push(field, details string, want, got interface{}) {
+	*ps = append(*ps, *newProblem(field, details, want, got))
 }
 
 // merge merges another problems slice with this one.
@@ -36,11 +38,11 @@ func (ps *problems) merge(pss problems) {
 
 // A problem is an inconsistency detected in another router's RA.
 type problem struct {
-	Field, Details string
+	Field, Details, Message string
 }
 
 // newProblem constructs a problem with the input fields.
-func newProblem(field string, want, got interface{}) *problem {
+func newProblem(field, details string, want, got interface{}) *problem {
 	// Sanity check: any code using this API must pass identical types for
 	// any sort of sane output.
 	if reflect.TypeOf(want) != reflect.TypeOf(got) {
@@ -54,7 +56,8 @@ func newProblem(field string, want, got interface{}) *problem {
 	if okW && okG {
 		return &problem{
 			Field:   field,
-			Details: fmt.Sprintf("want: %q, got: %q", ws, gs),
+			Details: details,
+			Message: fmt.Sprintf("want: %q, got: %q", ws, gs),
 		}
 	}
 
@@ -63,14 +66,16 @@ func newProblem(field string, want, got interface{}) *problem {
 	if okW && okG {
 		return &problem{
 			Field:   field,
-			Details: fmt.Sprintf("want: %q, got: %q", wStr.String(), gStr.String()),
+			Details: details,
+			Message: fmt.Sprintf("want: %q, got: %q", wStr.String(), gStr.String()),
 		}
 	}
 
 	// Fall back to normal formatting.
 	return &problem{
 		Field:   field,
-		Details: fmt.Sprintf("want: %v, got: %v", want, got),
+		Details: details,
+		Message: fmt.Sprintf("want: %v, got: %v", want, got),
 	}
 }
 
@@ -93,23 +98,23 @@ func verifyRAs(a, b *ndp.RouterAdvertisement) []problem {
 func checkRAs(a, b *ndp.RouterAdvertisement) problems {
 	var ps problems
 	if a.CurrentHopLimit != b.CurrentHopLimit {
-		ps.push("hop_limit", a.CurrentHopLimit, b.CurrentHopLimit)
+		ps.push("hop_limit", "", a.CurrentHopLimit, b.CurrentHopLimit)
 	}
 
 	if a.ManagedConfiguration != b.ManagedConfiguration {
-		ps.push("managed_configuration", a.ManagedConfiguration, b.ManagedConfiguration)
+		ps.push("managed_configuration", "", a.ManagedConfiguration, b.ManagedConfiguration)
 	}
 
 	if a.OtherConfiguration != b.OtherConfiguration {
-		ps.push("other_configuration", a.OtherConfiguration, b.OtherConfiguration)
+		ps.push("other_configuration", "", a.OtherConfiguration, b.OtherConfiguration)
 	}
 
 	if !durationsConsistent(a.ReachableTime, b.ReachableTime) {
-		ps.push("reachable_time", a.ReachableTime, b.ReachableTime)
+		ps.push("reachable_time", "", a.ReachableTime, b.ReachableTime)
 	}
 
 	if !durationsConsistent(a.RetransmitTimer, b.RetransmitTimer) {
-		ps.push("retransmit_timer", a.RetransmitTimer, b.RetransmitTimer)
+		ps.push("retransmit_timer", "", a.RetransmitTimer, b.RetransmitTimer)
 	}
 
 	return ps
@@ -141,7 +146,7 @@ func checkMTUs(want, got []ndp.Option) problems {
 	}
 
 	var ps problems
-	ps.push("mtu", mtuA, mtuB)
+	ps.push("mtu", "", mtuA, mtuB)
 	return ps
 }
 
@@ -169,10 +174,10 @@ func checkPrefixes(want, got []ndp.Option) problems {
 			// TODO: deal with decrementing lifetimes? CoreRAD doesn't support
 			// them at the moment so we can't verify them either.
 			if a.PreferredLifetime != b.PreferredLifetime {
-				ps.push("prefix_information_preferred_lifetime", a.PreferredLifetime, b.PreferredLifetime)
+				ps.push("prefix_information_preferred_lifetime", prefixStr(a), a.PreferredLifetime, b.PreferredLifetime)
 			}
 			if a.ValidLifetime != b.ValidLifetime {
-				ps.push("prefix_information_valid_lifetime", a.ValidLifetime, b.ValidLifetime)
+				ps.push("prefix_information_valid_lifetime", prefixStr(a), a.ValidLifetime, b.ValidLifetime)
 			}
 		}
 	}
@@ -209,7 +214,7 @@ func checkRoutes(want, got []ndp.Option) problems {
 			// TODO: deal with decrementing lifetimes? CoreRAD doesn't support
 			// them at the moment so we can't verify them either.
 			if a.Preference == b.Preference && a.RouteLifetime != b.RouteLifetime {
-				ps.push("route_information_lifetime", a.RouteLifetime, b.RouteLifetime)
+				ps.push("route_information_lifetime", routeStr(a), a.RouteLifetime, b.RouteLifetime)
 			}
 		}
 	}
@@ -231,26 +236,32 @@ func checkRDNSS(want, got []ndp.Option) problems {
 	var ps problems
 	if len(a) != len(b) {
 		// Inconsistent number of options, so we can perform no further checks.
-		ps.push("rdnss_count", len(a), len(b))
+		ps.push("rdnss_count", "", len(a), len(b))
 		return ps
 	}
 
 	// Assuming both are advertising RDNSS, the options must be identical.
 	for i := range a {
 		if a, b := a[i].Lifetime, b[i].Lifetime; a != b {
-			ps.push("rdnss_lifetime", a, b)
+			ps.push("rdnss_lifetime", "", a, b)
 		}
 
-		if a, b := len(a[i].Servers), len(b[i].Servers); a != b {
+		if len(a[i].Servers) != len(b[i].Servers) {
 			// Inconsistent number of servers, so we can perform no further checks.
-			ps.push("rdnss_servers_count", a, b)
+			ps.push("rdnss_servers", "", ipsStr(a[i].Servers), ipsStr(b[i].Servers))
 			continue
 		}
 
+		equal := true
 		for j := range a[i].Servers {
 			if a, b := a[i].Servers[j], b[i].Servers[j]; !a.Equal(b) {
-				ps.push("rdnss_servers", a, b)
+				equal = false
+				break
+
 			}
+		}
+		if !equal {
+			ps.push("rdnss_servers", "", ipsStr(a[i].Servers), ipsStr(b[i].Servers))
 		}
 	}
 
@@ -271,27 +282,36 @@ func checkDNSSL(want, got []ndp.Option) problems {
 	var ps problems
 	if len(a) != len(b) {
 		// Inconsistent number of domains, so we can perform no further checks.
-		ps.push("dnssl_count", len(a), len(b))
+		ps.push("dnssl_count", "", len(a), len(b))
 		return ps
+	}
+
+	join := func(ss []string) string {
+		return strings.Join(ss, ", ")
 	}
 
 	// Assuming both are advertising DNSSL, the options must be identical.
 	for i := range a {
 		if a, b := a[i].Lifetime, b[i].Lifetime; a != b {
-			ps.push("dnssl_lifetime", a, b)
+			ps.push("dnssl_lifetime", "", a, b)
 		}
 
-		if a, b := len(a[i].DomainNames), len(b[i].DomainNames); a != b {
-			ps.push("dnssl_domain_names_count", a, b)
+		if len(a[i].DomainNames) != len(b[i].DomainNames) {
+			ps.push("dnssl_domain_names", "", join(a[i].DomainNames), join(b[i].DomainNames))
 			// Inconsistent number of domain names, so we can perform no
 			// further checks.
 			continue
 		}
 
+		equal := true
 		for j := range a[i].DomainNames {
 			if a, b := a[i].DomainNames[j], b[i].DomainNames[j]; a != b {
-				ps.push("dnssl_domain_names", a, b)
+				equal = false
+				break
 			}
+		}
+		if !equal {
+			ps.push("dnssl_domain_names", "", join(a[i].DomainNames), join(b[i].DomainNames))
 		}
 	}
 
@@ -367,4 +387,13 @@ func sourceLLA(options []ndp.Option) string {
 	}
 
 	return "unknown"
+}
+
+func ipsStr(ips []net.IP) string {
+	ss := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		ss = append(ss, ip.String())
+	}
+
+	return strings.Join(ss, ", ")
 }
