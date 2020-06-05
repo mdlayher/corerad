@@ -607,7 +607,7 @@ func testSimulatedAdvertiserClient(
 		cfg.Name,
 		*cfg,
 		&system.Dialer{
-			DialFunc: func() *system.DialContext {
+			DialFunc: func() (*system.DialContext, error) {
 				return &system.DialContext{
 					Conn: sc,
 					Interface: &net.Interface{
@@ -615,7 +615,7 @@ func testSimulatedAdvertiserClient(
 						HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 					},
 					IP: net.IPv6loopback,
-				}
+				}, nil
 			},
 		},
 		ts,

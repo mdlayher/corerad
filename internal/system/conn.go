@@ -32,9 +32,9 @@ type Conn interface {
 
 var _ Conn = &ndp.Conn{}
 
-// errLinkNotReady is a sentinel which indicates an interface is not ready
-// for use with an Advertiser.
-var errLinkNotReady = errors.New("link not ready")
+// ErrLinkNotReady is a sentinel which indicates an interface is not ready
+// for use with a Dialer listener.
+var ErrLinkNotReady = errors.New("link not ready")
 
 // lookupInterface looks up an interface by name, but also returns ErrLinkNotReady
 // if the interface doesn't exist.
@@ -43,7 +43,7 @@ func lookupInterface(iface string) (*net.Interface, error) {
 	if err != nil {
 		if isNoSuchInterface(err) {
 			// Allow retry if the interface may not exist yet.
-			return nil, fmt.Errorf("interface %q does not exist: %w", iface, errLinkNotReady)
+			return nil, fmt.Errorf("interface %q does not exist: %w", iface, ErrLinkNotReady)
 		}
 
 		return nil, fmt.Errorf("failed to get interface %q: %v", iface, err)
@@ -62,7 +62,7 @@ func checkInterface(ifi *net.Interface, addrFunc func() ([]net.Addr, error)) err
 	// Link must be up.
 	// TODO: check point-to-point and multicast flags and configure accordingly.
 	if ifi.Flags&net.FlagUp == 0 {
-		return fmt.Errorf("interface %q is not up: %w", ifi.Name, errLinkNotReady)
+		return fmt.Errorf("interface %q is not up: %w", ifi.Name, ErrLinkNotReady)
 	}
 
 	// Link must have an IPv6 link-local unicast address.
@@ -81,7 +81,7 @@ func checkInterface(ifi *net.Interface, addrFunc func() ([]net.Addr, error)) err
 		}
 	}
 	if !foundLL {
-		return fmt.Errorf("interface %q has no IPv6 link-local address: %w", ifi.Name, errLinkNotReady)
+		return fmt.Errorf("interface %q has no IPv6 link-local address: %w", ifi.Name, ErrLinkNotReady)
 	}
 
 	return nil

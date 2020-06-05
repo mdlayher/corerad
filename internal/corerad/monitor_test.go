@@ -122,7 +122,7 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 	mon := NewMonitor(
 		iface,
 		&system.Dialer{
-			DialFunc: func() *system.DialContext {
+			DialFunc: func() (*system.DialContext, error) {
 				return &system.DialContext{
 					Conn: sc,
 					Interface: &net.Interface{
@@ -130,7 +130,7 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 						HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 					},
 					IP: net.IPv6loopback,
-				}
+				}, nil
 			},
 		},
 		ts,

@@ -32,7 +32,7 @@ type Dialer struct {
 	// DialFunc specifies a function which will override the default dialing
 	// logic to produce an arbitrary DialContext. DialFunc should only be
 	// set in tests.
-	DialFunc func() *DialContext
+	DialFunc func() (*DialContext, error)
 
 	iface string
 	ll    *log.Logger
@@ -44,10 +44,13 @@ func NewDialer(ll *log.Logger, iface string) *Dialer {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
 
-	return &Dialer{
+	d := &Dialer{
 		iface: iface,
 		ll:    ll,
 	}
+	d.DialFunc = d.dial
+
+	return d
 }
 
 // A DialContext stores data used in the context of a Dialer.Dial closure.
@@ -59,31 +62,28 @@ type DialContext struct {
 	done func() error
 }
 
-// TODO(mdlayher): tests for reinit logic on Dialer type now that it has been
-// factored out from the Advertiser.
-
 // Dial creates a Conn and invokes fn with a populated DialContext for the
 // caller's use. If fn returns an error which is considered retryable, Dial
 // will attempt to re-dial the Conn and invoke fn again.
 func (d *Dialer) Dial(ctx context.Context, fn func(ctx context.Context, dctx *DialContext) error) error {
-	if d.DialFunc != nil {
-		return fn(ctx, d.DialFunc())
-	}
+	// Variables are reused for each loop, and error is intentionally nil on the
+	// first pass so initialization occurs.
+	var (
+		dctx *DialContext
+		err  error
+	)
 
-	// err is reused for each loop, and intentionally nil on the first pass
-	// so initialization occurs.
-	var err error
 	for {
 		// Either initialize or reinitialize the DialContext based on the value
 		// of err, and whether or not err is recoverable.
-		dctx, err := d.init(ctx, err)
+		dctx, err = d.init(ctx, err)
 		if err != nil {
 			// Don't block user shutdown.
 			if errors.Is(err, context.Canceled) {
 				return nil
 			}
 
-			return fmt.Errorf("failed to reinitialize %q advertiser: %v", d.iface, err)
+			return fmt.Errorf("failed to reinitialize %q listener: %w", d.iface, err)
 		}
 
 		// Invoke the user's function and track any errors returned. Once the
@@ -91,8 +91,10 @@ func (d *Dialer) Dial(ctx context.Context, fn func(ctx context.Context, dctx *Di
 		// closed so it can either be cleaned up or reinitialized on the next
 		// loop iteration.
 		err = fn(ctx, dctx)
-		if derr := dctx.done(); derr != nil {
-			return fmt.Errorf("failed to clean up connection: %v", derr)
+		if dctx.done != nil {
+			if derr := dctx.done(); derr != nil {
+				return fmt.Errorf("failed to clean up connection: %v", derr)
+			}
 		}
 		if err == nil {
 			// No error, all done.
@@ -111,7 +113,7 @@ func (d *Dialer) init(ctx context.Context, err error) (*DialContext, error) {
 	var dctx *DialContext
 	if err == nil {
 		// Nil input error, this must be the first initialization.
-		dctx, err = d.dial()
+		dctx, err = d.DialFunc()
 	}
 
 	// Check for conditions which are recoverable.
@@ -124,8 +126,8 @@ func (d *Dialer) init(ctx context.Context, err error) (*DialContext, error) {
 		}
 
 		// For other syscall errors, try again.
-		d.logf("error advertising, reinitializing")
-	case errors.Is(err, errLinkNotReady):
+		d.logf("error listening, reinitializing")
+	case errors.Is(err, ErrLinkNotReady):
 		d.logf("interface not ready, reinitializing")
 	case errors.Is(err, ErrLinkChange):
 		d.logf("interface state changed, reinitializing")
@@ -137,26 +139,28 @@ func (d *Dialer) init(ctx context.Context, err error) (*DialContext, error) {
 		return nil, err
 	}
 
-	// Recoverable error, try to initialize for delay*attempts seconds, every
-	// delay seconds.
+	// Recoverable error, try to initialize with backoff and retry.
 	const (
-		attempts = 40
-		delay    = 3 * time.Second
+		attempts = 50
+		maxDelay = 3 * time.Second
 	)
 
+	var delay time.Duration
 	for i := 0; i < attempts; i++ {
-		// Don't wait on the first attempt.
-		if i != 0 {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(delay):
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(delay):
+			// Add 250ms every iteration, up to maxDelay time.
+			delay = time.Duration(i+1) * 250 * time.Millisecond
+			if delay > maxDelay {
+				delay = maxDelay
 			}
 		}
 
-		dctx, err := d.dial()
+		dctx, err := d.DialFunc()
 		if err != nil {
-			d.logf("retrying initialization, %d attempt(s) remaining: %v", attempts-(i+1), err)
+			d.logf("retrying initialization in %s, %d attempt(s) remaining: %v", delay, attempts-(i+1), err)
 			continue
 		}
 
