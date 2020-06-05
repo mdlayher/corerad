@@ -262,10 +262,13 @@ func Test_verifyRAs(t *testing.T) {
 			},
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
-					&ndp.DNSSearchList{Lifetime: 10 * time.Second},
+					&ndp.DNSSearchList{
+						Lifetime:    10 * time.Second,
+						DomainNames: []string{"bar.example.com", "baz.example.com"},
+					},
 				},
 			},
-			problems: []problem{*newProblem("dnssl_domain_names", "", "foo.example.com", "")},
+			problems: []problem{*newProblem("dnssl_domain_names", "", "foo.example.com", "bar.example.com, baz.example.com")},
 		},
 		{
 			name: "DNSSL domains",
@@ -276,11 +279,11 @@ func Test_verifyRAs(t *testing.T) {
 				Options: []ndp.Option{
 					&ndp.DNSSearchList{
 						Lifetime:    10 * time.Second,
-						DomainNames: []string{"bar.example.com", "baz.example.com"},
+						DomainNames: []string{"bar.example.com"},
 					},
 				},
 			},
-			problems: []problem{*newProblem("dnssl_domain_names", "", "foo.example.com", "bar.example.com, baz.example.com")},
+			problems: []problem{*newProblem("dnssl_domain_names", "", "foo.example.com", "bar.example.com")},
 		},
 		{
 			name: "OK, reachable time unspecified",
