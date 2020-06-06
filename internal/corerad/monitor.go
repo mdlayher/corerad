@@ -21,9 +21,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/mdlayher/corerad/internal/netstate"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
-	"github.com/mdlayher/netstate"
 	"golang.org/x/sync/errgroup"
 	"inet.af/netaddr"
 )

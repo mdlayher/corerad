@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/netstate"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
-	"github.com/mdlayher/netstate"
 	"github.com/mdlayher/schedgroup"
 	"golang.org/x/sync/errgroup"
 	"inet.af/netaddr"

@@ -27,9 +27,9 @@ import (
 
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/crhttp"
+	"github.com/mdlayher/corerad/internal/netstate"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
-	"github.com/mdlayher/netstate"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 )
