@@ -16,6 +16,7 @@ package system_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/system"
+	"inet.af/netaddr"
 )
 
 const (
@@ -154,7 +156,35 @@ func testDialer(t *testing.T, privileged bool) *system.Dialer {
 
 	var name string
 	for _, ifi := range ifis {
-		if ifi.HardwareAddr != nil {
+		// Interface must have a MAC address (i.e. not WireGuard or similar) and
+		// an IPv6 link-local address to open ndp.Conn.
+		if ifi.HardwareAddr == nil {
+			continue
+		}
+
+		addrs, err := ifi.Addrs()
+		if err != nil {
+			t.Fatalf("failed to fetch addresses: %v", err)
+		}
+
+		var hasLLA bool
+		for _, a := range addrs {
+			ipn, ok := a.(*net.IPNet)
+			if !ok {
+				continue
+			}
+
+			ipp, ok := netaddr.FromStdIPNet(ipn)
+			if !ok {
+				panicf("system: invalid net.IPNet: %+v", a)
+			}
+
+			if ipp.IP.IsLinkLocalUnicast() || ipp.IP.Is6() {
+				hasLLA = true
+				break
+			}
+		}
+		if hasLLA {
 			name = ifi.Name
 			break
 		}
@@ -164,4 +194,8 @@ func testDialer(t *testing.T, privileged bool) *system.Dialer {
 	}
 
 	return system.NewDialer(log.New(os.Stderr, "", 0), name)
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }
