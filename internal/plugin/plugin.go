@@ -157,57 +157,66 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 
 // Apply implements Plugin.
 func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
+	if p.Prefix.IP != netaddr.IPv6Unspecified() {
+		// User specified an exact prefix so apply it directly.
+		p.applyPrefixes([]netaddr.IP{p.Prefix.IP}, ra)
+		return nil
+	}
+
+	// Expand ::/N to all unique, non-link local prefixes with matching length
+	// on this interface.
+	addrs, err := p.Addrs()
+	if err != nil {
+		return fmt.Errorf("failed to fetch IP addresses: %v", err)
+	}
+
 	var prefixes []netaddr.IP
-	if p.Prefix.IP == netaddr.IPv6Unspecified() {
-		// Expand ::/N to all unique, non-link local prefixes with matching
-		// length on this interface.
-		addrs, err := p.Addrs()
+	seen := make(map[netaddr.IPPrefix]struct{})
+	for _, a := range addrs {
+		ipn, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+
+		ipp, ok := netaddr.FromStdIPNet(ipn)
+		if !ok {
+			panicf("corerad: invalid net.IPNet: %+v", a)
+		}
+
+		// Only advertise non-link-local prefixes that also have a
+		// matching mask:
+		// https://tools.ietf.org/html/rfc4861#section-4.6.2.
+		if ipp.IP.IsLinkLocalUnicast() || ipp.Bits != p.Prefix.Bits {
+			continue
+		}
+
+		// Found a match, mask and keep the prefix bits of the address.
+		pfx, err := ipp.IP.Prefix(ipp.Bits)
 		if err != nil {
-			return fmt.Errorf("failed to fetch IP addresses: %v", err)
+			panicf("corerad: failed to produce prefix: %v", err)
 		}
 
-		seen := make(map[netaddr.IPPrefix]struct{})
-		for _, a := range addrs {
-			ipn, ok := a.(*net.IPNet)
-			if !ok {
-				continue
-			}
-
-			ipp, ok := netaddr.FromStdIPNet(ipn)
-			if !ok {
-				panicf("corerad: invalid net.IPNet: %+v", a)
-			}
-
-			// Only advertise non-link-local prefixes that also have a
-			// matching mask:
-			// https://tools.ietf.org/html/rfc4861#section-4.6.2.
-			if ipp.IP.IsLinkLocalUnicast() || ipp.Bits != p.Prefix.Bits {
-				continue
-			}
-
-			// Found a match, mask and keep the prefix bits of the address.
-			pfx, err := ipp.IP.Prefix(ipp.Bits)
-			if err != nil {
-				panicf("corerad: failed to produce prefix: %v", err)
-			}
-
-			// Only add each prefix once.
-			if _, ok := seen[pfx]; ok {
-				continue
-			}
-			seen[pfx] = struct{}{}
-
-			prefixes = append(prefixes, pfx.IP)
+		// Only add each prefix once.
+		if _, ok := seen[pfx]; ok {
+			continue
 		}
-	} else {
-		// Use the specified prefix.
-		prefixes = append(prefixes, p.Prefix.IP)
+		seen[pfx] = struct{}{}
+
+		prefixes = append(prefixes, pfx.IP)
 	}
 
 	// Produce a PrefixInformation option for each configured prefix.
 	// All prefixes expanded from ::/N have the same configuration.
+	p.applyPrefixes(prefixes, ra)
+	return nil
+}
+
+// applyPrefixes unpacks prefixes into ndp.PrefixInformation options within ra.
+func (p *Prefix) applyPrefixes(prefixes []netaddr.IP, ra *ndp.RouterAdvertisement) {
+	// Pre-allocate space for prefixes since we know how many are needed.
+	opts := make([]ndp.Option, 0, len(prefixes))
 	for _, pfx := range prefixes {
-		ra.Options = append(ra.Options, &ndp.PrefixInformation{
+		opts = append(opts, &ndp.PrefixInformation{
 			PrefixLength:                   p.Prefix.Bits,
 			OnLink:                         p.OnLink,
 			AutonomousAddressConfiguration: p.Autonomous,
@@ -217,7 +226,7 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 		})
 	}
 
-	return nil
+	ra.Options = append(ra.Options, opts...)
 }
 
 // A Route configures a NDP Route Information option.
