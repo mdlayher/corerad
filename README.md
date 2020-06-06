@@ -9,9 +9,9 @@ Apache 2.0 Licensed.
 
 CoreRAD is currently a **beta** project, and will remain as such for the
 entirety of the v0.2.x tag series. CoreRAD is currently deployed and running on
-several home LAN networks. Early adopters are welcome to join us in
-[Gophers Slack](https://invite.slack.golangbridge.org) in the `#corerad`
-channel!
+several home LAN networks. Early adopters are welcome to join us in `#corerad`
+on [Gophers Slack](https://invite.slack.golangbridge.org) or
+[the Freenode IRC network](https://webchat.freenode.net/).
 
 CoreRAD is inspired by the [CoreDNS](https://coredns.io/) and
 [CoreDHCP](https://coredhcp.io/) projects.
