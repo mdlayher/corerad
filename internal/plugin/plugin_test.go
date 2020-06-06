@@ -161,7 +161,7 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "automatic prefixes",
+			name: "automatic prefixes /64",
 			plugin: &Prefix{
 				Prefix:            crtest.MustIPPrefix("::/64"),
 				OnLink:            true,
@@ -199,6 +199,29 @@ func TestBuild(t *testing.T) {
 						PreferredLifetime:              10 * time.Second,
 						ValidLifetime:                  20 * time.Second,
 						Prefix:                         mustIP("fd00::"),
+					},
+				},
+			},
+		},
+		{
+			name: "automatic prefixes /32",
+			plugin: &Prefix{
+				Prefix: crtest.MustIPPrefix("::/32"),
+				Addrs: func() ([]net.Addr, error) {
+					return []net.Addr{
+						// Specify an IPv4 address that could feasibly be
+						// matched, but must be skipped due to incorrect address
+						// family.
+						mustCIDR("192.0.2.1/32"),
+						mustCIDR("2001:db8::1/32"),
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.PrefixInformation{
+						PrefixLength: 32,
+						Prefix:       mustIP("2001:db8::"),
 					},
 				},
 			},

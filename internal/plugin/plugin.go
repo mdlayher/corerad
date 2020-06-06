@@ -183,10 +183,10 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 			panicf("corerad: invalid net.IPNet: %+v", a)
 		}
 
-		// Only advertise non-link-local prefixes that also have a
+		// Only advertise non-link-local IPv6 prefixes that also have a
 		// matching mask:
 		// https://tools.ietf.org/html/rfc4861#section-4.6.2.
-		if ipp.IP.IsLinkLocalUnicast() || ipp.Bits != p.Prefix.Bits {
+		if ipp.IP.Is4() || ipp.IP.IsLinkLocalUnicast() || ipp.Bits != p.Prefix.Bits {
 			continue
 		}
 
