@@ -19,5 +19,5 @@ require (
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
 	golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980
 	google.golang.org/protobuf v1.24.0 // indirect
-	inet.af/netaddr v0.0.0-20200528163238-3f8099a68e42
+	inet.af/netaddr v0.0.0-20200606190438-f7635e935e44
 )
