@@ -119,12 +119,12 @@ func (s *Server) Run(ctx context.Context) error {
 		// Advertiser to flap.
 		watchC := w.Subscribe(iface.Name, netstate.LinkDown)
 
-		dialer := system.NewDialer(s.ll, iface.Name)
-
 		switch {
 		case iface.Advertise:
 			// Begin advertising on this interface until the context is canceled.
 			s.eg.Go(func() error {
+				dialer := system.NewDialer(iface.Name, state, system.Advertise, s.ll)
+
 				ad := NewAdvertiser(iface.Name, iface, dialer, state, s.ll, mm)
 				if err := ad.Advertise(ctx, watchC); err != nil {
 					return fmt.Errorf("failed to advertise NDP: %v", err)
@@ -135,7 +135,9 @@ func (s *Server) Run(ctx context.Context) error {
 		case iface.Monitor:
 			// Begin monitoring on this interface until the context is canceled.
 			s.eg.Go(func() error {
-				mon := NewMonitor(iface.Name, dialer, state, s.ll, mm)
+				dialer := system.NewDialer(iface.Name, state, system.Monitor, s.ll)
+
+				mon := NewMonitor(iface.Name, dialer, s.ll, mm)
 				if err := mon.Monitor(ctx, watchC); err != nil {
 					return fmt.Errorf("failed to monitor NDP: %v", err)
 				}

@@ -18,6 +18,7 @@ package system
 type State interface {
 	IPv6Autoconf(iface string) (bool, error)
 	IPv6Forwarding(iface string) (bool, error)
+	SetIPv6Autoconf(iface string, enable bool) error
 }
 
 // NewState creates State which directly manipulates the operating system.
@@ -30,6 +31,9 @@ var _ State = systemState{}
 
 func (systemState) IPv6Autoconf(iface string) (bool, error)   { return getIPv6Autoconf(iface) }
 func (systemState) IPv6Forwarding(iface string) (bool, error) { return getIPv6Forwarding(iface) }
+func (systemState) SetIPv6Autoconf(iface string, enable bool) error {
+	return setIPv6Autoconf(iface, enable)
+}
 
 // A TestState is a State which is primarily useful in tests.
 type TestState struct {
@@ -70,4 +74,9 @@ func (ts TestState) IPv6Forwarding(iface string) (bool, error) {
 
 	// Fall back to global configuration.
 	return ts.Forwarding, ts.Error
+}
+
+// SetIPv6Autoconf implements State.
+func (ts TestState) SetIPv6Autoconf(iface string, _ bool) error {
+	return ts.Error
 }

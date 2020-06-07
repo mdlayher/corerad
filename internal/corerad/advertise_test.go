@@ -800,13 +800,15 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 
 	ll := log.New(os.Stderr, "", 0)
 
+	state := system.NewState()
+
 	// Set up metrics node so we can inspect its contents at a later time.
-	mm := NewMetrics(metricslite.NewMemory(), system.NewState(), []config.Interface{*cfg})
+	mm := NewMetrics(metricslite.NewMemory(), state, []config.Interface{*cfg})
 	ad := NewAdvertiser(
 		router.Name,
 		*cfg,
-		system.NewDialer(ll, router.Name),
-		system.NewState(),
+		system.NewDialer(router.Name, state, system.Advertise, ll),
+		state,
 		ll,
 		mm,
 	)

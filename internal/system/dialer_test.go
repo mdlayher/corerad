@@ -113,7 +113,7 @@ func TestDialerDialRetryContextCanceled(t *testing.T) {
 	// retry due to the link not being ready. This will continue until the
 	// context is canceled after a couple of iterations.
 	var calls int
-	d := system.NewDialer(log.New(os.Stderr, "", 0), "test0")
+	d := system.NewDialer("test0", nil, system.Advertise, log.New(os.Stderr, "", 0))
 	d.DialFunc = func() (*system.DialContext, error) {
 		defer func() { calls++ }()
 
@@ -193,7 +193,7 @@ func testDialer(t *testing.T, privileged bool) *system.Dialer {
 		t.Skip("skipping, no suitable network interface")
 	}
 
-	return system.NewDialer(log.New(os.Stderr, "", 0), name)
+	return system.NewDialer(name, system.NewState(), system.Advertise, log.New(os.Stderr, "", 0))
 }
 
 func panicf(format string, a ...interface{}) {

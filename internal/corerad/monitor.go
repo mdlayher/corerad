@@ -41,7 +41,6 @@ type Monitor struct {
 
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
-	state  system.State
 
 	// now allows overriding the current time.
 	now func() time.Time
@@ -52,7 +51,6 @@ type Monitor struct {
 func NewMonitor(
 	iface string,
 	dialer *system.Dialer,
-	state system.State,
 	ll *log.Logger,
 	mm *Metrics,
 ) *Monitor {
@@ -68,7 +66,6 @@ func NewMonitor(
 		ll:     ll,
 		mm:     mm,
 		dialer: dialer,
-		state:  state,
 
 		// By default use real time.
 		now: time.Now,

@@ -117,8 +117,7 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 	const iface = "test0"
 
 	// Set up metrics node so we can inspect its contents at a later time.
-	ts := system.TestState{Forwarding: true}
-	mm := NewMetrics(metricslite.NewMemory(), ts, nil) // TODO: interfaces
+	mm := NewMetrics(metricslite.NewMemory(), system.TestState{Forwarding: true}, nil)
 	mon := NewMonitor(
 		iface,
 		&system.Dialer{
@@ -133,7 +132,6 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 				}, nil
 			},
 		},
-		ts,
 		log.New(os.Stderr, "", 0),
 		mm,
 	)

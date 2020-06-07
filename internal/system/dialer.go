@@ -35,17 +35,37 @@ type Dialer struct {
 	DialFunc func() (*DialContext, error)
 
 	iface string
+	state State
+	mode  DialerMode
 	ll    *log.Logger
 }
 
+// A DialerMode specifies a mode of operation for the Dialer.
+type DialerMode int
+
+// Possible DialerMode values.
+const (
+	_ DialerMode = iota
+	Advertise
+	Monitor
+)
+
 // NewDialer creates a Dialer using the specified logger and network interface.
-func NewDialer(ll *log.Logger, iface string) *Dialer {
+func NewDialer(iface string, state State, mode DialerMode, ll *log.Logger) *Dialer {
 	if ll == nil {
 		ll = log.New(ioutil.Discard, "", 0)
 	}
 
+	switch mode {
+	case Advertise, Monitor:
+	default:
+		panicf("system: invalid DialerMode: %d", mode)
+	}
+
 	d := &Dialer{
 		iface: iface,
+		state: state,
+		mode:  mode,
 		ll:    ll,
 	}
 	d.DialFunc = d.dial
@@ -187,19 +207,14 @@ func (d *Dialer) dial() (*DialContext, error) {
 		return nil, err
 	}
 
-	// If possible, disable IPv6 autoconfiguration on this interface so that
-	// our RAs don't configure more IP addresses on this interface.
-	autoPrev, err := getIPv6Autoconf(d.iface)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get IPv6 autoconfiguration state on %q: %v", d.iface, err)
-	}
-
-	if err := setIPv6Autoconf(d.iface, false); err != nil {
-		if errors.Is(err, os.ErrPermission) {
-			// Continue anyway but provide a hint.
-			d.logf("permission denied while disabling IPv6 autoconfiguration, continuing anyway (try setting CAP_NET_ADMIN)")
-		} else {
-			return nil, fmt.Errorf("failed to disable IPv6 autoconfiguration on %q: %v", d.iface, err)
+	// For Advertise mode only, we must temporarily disable IPv6 autoconfiguration.
+	// When the Dialer closes a Conn, restore will be invoked to restore the
+	// previous state of the interface.
+	var restore func() error
+	if d.mode == Advertise {
+		restore, err = d.setAutoconf()
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -217,14 +232,8 @@ func (d *Dialer) dial() (*DialContext, error) {
 			d.logf("failed to stop NDP listener: %v", err)
 		}
 
-		// If possible, restore the previous IPv6 autoconfiguration state.
-		if err := setIPv6Autoconf(d.iface, autoPrev); err != nil {
-			if errors.Is(err, os.ErrPermission) {
-				// Continue anyway but provide a hint.
-				d.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
-			} else {
-				return fmt.Errorf("failed to restore IPv6 autoconfiguration on %q: %v", d.iface, err)
-			}
+		if restore != nil {
+			return restore()
 		}
 
 		return nil
@@ -236,6 +245,42 @@ func (d *Dialer) dial() (*DialContext, error) {
 		IP:        ip,
 		done:      done,
 	}, nil
+}
+
+// setAutoconf disable IPv6 autoconfiguration for the Dialer's interface and
+// returns a function which restores the previous configuration when invoked.
+func (d *Dialer) setAutoconf() (func() error, error) {
+	// If possible, disable IPv6 autoconfiguration on this interface so that
+	// our RAs don't configure more IP addresses on this interface.
+	prev, err := d.state.IPv6Autoconf(d.iface)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get IPv6 autoconfiguration state on %q: %v", d.iface, err)
+	}
+
+	if err := d.state.SetIPv6Autoconf(d.iface, false); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			// Continue anyway but provide a hint.
+			d.logf("permission denied while disabling IPv6 autoconfiguration, continuing anyway (try setting CAP_NET_ADMIN)")
+		} else {
+			return nil, fmt.Errorf("failed to disable IPv6 autoconfiguration on %q: %v", d.iface, err)
+		}
+	}
+
+	restore := func() error {
+		// If possible, restore the previous IPv6 autoconfiguration state.
+		if err := d.state.SetIPv6Autoconf(d.iface, prev); err != nil {
+			if errors.Is(err, os.ErrPermission) {
+				// Continue anyway but provide a hint.
+				d.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
+			} else {
+				return fmt.Errorf("failed to restore IPv6 autoconfiguration on %q: %v", d.iface, err)
+			}
+		}
+
+		return nil
+	}
+
+	return restore, nil
 }
 
 // logf prints a formatted log with the Dialer's interface name.
@@ -266,10 +311,14 @@ func dialNDP(ifi *net.Interface) (*ndp.Conn, net.IP, error) {
 		return nil, nil, fmt.Errorf("failed to apply IPv6 control message flags: %v", err)
 	}
 
-	// We are now a router.
+	// We are now a router or want to examine messages as one would.
 	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
 		return nil, nil, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
 	}
 
 	return c, ip, nil
+}
+
+func panicf(format string, a ...interface{}) {
+	panic(fmt.Sprintf(format, a...))
 }
