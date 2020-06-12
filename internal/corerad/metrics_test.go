@@ -33,8 +33,8 @@ func TestMetrics(t *testing.T) {
 		// These series would normally be affected by linker flags but these defaults
 		// should be sufficient for tests.
 		base = map[string]metricslite.Series{
-			"corerad_build_info": {Samples: map[string]float64{"version=development": 1}},
-			"corerad_build_time": {Samples: map[string]float64{"": 0}},
+			"corerad_build_info":         {Samples: map[string]float64{"version=development": 1}},
+			"corerad_build_time_seconds": {Samples: map[string]float64{"": 0}},
 		}
 
 		// All interfaces except unused are assumed to be forwarding traffic.

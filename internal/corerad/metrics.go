@@ -41,7 +41,7 @@ const (
 	// Non-const metrics.
 	raInconsistencies = "corerad_advertiser_router_advertisement_inconsistencies_total"
 	monReceived       = "corerad_monitor_messages_received_total"
-	monDefaultRoute   = "corerad_monitor_default_route_expiration_time"
+	monDefaultRoute   = "corerad_monitor_default_route_expiration_time_seconds"
 	msgInvalid        = "corerad_messages_received_invalid_total"
 )
 
@@ -92,7 +92,7 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 		),
 
 		Time: m.Gauge(
-			"corerad_build_time",
+			"corerad_build_time_seconds",
 			"The UNIX timestamp of when this build of CoreRAD was produced.",
 		),
 
