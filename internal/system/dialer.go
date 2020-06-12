@@ -268,13 +268,20 @@ func (d *Dialer) setAutoconf() (func() error, error) {
 
 	restore := func() error {
 		// If possible, restore the previous IPv6 autoconfiguration state.
-		if err := d.state.SetIPv6Autoconf(d.iface, prev); err != nil {
-			if errors.Is(err, os.ErrPermission) {
-				// Continue anyway but provide a hint.
-				d.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
-			} else {
-				return fmt.Errorf("failed to restore IPv6 autoconfiguration on %q: %v", d.iface, err)
-			}
+		err := d.state.SetIPv6Autoconf(d.iface, prev)
+		switch {
+		case err == nil:
+			// All good!
+		case errors.Is(err, os.ErrPermission):
+			// Continue anyway but provide a hint.
+			d.logf("permission denied while restoring IPv6 autoconfiguration state, continuing anyway (try setting CAP_NET_ADMIN)")
+		case errors.Is(err, os.ErrNotExist):
+			// The interface may have been taken down due to system
+			// reconfiguration, assume nothing needs to happen.
+			d.logf("tried to restore IPv6 autoconfiguration state, but interface no longer exists, continuing anyway")
+		default:
+			// All other errors.
+			return fmt.Errorf("failed to restore IPv6 autoconfiguration on %q: %v", d.iface, err)
 		}
 
 		return nil
