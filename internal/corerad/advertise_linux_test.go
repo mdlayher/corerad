@@ -80,7 +80,7 @@ func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 	cancel()
 
 	// This should not block because the context is already canceled.
-	if err := ad.Advertise(ctx, nil); err != nil {
+	if err := ad.Run(ctx); err != nil {
 		t.Fatalf("failed to advertise: %v", err)
 	}
 }
@@ -108,8 +108,10 @@ func TestAdvertiserLinuxNetstateChange(t *testing.T) {
 	})
 	defer t2.Stop()
 
+	ad.watchC = watchC
+
 	// This should not block because a state change is ready.
-	if err := ad.Advertise(ctx, watchC); err != nil {
+	if err := ad.Run(ctx); err != nil {
 		t.Fatalf("failed to advertise: %v", err)
 	}
 }
@@ -123,7 +125,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 	// Capture the IPv6 autoconfiguration state while the advertiser is running
 	// and immediately after it stops.
 	state := system.NewState()
-	start, err := state.IPv6Autoconf(ad.iface)
+	start, err := state.IPv6Autoconf(ad.cfg.Name)
 	if err != nil {
 		t.Fatalf("failed to get start state: %v", err)
 	}
@@ -133,7 +135,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx, nil); err != nil {
+		if err := ad.Run(ctx); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 
@@ -145,7 +147,7 @@ func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 		t.Fatalf("failed to stop advertiser: %v", err)
 	}
 
-	end, err := state.IPv6Autoconf(ad.iface)
+	end, err := state.IPv6Autoconf(ad.cfg.Name)
 	if err != nil {
 		t.Fatalf("failed to get end state: %v", err)
 	}

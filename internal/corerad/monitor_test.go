@@ -132,6 +132,7 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 				}, nil
 			},
 		},
+		nil,
 		// Enable verbose logs for better debuggability.
 		true,
 		log.New(os.Stderr, "", 0),
@@ -148,7 +149,7 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 	var eg errgroup.Group
 	eg.Go(func() error {
 		close(readyC)
-		if err := mon.Monitor(ctx, nil); err != nil {
+		if err := mon.Run(ctx); err != nil {
 			return fmt.Errorf("failed to monitor: %v", err)
 		}
 

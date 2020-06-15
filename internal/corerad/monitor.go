@@ -42,6 +42,7 @@ type Monitor struct {
 
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
+	watchC <-chan netstate.Change
 
 	// now allows overriding the current time.
 	now func() time.Time
@@ -52,6 +53,7 @@ type Monitor struct {
 func NewMonitor(
 	iface string,
 	dialer *system.Dialer,
+	watchC <-chan netstate.Change,
 	verbose bool,
 	ll *log.Logger,
 	mm *Metrics,
@@ -75,16 +77,16 @@ func NewMonitor(
 	}
 }
 
-// Monitor initializes the configured interface and listening and reporting on
-// incoming NDP traffic. Monitor will block until ctx is canceled or an error
+// Run initializes the configured interface and listening and reporting on
+// incoming NDP traffic. Run will block until ctx is canceled or an error
 // occurs.
-func (m *Monitor) Monitor(ctx context.Context, watchC <-chan netstate.Change) error {
+func (m *Monitor) Run(ctx context.Context) error {
 	return m.dialer.Dial(ctx, func(ctx context.Context, dctx *system.DialContext) error {
 		m.logf("initialized, monitoring from %s", dctx.IP)
 
 		// Monitor until an error occurs, reinitializing under certain
 		// circumstances.
-		err := m.monitor(ctx, dctx.Conn, watchC)
+		err := m.monitor(ctx, dctx.Conn)
 		switch {
 		case errors.Is(err, context.Canceled):
 			// Intentional shutdown.
@@ -97,9 +99,12 @@ func (m *Monitor) Monitor(ctx context.Context, watchC <-chan netstate.Change) er
 	})
 }
 
+// String implements Task.
+func (m *Monitor) String() string { return fmt.Sprintf("monitor %q", m.iface) }
+
 // monitor is the internal loop for Monitor which coordinates the various
 // Monitor goroutines.
-func (m *Monitor) monitor(ctx context.Context, conn system.Conn, watchC <-chan netstate.Change) error {
+func (m *Monitor) monitor(ctx context.Context, conn system.Conn) error {
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
@@ -120,7 +125,7 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn, watchC <-chan n
 		})
 	})
 
-	eg.Go(linkStateWatcher(ctx, watchC))
+	eg.Go(linkStateWatcher(ctx, m.watchC))
 
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("failed to run Monitor: %w", err)

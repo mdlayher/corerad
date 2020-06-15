@@ -604,7 +604,6 @@ func testSimulatedAdvertiserClient(
 	ts := system.TestState{Forwarding: true}
 	mm := NewMetrics(metricslite.NewMemory(), ts, []config.Interface{*cfg})
 	ad := NewAdvertiser(
-		cfg.Name,
 		*cfg,
 		&system.Dialer{
 			DialFunc: func() (*system.DialContext, error) {
@@ -619,6 +618,7 @@ func testSimulatedAdvertiserClient(
 			},
 		},
 		ts,
+		nil,
 		log.New(os.Stderr, "", 0),
 		mm,
 	)
@@ -632,7 +632,7 @@ func testSimulatedAdvertiserClient(
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx, nil); err != nil {
+		if err := ad.Run(ctx); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 
@@ -805,10 +805,10 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	// Set up metrics node so we can inspect its contents at a later time.
 	mm := NewMetrics(metricslite.NewMemory(), state, []config.Interface{*cfg})
 	ad := NewAdvertiser(
-		router.Name,
 		*cfg,
 		system.NewDialer(router.Name, state, system.Advertise, ll),
 		state,
+		nil,
 		ll,
 		mm,
 	)
@@ -885,7 +885,7 @@ func testAdvertiserClient(
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		if err := ad.Advertise(ctx, nil); err != nil {
+		if err := ad.Run(ctx); err != nil {
 			return fmt.Errorf("failed to advertise: %v", err)
 		}
 

@@ -41,14 +41,14 @@ type Advertiser struct {
 	OnInconsistentRA func(ours, theirs *ndp.RouterAdvertisement)
 
 	// Static configuration.
-	iface string
-	cfg   config.Interface
-	ll    *log.Logger
-	mm    *Metrics
+	cfg config.Interface
+	ll  *log.Logger
+	mm  *Metrics
 
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
 	state  system.State
+	watchC <-chan netstate.Change
 
 	// Parameters which have defaults but may be explicitly overridden to speed
 	// up tests.
@@ -58,10 +58,10 @@ type Advertiser struct {
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded. If mm is nil, metrics are discarded.
 func NewAdvertiser(
-	iface string,
 	cfg config.Interface,
 	dialer *system.Dialer,
 	state system.State,
+	watchC <-chan netstate.Change,
 	ll *log.Logger,
 	mm *Metrics,
 ) *Advertiser {
@@ -73,22 +73,22 @@ func NewAdvertiser(
 	}
 
 	return &Advertiser{
-		iface:  iface,
 		cfg:    cfg,
 		ll:     ll,
 		mm:     mm,
 		dialer: dialer,
 		state:  state,
+		watchC: watchC,
 
 		// RFC defaults which can be overridden.
 		minDelayBetweenRAs: minDelayBetweenRAs,
 	}
 }
 
-// Advertise initializes the configured interface and begins router solicitation
-// and advertisement handling. Advertise will block until ctx is canceled or an
-// error occurs.
-func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Change) error {
+// Run initializes the configured interface and begins router solicitation and
+// advertisement handling. Run will block until ctx is canceled or an error
+// occurs.
+func (a *Advertiser) Run(ctx context.Context) error {
 	return a.dialer.Dial(ctx, func(ctx context.Context, dctx *system.DialContext) error {
 		// We can now initialize any plugins that rely on dynamic information
 		// about the network interface.
@@ -119,7 +119,7 @@ func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Chang
 
 		// Advertise until an error occurs, reinitializing under certain
 		// circumstances.
-		err := a.advertise(ctx, dctx.Conn, watchC)
+		err := a.advertise(ctx, dctx.Conn)
 		switch {
 		case errors.Is(err, context.Canceled):
 			// Intentional shutdown.
@@ -132,9 +132,12 @@ func (a *Advertiser) Advertise(ctx context.Context, watchC <-chan netstate.Chang
 	})
 }
 
+// String implements Task.
+func (a *Advertiser) String() string { return fmt.Sprintf("advertiser %q", a.cfg.Name) }
+
 // advertise is the internal loop for Advertise which coordinates the various
 // Advertiser goroutines.
-func (a *Advertiser) advertise(ctx context.Context, conn system.Conn, watchC <-chan netstate.Change) error {
+func (a *Advertiser) advertise(ctx context.Context, conn system.Conn) error {
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
@@ -161,7 +164,7 @@ func (a *Advertiser) advertise(ctx context.Context, conn system.Conn, watchC <-c
 
 	// Listener which issues RAs in response to RS messages.
 	eg.Go(func() error {
-		l := newListener(a.iface, conn, a.ll, a.mm)
+		l := newListener(a.cfg.Name, conn, a.ll, a.mm)
 		return l.Listen(ctx, func(msg message) error {
 			ip, err := a.handle(msg.Message, msg.Host)
 			if err != nil {
@@ -175,7 +178,7 @@ func (a *Advertiser) advertise(ctx context.Context, conn system.Conn, watchC <-c
 		})
 	})
 
-	eg.Go(linkStateWatcher(ctx, watchC))
+	eg.Go(linkStateWatcher(ctx, a.watchC))
 
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("failed to run advertiser: %w", err)
@@ -223,7 +226,7 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 
 // handle handles an incoming NDP message from a remote host.
 func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error) {
-	a.mm.AdvMessagesReceivedTotal(a.iface, m.Type().String())
+	a.mm.AdvMessagesReceivedTotal(a.cfg.Name, m.Type().String())
 
 	switch m := m.(type) {
 	case *ndp.RouterSolicitation:
@@ -266,7 +269,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 			}
 
 			a.logf("inconsistency %d: %q: %s%s", i, p.Field, details, p.Message)
-			a.mm.AdvRouterAdvertisementInconsistenciesTotal(a.iface, p.Details, p.Field)
+			a.mm.AdvRouterAdvertisementInconsistenciesTotal(a.cfg.Name, p.Details, p.Field)
 		}
 
 		if a.OnInconsistentRA != nil {
@@ -274,7 +277,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 		}
 	default:
 		a.logf("advertiser received NDP message of type %T from %s, ignoring", m, host)
-		a.mm.MessagesReceivedInvalidTotal(a.iface, m.Type().String())
+		a.mm.MessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
 	}
 
 	// No response necessary.
@@ -358,17 +361,17 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
 	if err := a.send(conn, ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
-		a.mm.AdvErrorsTotal(a.iface, "transmit")
+		a.mm.AdvErrorsTotal(a.cfg.Name, "transmit")
 		return err
 	}
 
 	typ := "unicast"
 	if ip.IsMulticast() {
 		typ = "multicast"
-		a.mm.AdvLastMulticastTime(float64(time.Now().Unix()), a.iface)
+		a.mm.AdvLastMulticastTime(float64(time.Now().Unix()), a.cfg.Name)
 	}
 
-	a.mm.AdvRouterAdvertisementsTotal(a.iface, typ)
+	a.mm.AdvRouterAdvertisementsTotal(a.cfg.Name, typ)
 	return nil
 }
 
@@ -434,7 +437,7 @@ func (a *Advertiser) shutdown(conn system.Conn) error {
 
 // logf prints a formatted log with the Advertiser's interface name.
 func (a *Advertiser) logf(format string, v ...interface{}) {
-	a.ll.Println(a.iface + ": " + fmt.Sprintf(format, v...))
+	a.ll.Println(a.cfg.Name + ": " + fmt.Sprintf(format, v...))
 }
 
 // multicastDelay selects an appropriate delay duration for unsolicited

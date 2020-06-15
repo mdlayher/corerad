@@ -82,7 +82,7 @@ func main() {
 	defer cancel()
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(1)
 	defer wg.Wait()
 
 	go func() {
@@ -103,14 +103,8 @@ func main() {
 	}()
 
 	// Start the server's goroutines and run until context cancelation.
-	s := corerad.NewServer(*cfg, ll)
-	go func() {
-		// Consume readiness notification.
-		defer wg.Done()
-		<-s.Ready()
-	}()
-
-	if err := s.Run(ctx); err != nil {
+	s := corerad.NewServer(ll)
+	if err := s.Serve(ctx, s.BuildTasks(*cfg)); err != nil {
 		ll.Fatalf("failed to run: %v", err)
 	}
 }

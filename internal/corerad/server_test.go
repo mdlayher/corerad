@@ -11,86 +11,182 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package corerad_test
+package corerad
 
 import (
 	"context"
+	"io"
+	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
-	"github.com/mdlayher/corerad/internal/corerad"
-	"golang.org/x/sync/errgroup"
 )
 
-func TestServerRun(t *testing.T) {
+func TestServerBuildTasks(t *testing.T) {
 	t.Parallel()
 
-	// This test covers basic server setup behaviors, but should not cover
-	// in-depth test cases for the Advertiser or HTTP server.
-
+	// Since each Task potentially encapsulates a lot of internal state, we
+	// just verify the stringified version of each Task to ensure that the
+	// appropriate Tasks were built based on input Config.
 	tests := []struct {
 		name string
 		cfg  config.Config
-
-		// fn is a test case. cancel must be invoked by fn. debug specifies the
-		// the address string for the HTTP debug server.
-		fn func(t *testing.T, cancel func(), debug string)
+		ss   []string
 	}{
 		{
-			name: "no configuration",
+			name: "empty config",
+			ss:   []string{"link state watcher"},
 		},
 		{
 			name: "debug HTTP",
 			cfg: config.Config{
-				Debug: config.Debug{
-					Address: randAddr(t),
-				},
+				Debug: config.Debug{Address: ":9430"},
 			},
-			fn: func(t *testing.T, cancel func(), debug string) {
-				defer cancel()
-
-				res := httpGet(t, debug)
-				if diff := cmp.Diff(http.StatusOK, res.StatusCode); diff != "" {
-					t.Fatalf("unexpected debug HTTP status (-want +got):\n%s", diff)
-				}
+			ss: []string{
+				`debug HTTP server ":9430"`,
+				"link state watcher",
+			},
+		},
+		{
+			name: "full",
+			cfg: config.Config{
+				Interfaces: []config.Interface{
+					{Name: "eth0", Monitor: true},
+					{Name: "eth1", Advertise: true},
+					// Not configured.
+					{Name: "eth2"},
+				},
+				Debug: config.Debug{Address: ":9430"},
+			},
+			ss: []string{
+				`monitor "eth0"`,
+				`advertiser "eth1"`,
+				`debug HTTP server ":9430"`,
+				"link state watcher",
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			srv := NewServer(log.New(os.Stderr, "", 0))
+
+			var ss []string
+			for _, task := range srv.BuildTasks(tt.cfg) {
+				ss = append(ss, task.String())
+			}
+
+			if diff := cmp.Diff(tt.ss, ss); diff != "" {
+				t.Fatalf("unexpected task strings (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestServerServeBasicTasks(t *testing.T) {
+	t.Parallel()
+
+	const text = "CoreRAD"
+	var (
+		// Pick an address that is likely to be unoccupied for the debug HTTP
+		// server bind.
+		addr = randAddr(t)
+		ll   = log.New(os.Stderr, "", 0)
+	)
+
+	tests := []struct {
+		name  string
+		task  Task
+		check func(t *testing.T)
+	}{
+		{
+			name: "debug HTTP",
+			task: &httpTask{
+				addr: addr,
+				h: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					_, _ = io.WriteString(w, text)
+				}),
+			},
+			check: func(t *testing.T) {
+				res := httpGet(t, addr)
+				defer res.Body.Close()
+
+				if diff := cmp.Diff(res.StatusCode, http.StatusOK); diff != "" {
+					t.Fatalf("unexpected HTTP status (-want +got):\n%s", diff)
+				}
+
+				b, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					t.Fatalf("failed to read HTTP body: %v", err)
+				}
+
+				if diff := cmp.Diff(text, string(b)); diff != "" {
+					t.Fatalf("unexpected HTTP body (-want +got):\n%s", diff)
+				}
+			},
+		},
+		{
+			name: "watcher not exist",
+			task: &watcherTask{
+				watch: func(_ context.Context) error {
+					return os.ErrNotExist
+				},
+				ll: ll,
+			},
+		},
+		{
+			name: "watcher OK",
+			task: &watcherTask{
+				watch: func(ctx context.Context) error {
+					<-ctx.Done()
+					return nil
+				},
+				ll: ll,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			timer := time.AfterFunc(5*time.Second, func() {
+				panic("test took too long")
+			})
+			defer timer.Stop()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			s := corerad.NewServer(tt.cfg, nil)
-
-			debug := tt.cfg.Debug.Address
-
-			var eg errgroup.Group
-			eg.Go(func() error {
-				return s.Run(ctx)
-			})
-
-			// Ensure the server has time to fully set up before we run tests.
-			<-s.Ready()
-
-			if tt.fn == nil {
-				// If no function specified, just cancel the server immediately.
+			// Run the Server until the context is canceled and verify it
+			// actually halts.
+			var wg sync.WaitGroup
+			wg.Add(1)
+			defer func() {
 				cancel()
-			} else {
-				tt.fn(t, cancel, debug)
-			}
+				wg.Wait()
+			}()
 
-			if err := eg.Wait(); err != nil {
-				t.Fatalf("failed to run server: %v", err)
+			sigC := make(chan struct{})
+
+			go func() {
+				defer wg.Done()
+				close(sigC)
+
+				if err := NewServer(ll).Serve(ctx, []Task{tt.task}); err != nil {
+					panicf("failed to serve: %v", err)
+				}
+			}()
+
+			<-sigC
+			if tt.check != nil {
+				tt.check(t)
 			}
 		})
 	}
