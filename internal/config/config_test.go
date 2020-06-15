@@ -134,6 +134,7 @@ func TestParse(t *testing.T) {
 
 			[[interfaces]]
 			name = "eth2"
+			verbose = true
 			hop_limit = 0
 			unicast_only = true
 			source_lla = false
@@ -142,6 +143,7 @@ func TestParse(t *testing.T) {
 			[[interfaces]]
 			name = "eth3"
 			monitor = true
+			verbose = true
 
 			[debug]
 			address = "localhost:9430"
@@ -208,6 +210,7 @@ func TestParse(t *testing.T) {
 					{
 						Name:            "eth2",
 						Advertise:       false,
+						Verbose:         true,
 						MinInterval:     3*time.Minute + 18*time.Second,
 						MaxInterval:     10 * time.Minute,
 						HopLimit:        0,
@@ -219,6 +222,7 @@ func TestParse(t *testing.T) {
 					{
 						Name:    "eth3",
 						Monitor: true,
+						Verbose: true,
 					},
 				},
 				Debug: config.Debug{

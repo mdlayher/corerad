@@ -137,7 +137,7 @@ func (s *Server) Run(ctx context.Context) error {
 			s.eg.Go(func() error {
 				dialer := system.NewDialer(iface.Name, state, system.Monitor, s.ll)
 
-				mon := NewMonitor(iface.Name, dialer, s.ll, mm)
+				mon := NewMonitor(iface.Name, dialer, iface.Verbose, s.ll, mm)
 				if err := mon.Monitor(ctx, watchC); err != nil {
 					return fmt.Errorf("failed to monitor NDP: %v", err)
 				}

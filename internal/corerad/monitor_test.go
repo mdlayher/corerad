@@ -132,6 +132,8 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 				}, nil
 			},
 		},
+		// Enable verbose logs for better debuggability.
+		true,
 		log.New(os.Stderr, "", 0),
 		mm,
 	)

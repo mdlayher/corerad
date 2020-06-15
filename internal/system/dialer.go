@@ -146,7 +146,7 @@ func (d *Dialer) init(ctx context.Context, err error) (*DialContext, error) {
 		}
 
 		// For other syscall errors, try again.
-		d.logf("error listening, reinitializing")
+		d.logf("error listening, reinitializing: %v", err)
 	case errors.Is(err, ErrLinkNotReady):
 		d.logf("interface not ready, reinitializing")
 	case errors.Is(err, ErrLinkChange):

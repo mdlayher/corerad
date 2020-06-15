@@ -28,6 +28,12 @@ advertise = false
 # All other interface parameters in this section can be removed to simplify
 # configuration with sane defaults.
 
+# Indicates whether or not this interface will have verbose logging mode enabled.
+# By default, CoreRAD prefers to use metrics to communicate non-error conditions,
+# while errors are communicated with both metrics and logs. Setting this to true
+# will enable more informational logging output.
+verbose = false
+
 # MaxRtrAdvInterval: the maximum time between sending unsolicited multicast
 # router advertisements. Must be between 4 and 1800 seconds.
 max_interval = "600s"

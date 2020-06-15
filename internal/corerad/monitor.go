@@ -35,9 +35,10 @@ type Monitor struct {
 	OnMessage func(m ndp.Message)
 
 	// Static configuration.
-	iface string
-	ll    *log.Logger
-	mm    *Metrics
+	iface   string
+	verbose bool
+	ll      *log.Logger
+	mm      *Metrics
 
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
@@ -51,6 +52,7 @@ type Monitor struct {
 func NewMonitor(
 	iface string,
 	dialer *system.Dialer,
+	verbose bool,
 	ll *log.Logger,
 	mm *Metrics,
 ) *Monitor {
@@ -62,10 +64,11 @@ func NewMonitor(
 	}
 
 	return &Monitor{
-		iface:  iface,
-		ll:     ll,
-		mm:     mm,
-		dialer: dialer,
+		iface:   iface,
+		verbose: verbose,
+		ll:      ll,
+		mm:      mm,
+		dialer:  dialer,
 
 		// By default use real time.
 		now: time.Now,
@@ -129,9 +132,7 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn, watchC <-chan n
 
 // handle handles an incoming NDP message and reports on it.
 func (m *Monitor) handle(msg ndp.Message, host netaddr.IP) {
-	// TODO(mdlayher): consider adding a verbose mode and hiding some/all
-	// of these logs.
-	m.logf("monitor received %q from %s", msg.Type(), host)
+	m.debugf("monitor received %q from %s", msg.Type(), host)
 
 	m.mm.MonMessagesReceivedTotal(m.iface, host.String(), msg.Type().String())
 
@@ -156,4 +157,13 @@ func (m *Monitor) handle(msg ndp.Message, host netaddr.IP) {
 // logf prints a formatted log with the Monitor's interface name.
 func (m *Monitor) logf(format string, v ...interface{}) {
 	m.ll.Println(m.iface + ": " + fmt.Sprintf(format, v...))
+}
+
+// debugf prints a formatted debug log if verbose mode is configured.
+func (m *Monitor) debugf(format string, v ...interface{}) {
+	if !m.verbose {
+		return
+	}
+
+	m.logf("debug: %s", fmt.Sprintf(format, v...))
 }

@@ -33,6 +33,7 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		return &Interface{
 			Name:    ifi.Name,
 			Monitor: ifi.Monitor,
+			Verbose: ifi.Verbose,
 		}, nil
 	}
 
@@ -116,6 +117,7 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 		Name:            ifi.Name,
 		Monitor:         ifi.Monitor,
 		Advertise:       ifi.Advertise,
+		Verbose:         ifi.Verbose,
 		MinInterval:     minInterval,
 		MaxInterval:     maxInterval,
 		Managed:         ifi.Managed,
