@@ -923,6 +923,11 @@ func waitInterfacesReady(t *testing.T, ifi0, ifi1 string) {
 	}
 
 	for i := 0; i < 5; i++ {
+		if i > 0 {
+			time.Sleep(1 * time.Second)
+			t.Log("waiting for interface readiness...")
+		}
+
 		aaddrs, err := a.Addrs()
 		if err != nil {
 			t.Fatalf("failed to get first addresses: %v", err)
@@ -933,15 +938,56 @@ func waitInterfacesReady(t *testing.T, ifi0, ifi1 string) {
 			t.Fatalf("failed to get second addresses: %v", err)
 		}
 
-		if len(aaddrs) > 0 && len(baddrs) > 0 {
-			return
+		if len(aaddrs) == 0 || len(baddrs) == 0 {
+			// No addresses yet.
+			continue
 		}
 
-		time.Sleep(1 * time.Second)
-		t.Log("waiting for interface readiness...")
+		// Do we have a link-local address assigned to each interface, and
+		// can we bind to that address?
+		if !linkLocalReady(t, aaddrs, ifi0) || !linkLocalReady(t, baddrs, ifi1) {
+			continue
+		}
+
+		return
 	}
 
 	t.Fatal("failed to wait for interface readiness")
+}
+
+func linkLocalReady(t *testing.T, addrs []net.Addr, zone string) bool {
+	t.Helper()
+
+	for _, a := range addrs {
+		ip, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+
+		if ip.IP.To16() == nil || ip.IP.To4() != nil || !ip.IP.IsLinkLocalUnicast() {
+			continue
+		}
+
+		// We've found a link-local IPv6 address. Try to bind a random socket to
+		// it to verify the address is ready for use.
+		addr := &net.UDPAddr{
+			IP:   ip.IP,
+			Port: 0,
+			Zone: zone,
+		}
+
+		l, err := net.ListenPacket("udp", addr.String())
+		if err != nil {
+			return false
+		}
+		_ = l.Close()
+
+		t.Logf("ready: %s", addr.String())
+
+		return true
+	}
+
+	return false
 }
 
 func skipShort(t *testing.T) {
