@@ -14,7 +14,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "6.7.1"
+      "version": "6.7.4"
     },
     {
       "type": "panel",
@@ -60,120 +60,26 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1591031946113,
+  "iteration": 1592324448816,
   "links": [],
   "panels": [
     {
-      "columns": [
-        {
-          "$$hashKey": "object:396",
-          "text": "Current",
-          "value": "current"
-        }
-      ],
+      "collapsed": false,
       "datasource": "${DS_PROMETHEUS}",
-      "fontSize": "100%",
       "gridPos": {
-        "h": 18,
-        "w": 6,
+        "h": 1,
+        "w": 24,
         "x": 0,
         "y": 0
       },
-      "id": 10,
-      "pageSize": null,
-      "showHeader": true,
-      "sort": {
-        "col": 0,
-        "desc": false
-      },
-      "styles": [
-        {
-          "$$hashKey": "object:398",
-          "alias": "Interface/Prefix",
-          "align": "auto",
-          "colorMode": null,
-          "colors": [
-            "#F2495C",
-            "rgba(237, 129, 40, 0.89)",
-            "rgba(50, 172, 45, 0.97)"
-          ],
-          "decimals": 0,
-          "link": false,
-          "mappingType": 1,
-          "pattern": "Metric",
-          "thresholds": [
-            ""
-          ],
-          "type": "string",
-          "unit": "short",
-          "valueMaps": []
-        },
-        {
-          "$$hashKey": "object:399",
-          "alias": "SLAAC",
-          "align": "auto",
-          "colorMode": "value",
-          "colors": [
-            "rgba(245, 54, 54, 0.9)",
-            "rgba(237, 129, 40, 0.89)",
-            "rgba(50, 172, 45, 0.97)"
-          ],
-          "dateFormat": "YYYY-MM-DD HH:mm:ss",
-          "decimals": 2,
-          "mappingType": 1,
-          "pattern": "Current",
-          "rangeMaps": [
-            {
-              "from": "0",
-              "text": "false",
-              "to": "0.99"
-            },
-            {
-              "from": "",
-              "text": "",
-              "to": ""
-            }
-          ],
-          "thresholds": [
-            "0",
-            " 1"
-          ],
-          "type": "string",
-          "unit": "short",
-          "valueMaps": [
-            {
-              "$$hashKey": "object:448",
-              "text": "false",
-              "value": "0"
-            },
-            {
-              "$$hashKey": "object:449",
-              "text": "true",
-              "value": "1"
-            }
-          ]
-        }
-      ],
-      "targets": [
-        {
-          "expr": "corerad_advertiser_router_advertisement_prefix_autonomous{instance=~\"$instance.*\"}",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "{{interface}}: {{prefix}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Interface prefix SLAAC",
-      "transform": "timeseries_aggregations",
-      "type": "table"
+      "id": 22,
+      "panels": [],
+      "title": "Overview",
+      "type": "row"
     },
     {
       "cacheTimeout": null,
       "colorBackground": false,
-      "colorPostfix": false,
-      "colorPrefix": false,
       "colorValue": false,
       "colors": [
         "#299c46",
@@ -181,8 +87,7 @@
         "#d44a3a"
       ],
       "datasource": "${DS_PROMETHEUS}",
-      "decimals": 2,
-      "format": "s",
+      "format": "none",
       "gauge": {
         "maxValue": 100,
         "minValue": 0,
@@ -191,23 +96,23 @@
         "thresholdMarkers": true
       },
       "gridPos": {
-        "h": 9,
+        "h": 10,
         "w": 6,
-        "x": 6,
-        "y": 0
+        "x": 0,
+        "y": 1
       },
-      "id": 16,
+      "id": 18,
       "interval": null,
       "links": [],
       "mappingType": 1,
       "mappingTypes": [
         {
-          "$$hashKey": "object:1953",
+          "$$hashKey": "object:803",
           "name": "value to text",
           "value": 1
         },
         {
-          "$$hashKey": "object:1954",
+          "$$hashKey": "object:804",
           "name": "range to text",
           "value": 2
         }
@@ -215,7 +120,6 @@
       "maxDataPoints": 100,
       "nullPointMode": "connected",
       "nullText": null,
-      "pluginVersion": "6.7.1",
       "postfix": "",
       "postfixFontSize": "50%",
       "prefix": "",
@@ -228,83 +132,152 @@
         }
       ],
       "sparkline": {
-        "fillColor": "rgba(255, 255, 255, 0)",
+        "fillColor": "rgba(31, 118, 189, 0.18)",
         "full": false,
-        "lineColor": "#73BF69",
-        "show": true,
+        "lineColor": "rgb(31, 120, 193)",
+        "show": false,
         "ymax": null,
         "ymin": null
       },
       "tableColumn": "",
       "targets": [
         {
-          "expr": "corerad_monitor_default_route_expiration_time{instance=~\"$instance.*\"} - time()",
+          "expr": "corerad_build_info{instance=\"$instance\"}",
+          "instant": true,
           "interval": "",
-          "legendFormat": "{{interface}} : {{router}}",
+          "legendFormat": "{{version}}",
           "refId": "A"
         }
       ],
       "thresholds": "",
       "timeFrom": null,
       "timeShift": null,
-      "title": "Default route lifetime",
+      "title": "CoreRAD version",
       "type": "singlestat",
       "valueFontSize": "200%",
       "valueMaps": [
         {
-          "$$hashKey": "object:1956",
+          "$$hashKey": "object:806",
           "op": "=",
           "text": "N/A",
           "value": "null"
         }
       ],
-      "valueName": "current"
+      "valueName": "name"
     },
     {
-      "columns": [
+      "columns": [],
+      "datasource": "${DS_PROMETHEUS}",
+      "fontSize": "200%",
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 29,
+      "pageSize": null,
+      "showHeader": true,
+      "sort": {
+        "col": 1,
+        "desc": false
+      },
+      "styles": [
         {
-          "$$hashKey": "object:387",
-          "text": "Current",
-          "value": "current"
+          "$$hashKey": "object:3434",
+          "alias": "Time",
+          "align": "",
+          "dateFormat": "MM/DD/YY h:mm:ss a",
+          "pattern": "Value",
+          "type": "date"
+        },
+        {
+          "$$hashKey": "object:523",
+          "alias": "",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "Time",
+          "thresholds": [],
+          "type": "hidden",
+          "unit": "short"
+        },
+        {
+          "$$hashKey": "object:1204",
+          "alias": "",
+          "align": "left",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "Metric",
+          "thresholds": [],
+          "type": "number",
+          "unit": "short"
         }
       ],
+      "targets": [
+        {
+          "expr": "corerad_build_time{instance=\"$instance\"} * 1000",
+          "format": "time_series",
+          "hide": false,
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Build Time",
+          "refId": "A"
+        },
+        {
+          "expr": "process_start_time_seconds{instance=\"$instance\"} * 1000",
+          "format": "time_series",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Start Time",
+          "refId": "B"
+        },
+        {
+          "expr": "corerad_build_time_seconds{instance=\"$instance\"} * 1000",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Build Time",
+          "refId": "C"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "CoreRAD date information",
+      "transform": "timeseries_to_rows",
+      "type": "table"
+    },
+    {
+      "columns": [],
       "datasource": "${DS_PROMETHEUS}",
-      "fontSize": "100%",
+      "fontSize": "120%",
       "gridPos": {
-        "h": 9,
-        "w": 3,
+        "h": 10,
+        "w": 12,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "id": 8,
       "pageSize": null,
       "showHeader": true,
       "sort": {
-        "col": 0,
+        "col": 2,
         "desc": false
       },
       "styles": [
-        {
-          "$$hashKey": "object:389",
-          "alias": "Interface",
-          "align": "auto",
-          "colorMode": null,
-          "colors": [
-            "#F2495C",
-            "rgba(237, 129, 40, 0.89)",
-            "rgba(50, 172, 45, 0.97)"
-          ],
-          "decimals": 0,
-          "link": false,
-          "mappingType": 1,
-          "pattern": "Metric",
-          "thresholds": [
-            ""
-          ],
-          "type": "string",
-          "unit": "short",
-          "valueMaps": []
-        },
         {
           "$$hashKey": "object:390",
           "alias": "Advertising",
@@ -318,7 +291,7 @@
           "dateFormat": "YYYY-MM-DD HH:mm:ss",
           "decimals": 2,
           "mappingType": 1,
-          "pattern": "Current",
+          "pattern": "Value #A",
           "rangeMaps": [
             {
               "from": "0",
@@ -349,70 +322,9 @@
               "value": "1"
             }
           ]
-        }
-      ],
-      "targets": [
-        {
-          "expr": "corerad_interface_advertising{instance=~\"$instance.*\"}",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "{{interface}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Interface advertising",
-      "transform": "timeseries_aggregations",
-      "type": "table"
-    },
-    {
-      "columns": [
-        {
-          "$$hashKey": "object:387",
-          "text": "Current",
-          "value": "current"
-        }
-      ],
-      "datasource": "${DS_PROMETHEUS}",
-      "fontSize": "100%",
-      "gridPos": {
-        "h": 9,
-        "w": 3,
-        "x": 15,
-        "y": 0
-      },
-      "id": 13,
-      "pageSize": null,
-      "showHeader": true,
-      "sort": {
-        "col": 0,
-        "desc": false
-      },
-      "styles": [
-        {
-          "$$hashKey": "object:389",
-          "alias": "Interface",
-          "align": "auto",
-          "colorMode": null,
-          "colors": [
-            "#F2495C",
-            "rgba(237, 129, 40, 0.89)",
-            "rgba(50, 172, 45, 0.97)"
-          ],
-          "decimals": 0,
-          "link": false,
-          "mappingType": 1,
-          "pattern": "Metric",
-          "thresholds": [
-            ""
-          ],
-          "type": "string",
-          "unit": "short",
-          "valueMaps": []
         },
         {
-          "$$hashKey": "object:390",
+          "$$hashKey": "object:229",
           "alias": "Monitoring",
           "align": "auto",
           "colorMode": "value",
@@ -424,19 +336,7 @@
           "dateFormat": "YYYY-MM-DD HH:mm:ss",
           "decimals": 2,
           "mappingType": 1,
-          "pattern": "Current",
-          "rangeMaps": [
-            {
-              "from": "0",
-              "text": "false",
-              "to": "0.99"
-            },
-            {
-              "from": "",
-              "text": "",
-              "to": ""
-            }
-          ],
+          "pattern": "Value #B",
           "thresholds": [
             "0",
             " 1"
@@ -445,104 +345,31 @@
           "unit": "short",
           "valueMaps": [
             {
-              "$$hashKey": "object:439",
+              "$$hashKey": "object:250",
               "text": "false",
               "value": "0"
             },
             {
-              "$$hashKey": "object:440",
+              "$$hashKey": "object:252",
               "text": "true",
               "value": "1"
             }
           ]
-        }
-      ],
-      "targets": [
-        {
-          "expr": "corerad_interface_monitoring{instance=~\"$instance.*\"}",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "{{interface}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Interface monitoring",
-      "transform": "timeseries_aggregations",
-      "type": "table"
-    },
-    {
-      "columns": [
-        {
-          "$$hashKey": "object:282",
-          "text": "Current",
-          "value": "current"
-        }
-      ],
-      "datasource": "${DS_PROMETHEUS}",
-      "fontSize": "100%",
-      "gridPos": {
-        "h": 9,
-        "w": 3,
-        "x": 18,
-        "y": 0
-      },
-      "id": 9,
-      "pageSize": null,
-      "showHeader": true,
-      "sort": {
-        "col": 0,
-        "desc": false
-      },
-      "styles": [
-        {
-          "$$hashKey": "object:284",
-          "alias": "Interface",
-          "align": "auto",
-          "colorMode": null,
-          "colors": [
-            "#F2495C",
-            "rgba(237, 129, 40, 0.89)",
-            "rgba(50, 172, 45, 0.97)"
-          ],
-          "decimals": 0,
-          "link": false,
-          "mappingType": 1,
-          "pattern": "Metric",
-          "thresholds": [
-            ""
-          ],
-          "type": "string",
-          "unit": "short",
-          "valueMaps": []
         },
         {
-          "$$hashKey": "object:285",
+          "$$hashKey": "object:337",
           "alias": "Autoconfiguration",
           "align": "auto",
           "colorMode": "value",
           "colors": [
-            "#E02F44",
-            "#56A64B",
-            "rgba(245, 54, 54, 0.9)"
+            "rgba(245, 54, 54, 0.9)",
+            "#F2495C",
+            "rgba(50, 172, 45, 0.97)"
           ],
           "dateFormat": "YYYY-MM-DD HH:mm:ss",
           "decimals": 2,
           "mappingType": 1,
-          "pattern": "Current",
-          "rangeMaps": [
-            {
-              "from": "0",
-              "text": "false",
-              "to": "0.99"
-            },
-            {
-              "from": "",
-              "text": "",
-              "to": ""
-            }
-          ],
+          "pattern": "Value #C",
           "thresholds": [
             "0",
             " 1"
@@ -551,83 +378,55 @@
           "unit": "short",
           "valueMaps": [
             {
-              "$$hashKey": "object:334",
+              "$$hashKey": "object:679",
               "text": "false",
               "value": "0"
             },
             {
-              "$$hashKey": "object:335",
+              "$$hashKey": "object:681",
               "text": "true",
               "value": "1"
             }
           ]
-        }
-      ],
-      "targets": [
-        {
-          "expr": "corerad_interface_autoconfiguration{instance=~\"$instance.*\"}",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "{{interface}}",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Interface autoconfiguration",
-      "transform": "timeseries_aggregations",
-      "type": "table"
-    },
-    {
-      "columns": [
-        {
-          "$$hashKey": "object:557",
-          "text": "Current",
-          "value": "current"
-        }
-      ],
-      "datasource": "${DS_PROMETHEUS}",
-      "fontSize": "100%",
-      "gridPos": {
-        "h": 9,
-        "w": 3,
-        "x": 21,
-        "y": 0
-      },
-      "id": 11,
-      "pageSize": null,
-      "showHeader": true,
-      "sort": {
-        "col": 0,
-        "desc": false
-      },
-      "styles": [
-        {
-          "$$hashKey": "object:559",
-          "alias": "Interface",
-          "align": "auto",
-          "colorMode": null,
-          "colors": [
-            "#F2495C",
-            "rgba(237, 129, 40, 0.89)",
-            "rgba(50, 172, 45, 0.97)"
-          ],
-          "decimals": 0,
-          "link": false,
-          "mappingType": 1,
-          "pattern": "Metric",
-          "thresholds": [
-            ""
-          ],
-          "type": "string",
-          "unit": "short",
-          "valueMaps": []
         },
         {
-          "$$hashKey": "object:560",
+          "$$hashKey": "object:683",
           "alias": "Forwarding",
           "align": "auto",
           "colorMode": "value",
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "#F2495C",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "Value #D",
+          "thresholds": [
+            "0",
+            " 1"
+          ],
+          "type": "string",
+          "unit": "short",
+          "valueMaps": [
+            {
+              "$$hashKey": "object:706",
+              "text": "false",
+              "value": "0"
+            },
+            {
+              "$$hashKey": "object:708",
+              "text": "true",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "$$hashKey": "object:710",
+          "alias": "",
+          "align": "auto",
+          "colorMode": null,
           "colors": [
             "rgba(245, 54, 54, 0.9)",
             "rgba(237, 129, 40, 0.89)",
@@ -636,19 +435,386 @@
           "dateFormat": "YYYY-MM-DD HH:mm:ss",
           "decimals": 2,
           "mappingType": 1,
-          "pattern": "Current",
-          "rangeMaps": [
-            {
-              "from": "0",
-              "text": "false",
-              "to": "0.99"
-            },
-            {
-              "from": "",
-              "text": "",
-              "to": ""
-            }
+          "pattern": "/(Time|instance|job)/",
+          "thresholds": [],
+          "type": "hidden",
+          "unit": "short"
+        },
+        {
+          "$$hashKey": "object:1820",
+          "alias": "Interface",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
           ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "interface",
+          "thresholds": [],
+          "type": "number",
+          "unit": "short"
+        }
+      ],
+      "targets": [
+        {
+          "expr": "corerad_interface_advertising{instance=\"$instance\"} + 0",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "A"
+        },
+        {
+          "expr": "corerad_interface_monitoring{instance=\"$instance\"} + 0",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "expr": "corerad_interface_autoconfiguration{instance=\"$instance\"} + 0",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
+        },
+        {
+          "expr": "corerad_interface_forwarding{instance=\"$instance\"} + 0",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "D"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "Interface configuration",
+      "transform": "table",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 26,
+      "panels": [],
+      "title": "Monitor",
+      "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "cacheTimeout": null,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "hiddenSeries": false,
+      "id": 16,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pluginVersion": "6.7.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "corerad_monitor_default_route_expiration_time{instance=\"$instance\"} - time()",
+          "interval": "",
+          "legendFormat": "{{interface}} : {{router}}",
+          "refId": "A"
+        },
+        {
+          "expr": "corerad_monitor_default_route_expiration_time_seconds{instance=\"$instance\"} - time()",
+          "interval": "",
+          "legendFormat": "{{interface}} : {{router}}",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [
+        {
+          "$$hashKey": "object:7513",
+          "colorMode": "critical",
+          "fill": true,
+          "line": true,
+          "op": "lt",
+          "value": 7200,
+          "yaxis": "left"
+        }
+      ],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Default route lifetime",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:4659",
+          "decimals": 2,
+          "format": "s",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:4660",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "hiddenSeries": false,
+      "id": 4,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "irate(corerad_monitor_messages_received_total{instance=\"$instance\"}[5m])",
+          "interval": "",
+          "legendFormat": "{{interface}}: {{host}}: {{message}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Monitor messages received per second",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:295",
+          "format": "ops",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:296",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 24,
+      "panels": [],
+      "title": "Advertiser",
+      "type": "row"
+    },
+    {
+      "columns": [],
+      "datasource": "${DS_PROMETHEUS}",
+      "fontSize": "120%",
+      "gridPos": {
+        "h": 18,
+        "w": 8,
+        "x": 0,
+        "y": 22
+      },
+      "id": 27,
+      "pageSize": null,
+      "showHeader": true,
+      "sort": {
+        "col": 2,
+        "desc": false
+      },
+      "styles": [
+        {
+          "$$hashKey": "object:390",
+          "alias": "Preferred",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "Value #A",
+          "thresholds": [],
+          "type": "number",
+          "unit": "s"
+        },
+        {
+          "$$hashKey": "object:658",
+          "alias": "Valid",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "Value #B",
+          "thresholds": [],
+          "type": "number",
+          "unit": "s"
+        },
+        {
+          "$$hashKey": "object:714",
+          "alias": "",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "/(Time|instance|job)/",
+          "thresholds": [],
+          "type": "hidden",
+          "unit": "short"
+        },
+        {
+          "$$hashKey": "object:2794",
+          "alias": "SLAAC",
+          "align": "auto",
+          "colorMode": "value",
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "#F2495C",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "Value #C",
           "thresholds": [
             "0",
             " 1"
@@ -657,31 +823,86 @@
           "unit": "short",
           "valueMaps": [
             {
-              "$$hashKey": "object:609",
+              "$$hashKey": "object:2817",
               "text": "false",
               "value": "0"
             },
             {
-              "$$hashKey": "object:610",
+              "$$hashKey": "object:2819",
               "text": "true",
               "value": "1"
             }
           ]
+        },
+        {
+          "$$hashKey": "object:416",
+          "alias": "Interface",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "interface",
+          "thresholds": [],
+          "type": "number",
+          "unit": "short"
+        },
+        {
+          "$$hashKey": "object:427",
+          "alias": "Prefix",
+          "align": "auto",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "mappingType": 1,
+          "pattern": "prefix",
+          "thresholds": [],
+          "type": "number",
+          "unit": "short"
         }
       ],
       "targets": [
         {
-          "expr": "corerad_interface_forwarding{instance=~\"$instance.*\"}",
+          "expr": "(corerad_advertiser_router_advertisement_prefix_preferred_lifetime_seconds{instance=\"$instance\"} + on(instance, interface) group_left corerad_advertiser_last_multicast_time_seconds) - time()",
+          "format": "table",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{interface}}",
+          "intervalFactor": 1,
+          "legendFormat": "",
           "refId": "A"
+        },
+        {
+          "expr": "(corerad_advertiser_router_advertisement_prefix_valid_lifetime_seconds{instance=\"$instance\"} + on(instance, interface) group_left corerad_advertiser_last_multicast_time_seconds) - time()",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "",
+          "refId": "B"
+        },
+        {
+          "expr": "corerad_advertiser_router_advertisement_prefix_autonomous{instance=\"$instance\"} + 0",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "",
+          "refId": "C"
         }
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Interface forwarding",
-      "transform": "timeseries_aggregations",
+      "title": "Router Advertisement prefix information",
+      "transform": "table",
       "type": "table"
     },
     {
@@ -694,17 +915,19 @@
       "fillGradient": 0,
       "gridPos": {
         "h": 9,
-        "w": 18,
-        "x": 6,
-        "y": 9
+        "w": 8,
+        "x": 8,
+        "y": 22
       },
       "hiddenSeries": false,
-      "id": 2,
+      "id": 14,
       "legend": {
+        "alignAsTable": true,
         "avg": false,
         "current": false,
         "max": false,
         "min": false,
+        "rightSide": true,
         "show": true,
         "total": false,
         "values": false
@@ -725,9 +948,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(corerad_advertiser_router_advertisements_total{instance=~\"$instance.*\"}[5m])",
+          "expr": "irate(corerad_advertiser_messages_received_total{instance=\"$instance\"}[5m])",
           "interval": "",
-          "legendFormat": "{{interface}}: {{type}}",
+          "legendFormat": "{{interface}}: {{message}}",
           "refId": "A"
         }
       ],
@@ -735,7 +958,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Router Advertisements sent per second",
+      "title": "Advertiser messages received per second",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -751,6 +974,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:609",
           "format": "ops",
           "label": null,
           "logBase": 1,
@@ -759,6 +983,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:610",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -782,9 +1007,9 @@
       "fillGradient": 0,
       "gridPos": {
         "h": 9,
-        "w": 6,
-        "x": 0,
-        "y": 18
+        "w": 8,
+        "x": 16,
+        "y": 22
       },
       "hiddenSeries": false,
       "id": 12,
@@ -813,7 +1038,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(corerad_advertiser_router_advertisement_inconsistencies_total{instance=~\"$instance.*\"}[5m])",
+          "expr": "irate(corerad_advertiser_router_advertisement_inconsistencies_total{instance=\"$instance\"}[5m])",
           "interval": "",
           "legendFormat": "{{interface}}: {{field}}",
           "refId": "A"
@@ -823,7 +1048,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Inconsistent RAs received per second",
+      "title": "Inconsistent Router Advertisements received per second",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -872,17 +1097,19 @@
       "fillGradient": 0,
       "gridPos": {
         "h": 9,
-        "w": 9,
-        "x": 6,
-        "y": 18
+        "w": 8,
+        "x": 8,
+        "y": 31
       },
       "hiddenSeries": false,
-      "id": 4,
+      "id": 2,
       "legend": {
+        "alignAsTable": true,
         "avg": false,
         "current": false,
         "max": false,
         "min": false,
+        "rightSide": true,
         "show": true,
         "total": false,
         "values": false
@@ -903,9 +1130,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(corerad_monitor_messages_received_total{instance=~\"$instance.*\"}[5m])",
+          "expr": "irate(corerad_advertiser_router_advertisements_total{instance=\"$instance\"}[5m])",
           "interval": "",
-          "legendFormat": "{{interface}}: {{host}}: {{message}}",
+          "legendFormat": "{{interface}}: {{type}}",
           "refId": "A"
         }
       ],
@@ -913,7 +1140,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Monitor messages received per second",
+      "title": "Router Advertisements sent per second",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -929,6 +1156,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:528",
           "format": "ops",
           "label": null,
           "logBase": 1,
@@ -937,6 +1165,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:529",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -960,17 +1189,19 @@
       "fillGradient": 0,
       "gridPos": {
         "h": 9,
-        "w": 9,
-        "x": 15,
-        "y": 18
+        "w": 8,
+        "x": 16,
+        "y": 31
       },
       "hiddenSeries": false,
-      "id": 14,
+      "id": 20,
       "legend": {
+        "alignAsTable": true,
         "avg": false,
         "current": false,
         "max": false,
         "min": false,
+        "rightSide": true,
         "show": true,
         "total": false,
         "values": false
@@ -991,9 +1222,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(corerad_advertiser_messages_received_total{instance=~\"$instance.*\"}[5m])",
+          "expr": "irate(corerad_advertiser_errors_total{instance=\"$instance\"}[5m])",
           "interval": "",
-          "legendFormat": "{{interface}}: {{message}}",
+          "legendFormat": "{{interface}}: {{error}}",
           "refId": "A"
         }
       ],
@@ -1001,7 +1232,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Advertiser messages received per second",
+      "title": "Advertiser errors per second",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1017,6 +1248,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:528",
           "format": "ops",
           "label": null,
           "logBase": 1,
@@ -1025,6 +1257,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:529",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1039,7 +1272,7 @@
       }
     }
   ],
-  "refresh": "",
+  "refresh": false,
   "schemaVersion": 22,
   "style": "dark",
   "tags": [
@@ -1063,7 +1296,7 @@
         "options": [],
         "query": "corerad_build_info",
         "refresh": 1,
-        "regex": "/.*instance=\"([^\"]*):/",
+        "regex": "/.*instance=\"([^\"]*)/",
         "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
@@ -1075,7 +1308,7 @@
     ]
   },
   "time": {
-    "from": "now-12h",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {
@@ -1098,5 +1331,5 @@
   "variables": {
     "list": []
   },
-  "version": 18
+  "version": 49
 }
