@@ -202,12 +202,19 @@ func httpGet(t *testing.T, addr string) *http.Response {
 	}
 
 	c := &http.Client{Timeout: 1 * time.Second}
-	res, err := c.Get(u.String())
-	if err != nil {
-		t.Fatalf("failed to HTTP GET: %v", err)
+
+	for i := 0; i < 5; i++ {
+		res, err := c.Get(u.String())
+		if err == nil {
+			return res
+		}
+
+		t.Logf("HTTP GET retry %02d: %v", i, err)
+		time.Sleep(250 * time.Millisecond)
 	}
 
-	return res
+	t.Fatal("failed to HTTP GET, ran out of retry attempts")
+	return nil
 }
 
 func randAddr(t *testing.T) string {
