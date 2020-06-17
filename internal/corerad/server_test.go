@@ -15,6 +15,7 @@ package corerad
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -187,6 +188,62 @@ func TestServerServeBasicTasks(t *testing.T) {
 			<-sigC
 			if tt.check != nil {
 				tt.check(t)
+			}
+		})
+	}
+}
+
+func Test_serve(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		mkCtx func() context.Context
+		fn    func() error
+		ok    bool
+	}{
+		{
+			name: "context canceled",
+			mkCtx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			},
+			ok: true,
+		},
+		{
+			name: "context deadline exceeded",
+			mkCtx: func() context.Context {
+				ctx, _ := context.WithTimeout(context.Background(), 20*time.Millisecond)
+				return ctx
+			},
+			fn: func() error { return &net.OpError{} },
+			ok: true,
+		},
+		{
+			name:  "fatal error",
+			mkCtx: context.Background,
+			fn:    func() error { return errors.New("fatal") },
+		},
+		{
+			name:  "HTTP shutdown",
+			mkCtx: context.Background,
+			fn:    func() error { return http.ErrServerClosed },
+			ok:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := serve(tt.mkCtx(), nil, 5*time.Millisecond, tt.fn)
+			if tt.ok && err != nil {
+				t.Fatalf("failed to serve: %v", err)
+			}
+			if !tt.ok && err == nil {
+				t.Fatal("expected an error, but none occurred")
+			}
+			if err != nil {
+				t.Logf("err: %v", err)
 			}
 		})
 	}

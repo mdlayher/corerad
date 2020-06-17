@@ -187,7 +187,8 @@ type httpTask struct {
 
 // Run implements Task.
 func (t *httpTask) Run(ctx context.Context) error {
-	return serve(ctx, t.ll, func() error {
+	// Wait 3 seconds between listen attempts.
+	return serve(ctx, t.ll, 3*time.Second, func() error {
 		l, err := net.Listen("tcp", t.addr)
 		if err != nil {
 			return err
@@ -223,14 +224,15 @@ func (t *httpTask) String() string {
 
 // serve invokes fn with retries until a listener is started, handling certain
 // network listener errors as appropriate.
-func serve(ctx context.Context, ll *log.Logger, fn func() error) error {
-	const (
-		attempts = 40
-		delay    = 3 * time.Second
-	)
+func serve(ctx context.Context, ll *log.Logger, delay time.Duration, fn func() error) error {
+	const attempts = 40
 
 	var nerr *net.OpError
 	for i := 0; i < attempts; i++ {
+		if ctx.Err() != nil {
+			return nil
+		}
+
 		// Don't wait on the first attempt.
 		if i != 0 {
 			select {
