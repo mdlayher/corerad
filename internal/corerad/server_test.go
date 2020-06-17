@@ -214,7 +214,9 @@ func Test_serve(t *testing.T) {
 		{
 			name: "context deadline exceeded",
 			mkCtx: func() context.Context {
-				ctx, _ := context.WithTimeout(context.Background(), 20*time.Millisecond)
+				// Kind of a hack to avoid dropping the cancel.
+				ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+				time.AfterFunc(1*time.Second, cancel)
 				return ctx
 			},
 			fn: func() error { return &net.OpError{} },
