@@ -43,11 +43,11 @@ const (
 	// Non-const metrics.
 	raInconsistencies   = "corerad_advertiser_router_advertisement_inconsistencies_total"
 	monReceived         = "corerad_monitor_messages_received_total"
-	monDefaultRoute     = "corerad_monitor_default_route_expiration_time_seconds"
+	monDefaultRoute     = "corerad_monitor_default_route_expiration_timestamp_seconds"
 	monPrefixAutonomous = "corerad_monitor_prefix_autonomous"
 	monPrefixOnLink     = "corerad_monitor_prefix_on_link"
-	monPrefixPreferred  = "corerad_monitor_prefix_preferred_lifetime_expiration_time_seconds"
-	monPrefixValid      = "corerad_monitor_prefix_valid_lifetime_expiration_time_seconds"
+	monPrefixPreferred  = "corerad_monitor_prefix_preferred_lifetime_expiration_timestamp_seconds"
+	monPrefixValid      = "corerad_monitor_prefix_valid_lifetime_expiration_timestamp_seconds"
 	msgInvalid          = "corerad_messages_received_invalid_total"
 )
 
@@ -102,7 +102,7 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 		),
 
 		Time: m.Gauge(
-			"corerad_build_time_seconds",
+			"corerad_build_timestamp_seconds",
 			"The UNIX timestamp of when this build of CoreRAD was produced.",
 		),
 
@@ -113,7 +113,7 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 		),
 
 		AdvLastMulticastTime: m.Gauge(
-			"corerad_advertiser_last_multicast_time_seconds",
+			"corerad_advertiser_last_multicast_timestamp_seconds",
 			"The UNIX timestamp of when the last multicast router advertisement was sent.",
 			"interface",
 		),
