@@ -35,7 +35,6 @@ const (
 	ifiAutoconfiguration = "corerad_interface_autoconfiguration"
 	ifiForwarding        = "corerad_interface_forwarding"
 	ifiMonitoring        = "corerad_interface_monitoring"
-	raPrefixInfo         = "corerad_advertiser_router_advertisement_prefix_info"
 	raPrefixAutonomous   = "corerad_advertiser_router_advertisement_prefix_autonomous"
 	raPrefixOnLink       = "corerad_advertiser_router_advertisement_prefix_on_link"
 	raPrefixValid        = "corerad_advertiser_router_advertisement_prefix_valid_lifetime_seconds"
@@ -218,37 +217,26 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 	)
 
 	m.ConstGauge(
-		raPrefixInfo,
-		"Metadata about a prefix being advertised via IPv6 router advertisement.",
-		// TODO: verify uniqueness of prefixes per interface.
-		"interface", "prefix",
-	)
-
-	m.ConstGauge(
 		raPrefixAutonomous,
 		"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
-		// TODO: verify uniqueness of prefixes per interface.
 		"interface", "prefix",
 	)
 
 	m.ConstGauge(
 		raPrefixOnLink,
 		"Indicates whether or not the On-Link flag is enabled for a given prefix.",
-		// TODO: verify uniqueness of prefixes per interface.
 		"interface", "prefix",
 	)
 
 	m.ConstGauge(
 		raPrefixValid,
 		"The amount of time in seconds that clients should consider this prefix valid for on-link determination.",
-		// TODO: verify uniqueness of prefixes per interface.
 		"interface", "prefix",
 	)
 
 	m.ConstGauge(
 		raPrefixPreferred,
 		"The amount of time in seconds that addresses generated via SLAAC by clients should remain preferred.",
-		// TODO: verify uniqueness of prefixes per interface.
 		"interface", "prefix",
 	)
 
@@ -330,11 +318,9 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 			c(boolFloat(mctx.Forwarding), mctx.Interface)
 		case ifiMonitoring:
 			c(boolFloat(mctx.Monitoring), mctx.Interface)
-		case raPrefixInfo, raPrefixAutonomous, raPrefixOnLink, raPrefixValid, raPrefixPreferred:
+		case raPrefixAutonomous, raPrefixOnLink, raPrefixValid, raPrefixPreferred:
 			for _, p := range prefixes {
 				switch m {
-				case raPrefixInfo:
-					c(1, mctx.Interface, prefixStr(p))
 				case raPrefixAutonomous:
 					c(boolFloat(p.AutonomousAddressConfiguration), mctx.Interface, prefixStr(p))
 				case raPrefixOnLink:

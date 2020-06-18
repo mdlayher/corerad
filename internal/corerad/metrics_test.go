@@ -119,12 +119,6 @@ func TestMetrics(t *testing.T) {
 				},
 			},
 			series: mergeSeries(base, wan, lan, map[string]metricslite.Series{
-				raPrefixInfo: {
-					Samples: map[string]float64{
-						"interface=eth1,prefix=2001:db8::/64":            1,
-						"interface=eth1,prefix=fdff:dead:beef:dead::/64": 1,
-					},
-				},
 				raPrefixAutonomous: {
 					Samples: map[string]float64{
 						"interface=eth1,prefix=2001:db8::/64":            0,
