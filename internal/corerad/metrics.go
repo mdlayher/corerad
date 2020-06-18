@@ -37,15 +37,15 @@ const (
 	msgInvalid           = "corerad_messages_received_invalid_total"
 	advPrefixAutonomous  = "corerad_advertiser_prefix_autonomous"
 	advPrefixOnLink      = "corerad_advertiser_prefix_on_link"
-	advPrefixValid       = "corerad_advertiser_prefix_valid_lifetime_seconds"
-	advPrefixPreferred   = "corerad_advertiser_prefix_preferred_lifetime_seconds"
+	advPrefixValid       = "corerad_advertiser_prefix_valid_seconds"
+	advPrefixPreferred   = "corerad_advertiser_prefix_preferred_seconds"
 	advInconsistencies   = "corerad_advertiser_inconsistencies_total"
 	monReceived          = "corerad_monitor_messages_received_total"
 	monDefaultRoute      = "corerad_monitor_default_route_expiration_timestamp_seconds"
 	monPrefixAutonomous  = "corerad_monitor_prefix_autonomous"
 	monPrefixOnLink      = "corerad_monitor_prefix_on_link"
-	monPrefixPreferred   = "corerad_monitor_prefix_preferred_lifetime_expiration_timestamp_seconds"
-	monPrefixValid       = "corerad_monitor_prefix_valid_lifetime_expiration_timestamp_seconds"
+	monPrefixPreferred   = "corerad_monitor_prefix_preferred_expiration_timestamp_seconds"
+	monPrefixValid       = "corerad_monitor_prefix_valid_expiration_timestamp_seconds"
 )
 
 // Metrics contains metrics for a CoreRAD instance.
