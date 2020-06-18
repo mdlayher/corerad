@@ -429,7 +429,7 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 				// Verify that a metric was produced indicating an RA
 				// inconsistency in the managed configuration field was detected
 				// by this interface.
-				ts := findMetric(t, cctx.mm, raInconsistencies)
+				ts := findMetric(t, cctx.mm, advInconsistencies)
 
 				label := fmt.Sprintf("interface=%s,details=,field=managed_configuration", cctx.router.Name)
 				if diff := cmp.Diff(1., ts.Samples[label]); diff != "" {
@@ -498,8 +498,8 @@ func TestAdvertiserPrometheusMetrics(t *testing.T) {
 				// Gather only the necessary information after a single RA and
 				// immediately stop the Advertiser to verify the output.
 				ra = m.(*ndp.RouterAdvertisement)
-				pfxAuto = findMetric(t, cctx.mm, raPrefixAutonomous)
-				pfxOnLink = findMetric(t, cctx.mm, raPrefixOnLink)
+				pfxAuto = findMetric(t, cctx.mm, advPrefixAutonomous)
+				pfxOnLink = findMetric(t, cctx.mm, advPrefixOnLink)
 				iface = cctx.router.Name
 			})
 			done()

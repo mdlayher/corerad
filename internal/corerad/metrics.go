@@ -30,25 +30,22 @@ import (
 
 // Names of metrics which are referenced here and in tests.
 const (
-	// Const metrics.
 	ifiAdvertising       = "corerad_interface_advertising"
 	ifiAutoconfiguration = "corerad_interface_autoconfiguration"
 	ifiForwarding        = "corerad_interface_forwarding"
 	ifiMonitoring        = "corerad_interface_monitoring"
-	raPrefixAutonomous   = "corerad_advertiser_router_advertisement_prefix_autonomous"
-	raPrefixOnLink       = "corerad_advertiser_router_advertisement_prefix_on_link"
-	raPrefixValid        = "corerad_advertiser_router_advertisement_prefix_valid_lifetime_seconds"
-	raPrefixPreferred    = "corerad_advertiser_router_advertisement_prefix_preferred_lifetime_seconds"
-
-	// Non-const metrics.
-	raInconsistencies   = "corerad_advertiser_router_advertisement_inconsistencies_total"
-	monReceived         = "corerad_monitor_messages_received_total"
-	monDefaultRoute     = "corerad_monitor_default_route_expiration_timestamp_seconds"
-	monPrefixAutonomous = "corerad_monitor_prefix_autonomous"
-	monPrefixOnLink     = "corerad_monitor_prefix_on_link"
-	monPrefixPreferred  = "corerad_monitor_prefix_preferred_lifetime_expiration_timestamp_seconds"
-	monPrefixValid      = "corerad_monitor_prefix_valid_lifetime_expiration_timestamp_seconds"
-	msgInvalid          = "corerad_messages_received_invalid_total"
+	msgInvalid           = "corerad_messages_received_invalid_total"
+	advPrefixAutonomous  = "corerad_advertiser_prefix_autonomous"
+	advPrefixOnLink      = "corerad_advertiser_prefix_on_link"
+	advPrefixValid       = "corerad_advertiser_prefix_valid_lifetime_seconds"
+	advPrefixPreferred   = "corerad_advertiser_prefix_preferred_lifetime_seconds"
+	advInconsistencies   = "corerad_advertiser_inconsistencies_total"
+	monReceived          = "corerad_monitor_messages_received_total"
+	monDefaultRoute      = "corerad_monitor_default_route_expiration_timestamp_seconds"
+	monPrefixAutonomous  = "corerad_monitor_prefix_autonomous"
+	monPrefixOnLink      = "corerad_monitor_prefix_on_link"
+	monPrefixPreferred   = "corerad_monitor_prefix_preferred_lifetime_expiration_timestamp_seconds"
+	monPrefixValid       = "corerad_monitor_prefix_valid_lifetime_expiration_timestamp_seconds"
 )
 
 // Metrics contains metrics for a CoreRAD instance.
@@ -114,7 +111,7 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 
 		AdvLastMulticastTime: m.Gauge(
 			"corerad_advertiser_last_multicast_timestamp_seconds",
-			"The UNIX timestamp of when the last multicast router advertisement was sent.",
+			"The UNIX timestamp of when the last multicast router advertisement was sent from an advertising interface.",
 			"interface",
 		),
 
@@ -125,20 +122,20 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 		),
 
 		AdvRouterAdvertisementInconsistenciesTotal: m.Counter(
-			raInconsistencies,
+			advInconsistencies,
 			"The total number of NDP router advertisements received which contain inconsistent data with this advertiser's configuration, partitioned by the problematic field.",
 			"interface", "details", "field",
 		),
 
 		AdvRouterAdvertisementsTotal: m.Counter(
 			"corerad_advertiser_router_advertisements_total",
-			"The total number of NDP router advertisements sent by the advertiser on an interface.",
+			"The total number of unicast and/or multicast NDP router advertisements sent by an advertiser on an interface.",
 			"interface", "type",
 		),
 
 		AdvErrorsTotal: m.Counter(
 			"corerad_advertiser_errors_total",
-			"The total number and type of errors that occurred while advertising.",
+			"The total number and type of errors that occurred while advertising on an interface.",
 			"interface", "error",
 		),
 
@@ -150,33 +147,31 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 
 		MonDefaultRouteExpirationTime: m.Gauge(
 			monDefaultRoute,
-			"The UNIX timestamp of when the route provided by a default router will expire.",
+			"The UNIX timestamp of when the route provided by a default router will expire on a monitoring interface.",
 			"interface", "router",
 		),
 
 		MonPrefixAutonomous: m.Gauge(
 			monPrefixAutonomous,
-			"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
-			// TODO: verify uniqueness of prefixes per interface.
+			"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix received on a monitoring interface.",
 			"interface", "prefix", "router",
 		),
 
 		MonPrefixOnLink: m.Gauge(
 			monPrefixOnLink,
-			"Indicates whether or not the On-Link flag is enabled for a given prefix.",
-			// TODO: verify uniqueness of prefixes per interface.
+			"Indicates whether or not the On-Link flag is enabled for a given prefix received on a monitoring interface.",
 			"interface", "prefix", "router",
 		),
 
 		MonPrefixPreferredLifetimeExpirationTime: m.Gauge(
 			monPrefixPreferred,
-			"The UNIX timestamp of when a route to a prefix should no longer be preferred.",
+			"The UNIX timestamp of when a route to a given prefix should no longer be preferred on a monitoring interface.",
 			"interface", "prefix", "router",
 		),
 
 		MonPrefixValidLifetimeExpirationTime: m.Gauge(
 			monPrefixValid,
-			"The UNIX timestamp of when a route to a prefix will expire.",
+			"The UNIX timestamp of when a route to a given prefix will expire on a monitoring interface.",
 			"interface", "prefix", "router",
 		),
 	}
@@ -200,6 +195,12 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 	)
 
 	m.ConstGauge(
+		ifiMonitoring,
+		"Indicates whether or not NDP messages will be monitored on this interface.",
+		"interface",
+	)
+
+	m.ConstGauge(
 		ifiAutoconfiguration,
 		"Indicates whether or not IPv6 autoconfiguration is enabled on this interface.",
 		"interface",
@@ -211,31 +212,25 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 	)
 
 	m.ConstGauge(
-		ifiMonitoring,
-		"Indicates whether or not NDP messages will be monitored on this interface.",
-		"interface",
-	)
-
-	m.ConstGauge(
-		raPrefixAutonomous,
-		"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
+		advPrefixAutonomous,
+		"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given advertised prefix.",
 		"interface", "prefix",
 	)
 
 	m.ConstGauge(
-		raPrefixOnLink,
-		"Indicates whether or not the On-Link flag is enabled for a given prefix.",
+		advPrefixOnLink,
+		"Indicates whether or not the On-Link flag is enabled for a given advertised prefix.",
 		"interface", "prefix",
 	)
 
 	m.ConstGauge(
-		raPrefixValid,
-		"The amount of time in seconds that clients should consider this prefix valid for on-link determination.",
+		advPrefixValid,
+		"The amount of time in seconds that clients should consider this advertised prefix valid for on-link determination.",
 		"interface", "prefix",
 	)
 
 	m.ConstGauge(
-		raPrefixPreferred,
+		advPrefixPreferred,
 		"The amount of time in seconds that addresses generated via SLAAC by clients should remain preferred.",
 		"interface", "prefix",
 	)
@@ -318,16 +313,16 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 			c(boolFloat(mctx.Forwarding), mctx.Interface)
 		case ifiMonitoring:
 			c(boolFloat(mctx.Monitoring), mctx.Interface)
-		case raPrefixAutonomous, raPrefixOnLink, raPrefixValid, raPrefixPreferred:
+		case advPrefixAutonomous, advPrefixOnLink, advPrefixValid, advPrefixPreferred:
 			for _, p := range prefixes {
 				switch m {
-				case raPrefixAutonomous:
+				case advPrefixAutonomous:
 					c(boolFloat(p.AutonomousAddressConfiguration), mctx.Interface, prefixStr(p))
-				case raPrefixOnLink:
+				case advPrefixOnLink:
 					c(boolFloat(p.OnLink), mctx.Interface, prefixStr(p))
-				case raPrefixValid:
+				case advPrefixValid:
 					c(p.ValidLifetime.Seconds(), mctx.Interface, prefixStr(p))
-				case raPrefixPreferred:
+				case advPrefixPreferred:
 					c(p.PreferredLifetime.Seconds(), mctx.Interface, prefixStr(p))
 				default:
 					panicf("corerad: prefix metrics collection for %q is not handled", m)
