@@ -25,6 +25,9 @@ import (
 	"github.com/mdlayher/ndp"
 )
 
+// TODO: rename/collapse advertiser and monitor metrics where applicable?
+// Particularly metrics related to RA data.
+
 // Names of metrics which are referenced here and in tests.
 const (
 	// Const metrics.
@@ -39,10 +42,14 @@ const (
 	raPrefixPreferred    = "corerad_advertiser_router_advertisement_prefix_preferred_lifetime_seconds"
 
 	// Non-const metrics.
-	raInconsistencies = "corerad_advertiser_router_advertisement_inconsistencies_total"
-	monReceived       = "corerad_monitor_messages_received_total"
-	monDefaultRoute   = "corerad_monitor_default_route_expiration_time_seconds"
-	msgInvalid        = "corerad_messages_received_invalid_total"
+	raInconsistencies   = "corerad_advertiser_router_advertisement_inconsistencies_total"
+	monReceived         = "corerad_monitor_messages_received_total"
+	monDefaultRoute     = "corerad_monitor_default_route_expiration_time_seconds"
+	monPrefixAutonomous = "corerad_monitor_prefix_autonomous"
+	monPrefixOnLink     = "corerad_monitor_prefix_on_link"
+	monPrefixPreferred  = "corerad_monitor_prefix_preferred_lifetime_expiration_time_seconds"
+	monPrefixValid      = "corerad_monitor_prefix_valid_lifetime_expiration_time_seconds"
+	msgInvalid          = "corerad_messages_received_invalid_total"
 )
 
 // Metrics contains metrics for a CoreRAD instance.
@@ -62,8 +69,12 @@ type Metrics struct {
 	AdvErrorsTotal                             metricslite.Counter
 
 	// Per-monitor metrics.
-	MonMessagesReceivedTotal      metricslite.Counter
-	MonDefaultRouteExpirationTime metricslite.Gauge
+	MonMessagesReceivedTotal                 metricslite.Counter
+	MonDefaultRouteExpirationTime            metricslite.Gauge
+	MonPrefixAutonomous                      metricslite.Gauge
+	MonPrefixOnLink                          metricslite.Gauge
+	MonPrefixPreferredLifetimeExpirationTime metricslite.Gauge
+	MonPrefixValidLifetimeExpirationTime     metricslite.Gauge
 
 	// Used to fetch interface states.
 	state system.State
@@ -142,6 +153,32 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 			monDefaultRoute,
 			"The UNIX timestamp of when the route provided by a default router will expire.",
 			"interface", "router",
+		),
+
+		MonPrefixAutonomous: m.Gauge(
+			monPrefixAutonomous,
+			"Indicates whether or not the Autonomous Address Autoconfiguration (SLAAC) flag is enabled for a given prefix.",
+			// TODO: verify uniqueness of prefixes per interface.
+			"interface", "prefix", "router",
+		),
+
+		MonPrefixOnLink: m.Gauge(
+			monPrefixOnLink,
+			"Indicates whether or not the On-Link flag is enabled for a given prefix.",
+			// TODO: verify uniqueness of prefixes per interface.
+			"interface", "prefix", "router",
+		),
+
+		MonPrefixPreferredLifetimeExpirationTime: m.Gauge(
+			monPrefixPreferred,
+			"The UNIX timestamp of when a route to a prefix should no longer be preferred.",
+			"interface", "prefix", "router",
+		),
+
+		MonPrefixValidLifetimeExpirationTime: m.Gauge(
+			monPrefixValid,
+			"The UNIX timestamp of when a route to a prefix will expire.",
+			"interface", "prefix", "router",
 		),
 	}
 

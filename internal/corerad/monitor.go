@@ -25,7 +25,6 @@ import (
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/sync/errgroup"
-	"inet.af/netaddr"
 )
 
 // A Monitor listens and reports on NDP traffic.
@@ -113,7 +112,7 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn) error {
 	eg.Go(func() error {
 		l := newListener(m.iface, conn, m.ll, m.mm)
 		return l.Listen(ctx, func(msg message) error {
-			m.handle(msg.Message, msg.Host)
+			m.handle(msg.Message, msg.Host.String())
 
 			// Callback must fire after handle to ensure logs and metrics are
 			// consistent in tests.
@@ -136,26 +135,49 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn) error {
 }
 
 // handle handles an incoming NDP message and reports on it.
-func (m *Monitor) handle(msg ndp.Message, host netaddr.IP) {
+func (m *Monitor) handle(msg ndp.Message, host string) {
 	m.debugf("monitor received %q from %s", msg.Type(), host)
 
-	m.mm.MonMessagesReceivedTotal(m.iface, host.String(), msg.Type().String())
+	m.mm.MonMessagesReceivedTotal(m.iface, host, msg.Type().String())
 
 	// TODO(mdlayher): expand type switch.
 	switch msg := msg.(type) {
 	case *ndp.RouterAdvertisement:
-		if msg.RouterLifetime == 0 {
-			// Not a default router, do nothing.
-			return
+		now := m.now()
+
+		if msg.RouterLifetime != 0 {
+			// This is an advertisement from a default router. Calculate the
+			// UNIX timestamp of when the default route will expire.
+			m.mm.MonDefaultRouteExpirationTime(
+				float64(now.Add(msg.RouterLifetime).Unix()),
+				m.iface, host,
+			)
 		}
 
-		// This is an advertisement from a default router.
+		// Export metrics for each prefix option.
+		for _, p := range pickPrefixes(msg.Options) {
+			str := cidrStr(p.Prefix, p.PrefixLength)
 
-		// Calculate the UNIX timestamp of when the default route will expire.
-		m.mm.MonDefaultRouteExpirationTime(
-			float64(m.now().Add(msg.RouterLifetime).Unix()),
-			m.iface, host.String(),
-		)
+			m.mm.MonPrefixAutonomous(
+				boolFloat(p.AutonomousAddressConfiguration),
+				m.iface, str, host,
+			)
+
+			m.mm.MonPrefixOnLink(
+				boolFloat(p.OnLink),
+				m.iface, str, host,
+			)
+
+			m.mm.MonPrefixPreferredLifetimeExpirationTime(
+				float64(now.Add(p.PreferredLifetime).Unix()),
+				m.iface, str, host,
+			)
+
+			m.mm.MonPrefixValidLifetimeExpirationTime(
+				float64(now.Add(p.ValidLifetime).Unix()),
+				m.iface, str, host,
+			)
+		}
 	}
 }
 

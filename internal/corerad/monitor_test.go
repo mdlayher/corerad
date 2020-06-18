@@ -46,7 +46,16 @@ func TestMonitorMetrics(t *testing.T) {
 		ra = &ndp.RouterAdvertisement{
 			// Pretend to be a default router.
 			RouterLifetime: routerLifetime,
-			Options:        []ndp.Option{sll},
+			Options: []ndp.Option{
+				sll,
+				&ndp.PrefixInformation{
+					Prefix:            net.ParseIP("2001:db8::"),
+					PrefixLength:      32,
+					OnLink:            true,
+					ValidLifetime:     2 * time.Minute,
+					PreferredLifetime: 1 * time.Minute,
+				},
+			},
 		}
 	)
 
@@ -68,34 +77,56 @@ func TestMonitorMetrics(t *testing.T) {
 
 	// Now that we've sent our messages, verify the output of the monitor
 	// messages received time series.
-	gotReceived := findMetric(t, cctx.mm, monReceived)
-
-	wantReceived := metricslite.Series{
-		Name: monReceived,
-		Samples: map[string]float64{
-			"interface=test0,host=::1,message=router advertisement": 2,
-			"interface=test0,host=::1,message=router solicitation":  3,
+	want := []metricslite.Series{
+		{
+			Name: monReceived,
+			Samples: map[string]float64{
+				"interface=test0,host=::1,message=router advertisement": 2,
+				"interface=test0,host=::1,message=router solicitation":  3,
+			},
+		},
+		{
+			Name: monDefaultRoute,
+			Samples: map[string]float64{
+				// Because the fixed time is UNIX 0, we can use router lifetime in
+				// seconds directly as the timestamp for when the default route
+				// would actually expire.
+				"interface=test0,router=::1": routerLifetime.Seconds(),
+			},
+		},
+		{
+			Name: monPrefixAutonomous,
+			Samples: map[string]float64{
+				"interface=test0,prefix=2001:db8::/32,router=::1": 0,
+			},
+		},
+		{
+			Name: monPrefixOnLink,
+			Samples: map[string]float64{
+				"interface=test0,prefix=2001:db8::/32,router=::1": 1,
+			},
+		},
+		{
+			Name: monPrefixPreferred,
+			Samples: map[string]float64{
+				"interface=test0,prefix=2001:db8::/32,router=::1": 60,
+			},
+		},
+		{
+			Name: monPrefixValid,
+			Samples: map[string]float64{
+				"interface=test0,prefix=2001:db8::/32,router=::1": 120,
+			},
 		},
 	}
 
-	if diff := cmp.Diff(wantReceived, gotReceived); diff != "" {
-		t.Fatalf("unexpected monitor received values (-want +got):\n%s", diff)
-	}
-
-	gotDefault := findMetric(t, cctx.mm, monDefaultRoute)
-
-	wantDefault := metricslite.Series{
-		Name: monDefaultRoute,
-		Samples: map[string]float64{
-			// Because the fixed time is UNIX 0, we can use router lifetime in
-			// seconds directly as the timestamp for when the default route
-			// would actually expire.
-			"interface=test0,router=::1": routerLifetime.Seconds(),
-		},
-	}
-
-	if diff := cmp.Diff(wantDefault, gotDefault); diff != "" {
-		t.Fatalf("unexpected monitor default route values (-want +got):\n%s", diff)
+	for _, w := range want {
+		t.Run(w.Name, func(t *testing.T) {
+			got := findMetric(t, cctx.mm, w.Name)
+			if diff := cmp.Diff(w, got); diff != "" {
+				t.Fatalf("unexpected timeseries (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
