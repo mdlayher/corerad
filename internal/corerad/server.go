@@ -30,6 +30,7 @@ import (
 	"github.com/mdlayher/corerad/internal/netstate"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
+	"github.com/mdlayher/sdnotify"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 )
@@ -77,6 +78,9 @@ type Task interface {
 	// Run runs the Task until ctx is canceled or an error occurs. If ctx is
 	// canceled, the Task should consume that error internally and return nil.
 	Run(ctx context.Context) error
+
+	// Ready indicates if a Task has been fully initialized once.
+	Ready() <-chan struct{}
 
 	// String returns information about a Task.
 	fmt.Stringer
@@ -137,7 +141,8 @@ func (s *Server) BuildTasks(cfg config.Config) []Task {
 				d.PProf,
 				s.reg,
 			),
-			ll: s.ll,
+			ll:     s.ll,
+			readyC: make(chan struct{}),
 		})
 	}
 
@@ -153,10 +158,13 @@ func (s *Server) BuildTasks(cfg config.Config) []Task {
 }
 
 // Serve starts the CoreRAD server and runs Tasks until the context is canceled.
-func (s *Server) Serve(ctx context.Context, tasks []Task) error {
+func (s *Server) Serve(ctx context.Context, n *sdnotify.Notifier, tasks []Task) error {
 	// Attach the context to the errgroup so that goroutines are canceled when
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
+
+	var wg sync.WaitGroup
+	wg.Add(len(tasks))
 
 	for _, t := range tasks {
 		// Capture range variable for goroutines.
@@ -168,7 +176,18 @@ func (s *Server) Serve(ctx context.Context, tasks []Task) error {
 
 			return nil
 		})
+
+		go func() {
+			defer wg.Done()
+			<-t.Ready()
+			_ = n.Notify(sdnotify.Statusf("started %s", t))
+		}()
 	}
+
+	go func() {
+		wg.Wait()
+		_ = n.Notify(sdnotify.Statusf("server started, all tasks running"), sdnotify.Ready)
+	}()
 
 	// Wait for all goroutines to be canceled and stopped successfully.
 	if err := eg.Wait(); err != nil {
@@ -180,9 +199,10 @@ func (s *Server) Serve(ctx context.Context, tasks []Task) error {
 
 // An httpTask is a Task which serves a debug HTTP server.
 type httpTask struct {
-	addr string
-	h    http.Handler
-	ll   *log.Logger
+	addr   string
+	h      http.Handler
+	ll     *log.Logger
+	readyC chan struct{}
 }
 
 // Run implements Task.
@@ -213,9 +233,13 @@ func (t *httpTask) Run(ctx context.Context) error {
 			_ = s.Close()
 		}()
 
+		close(t.readyC)
 		return s.Serve(l)
 	})
 }
+
+// Ready implements Task.
+func (t *httpTask) Ready() <-chan struct{} { return t.readyC }
 
 // String implements Task.
 func (t *httpTask) String() string {
@@ -280,10 +304,17 @@ func (t *watcherTask) Run(ctx context.Context) error {
 		}
 
 		return fmt.Errorf("failed to watch for interface state changes: %v", err)
-
 	}
 
 	return nil
+}
+
+// Ready implements Task.
+func (*watcherTask) Ready() <-chan struct{} {
+	// No readiness notification, so immediately close the channel.
+	c := make(chan struct{})
+	close(c)
+	return c
 }
 
 // String implements Task.

@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -28,6 +29,7 @@ import (
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/corerad"
+	"github.com/mdlayher/sdnotify"
 )
 
 const cfgFile = "corerad.toml"
@@ -64,7 +66,15 @@ func main() {
 		return
 	}
 
-	ll.Printf("%s starting with configuration file %q", build.Banner(), *cfgFlag)
+	// Enable systemd notifications if running under systemd Type=notify.
+	n, err := sdnotify.New()
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		ll.Fatalf("failed to open systemd notifier: %v", err)
+	}
+
+	msg := fmt.Sprintf("%s starting with configuration file %q", build.Banner(), *cfgFlag)
+	ll.Print(msg)
+	_ = n.Notify(sdnotify.Statusf(msg))
 
 	f, err := os.Open(*cfgFlag)
 	if err != nil {
@@ -94,7 +104,9 @@ func main() {
 		signal.Notify(sigC, signals()...)
 
 		s := <-sigC
-		ll.Printf("received %s, shutting down", s)
+		msg := fmt.Sprintf("received %s, shutting down", s)
+		ll.Print(msg)
+		_ = n.Notify(sdnotify.Statusf(msg), sdnotify.Stopping)
 		cancel()
 
 		// Stop handling signals at this point to allow the user to forcefully
@@ -104,7 +116,7 @@ func main() {
 
 	// Start the server's goroutines and run until context cancelation.
 	s := corerad.NewServer(ll)
-	if err := s.Serve(ctx, s.BuildTasks(*cfg)); err != nil {
+	if err := s.Serve(ctx, n, s.BuildTasks(*cfg)); err != nil {
 		ll.Fatalf("failed to run: %v", err)
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/netstate"
@@ -42,6 +43,10 @@ type Monitor struct {
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
 	watchC <-chan netstate.Change
+
+	// Readiness notification.
+	readyOnce sync.Once
+	readyC    chan struct{}
 
 	// now allows overriding the current time.
 	now func() time.Time
@@ -70,6 +75,8 @@ func NewMonitor(
 		ll:      ll,
 		mm:      mm,
 		dialer:  dialer,
+		watchC:  watchC,
+		readyC:  make(chan struct{}),
 
 		// By default use real time.
 		now: time.Now,
@@ -81,6 +88,8 @@ func NewMonitor(
 // occurs.
 func (m *Monitor) Run(ctx context.Context) error {
 	return m.dialer.Dial(ctx, func(ctx context.Context, dctx *system.DialContext) error {
+		// Note readiness on first successful init.
+		m.readyOnce.Do(func() { close(m.readyC) })
 		m.logf("initialized, monitoring from %s", dctx.IP)
 
 		// Monitor until an error occurs, reinitializing under certain
@@ -97,6 +106,9 @@ func (m *Monitor) Run(ctx context.Context) error {
 		}
 	})
 }
+
+// Ready implements Task.
+func (m *Monitor) Ready() <-chan struct{} { return m.readyC }
 
 // String implements Task.
 func (m *Monitor) String() string { return fmt.Sprintf("monitor %q", m.iface) }

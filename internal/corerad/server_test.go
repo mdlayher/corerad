@@ -115,6 +115,7 @@ func TestServerServeBasicTasks(t *testing.T) {
 				h: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					_, _ = io.WriteString(w, text)
 				}),
+				readyC: make(chan struct{}),
 			},
 			check: func(t *testing.T) {
 				res := httpGet(t, addr)
@@ -180,7 +181,7 @@ func TestServerServeBasicTasks(t *testing.T) {
 				defer wg.Done()
 				close(sigC)
 
-				if err := NewServer(ll).Serve(ctx, []Task{tt.task}); err != nil {
+				if err := NewServer(ll).Serve(ctx, nil, []Task{tt.task}); err != nil {
 					panicf("failed to serve: %v", err)
 				}
 			}()

@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
@@ -50,6 +51,10 @@ type Advertiser struct {
 	state  system.State
 	watchC <-chan netstate.Change
 
+	// Readiness notification.
+	readyOnce sync.Once
+	readyC    chan struct{}
+
 	// Parameters which have defaults but may be explicitly overridden to speed
 	// up tests.
 	minDelayBetweenRAs time.Duration
@@ -79,6 +84,7 @@ func NewAdvertiser(
 		dialer: dialer,
 		state:  state,
 		watchC: watchC,
+		readyC: make(chan struct{}),
 
 		// RFC defaults which can be overridden.
 		minDelayBetweenRAs: minDelayBetweenRAs,
@@ -115,6 +121,8 @@ func (a *Advertiser) Run(ctx context.Context) error {
 			method = "unicast-only "
 		}
 
+		// Note readiness on first successful init.
+		a.readyOnce.Do(func() { close(a.readyC) })
 		a.logf("initialized, advertising %sfrom %s", method, dctx.IP)
 
 		// Advertise until an error occurs, reinitializing under certain
@@ -131,6 +139,9 @@ func (a *Advertiser) Run(ctx context.Context) error {
 		}
 	})
 }
+
+// Ready implements Task.
+func (a *Advertiser) Ready() <-chan struct{} { return a.readyC }
 
 // String implements Task.
 func (a *Advertiser) String() string { return fmt.Sprintf("advertiser %q", a.cfg.Name) }
