@@ -60,7 +60,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1592324448816,
+  "iteration": 1593201142874,
   "links": [],
   "panels": [
     {
@@ -230,7 +230,7 @@
       ],
       "targets": [
         {
-          "expr": "corerad_build_time{instance=\"$instance\"} * 1000",
+          "expr": "corerad_build_timestamp_seconds{instance=\"$instance\"} * 1000",
           "format": "time_series",
           "hide": false,
           "instant": true,
@@ -245,18 +245,11 @@
           "interval": "",
           "legendFormat": "Start Time",
           "refId": "B"
-        },
-        {
-          "expr": "corerad_build_time_seconds{instance=\"$instance\"} * 1000",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "Build Time",
-          "refId": "C"
         }
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "CoreRAD date information",
+      "title": "Dates and times",
       "transform": "timeseries_to_rows",
       "type": "table"
     },
@@ -524,7 +517,7 @@
       "fillGradient": 0,
       "gridPos": {
         "h": 9,
-        "w": 12,
+        "w": 6,
         "x": 0,
         "y": 12
       },
@@ -559,13 +552,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "corerad_monitor_default_route_expiration_time{instance=\"$instance\"} - time()",
-          "interval": "",
-          "legendFormat": "{{interface}} : {{router}}",
-          "refId": "A"
-        },
-        {
-          "expr": "corerad_monitor_default_route_expiration_time_seconds{instance=\"$instance\"} - time()",
+          "expr": "corerad_monitor_default_route_expiration_timestamp_seconds{instance=\"$instance\"} - time()",
           "interval": "",
           "legendFormat": "{{interface}} : {{router}}",
           "refId": "B"
@@ -586,6 +573,118 @@
       "timeRegions": [],
       "timeShift": null,
       "title": "Default route lifetime",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:4659",
+          "decimals": 2,
+          "format": "s",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:4660",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "cacheTimeout": null,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 6,
+        "y": 12
+      },
+      "hiddenSeries": false,
+      "id": 30,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": true,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pluginVersion": "6.7.1",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "corerad_monitor_prefix_preferred_expiration_timestamp_seconds{instance=\"$instance\"} - time()",
+          "interval": "",
+          "legendFormat": "{{interface}}: {{prefix}} preferred via {{router}}",
+          "refId": "A"
+        },
+        {
+          "expr": "corerad_monitor_prefix_valid_expiration_timestamp_seconds{instance=\"$instance\"} - time()",
+          "interval": "",
+          "legendFormat": "{{interface}}: {{prefix}} valid via {{router}}",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [
+        {
+          "$$hashKey": "object:7513",
+          "colorMode": "critical",
+          "fill": true,
+          "line": true,
+          "op": "lt",
+          "value": 172800,
+          "yaxis": "left"
+        }
+      ],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Upstream prefix route lifetimes",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -873,7 +972,7 @@
       ],
       "targets": [
         {
-          "expr": "(corerad_advertiser_router_advertisement_prefix_preferred_lifetime_seconds{instance=\"$instance\"} + on(instance, interface) group_left corerad_advertiser_last_multicast_time_seconds) - time()",
+          "expr": "(corerad_advertiser_prefix_preferred_seconds{instance=\"$instance\"} + on(instance, interface) group_left corerad_advertiser_last_multicast_time_seconds) - time()",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -882,7 +981,7 @@
           "refId": "A"
         },
         {
-          "expr": "(corerad_advertiser_router_advertisement_prefix_valid_lifetime_seconds{instance=\"$instance\"} + on(instance, interface) group_left corerad_advertiser_last_multicast_time_seconds) - time()",
+          "expr": "(corerad_advertiser_prefix_valid_seconds{instance=\"$instance\"} + on(instance, interface) group_left corerad_advertiser_last_multicast_time_seconds) - time()",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -891,7 +990,7 @@
           "refId": "B"
         },
         {
-          "expr": "corerad_advertiser_router_advertisement_prefix_autonomous{instance=\"$instance\"} + 0",
+          "expr": "corerad_advertiser_prefix_autonomous{instance=\"$instance\"} + 0",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -1038,7 +1137,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(corerad_advertiser_router_advertisement_inconsistencies_total{instance=\"$instance\"}[5m])",
+          "expr": "irate(corerad_advertiser_inconsistencies_total{instance=\"$instance\"}[5m])",
           "interval": "",
           "legendFormat": "{{interface}}: {{field}}",
           "refId": "A"
@@ -1308,7 +1407,7 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {
@@ -1327,9 +1426,9 @@
   },
   "timezone": "",
   "title": "CoreRAD",
-  "uid": "f8jqyBYWz",
+  "uid": "dsTtOuZMz",
   "variables": {
     "list": []
   },
-  "version": 49
+  "version": 3
 }
