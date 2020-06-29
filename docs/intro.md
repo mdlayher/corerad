@@ -16,7 +16,7 @@ This configuration file can be written to `corerad.toml` locally by running:
 ```text
 $ corerad -init
 $ head -n 1 corerad.toml
-# CoreRAD v0.2.1 (BETA) configuration file
+# CoreRAD v0.2.x (BETA) configuration file
 ```
 
 Although numerous configuration parameters are available, many of them are
@@ -45,7 +45,7 @@ Here is an example of a minimal configuration which:
 - serves CoreRAD's Prometheus metrics
 
 ```toml
-# CoreRAD v0.2.1 (BETA) configuration file
+# CoreRAD v0.2.x (BETA) configuration file
 
 [[interfaces]]
 name = "eth0"
@@ -108,7 +108,8 @@ $ corerad -c /etc/corerad/corerad.toml
 ```
 
 It is recommended to run CoreRAD on system startup. Here is an example systemd
-unit file for CoreRAD:
+unit file for CoreRAD, which also takes advantage of `Type=notify` so systemd
+can be notified when CoreRAD is starting up, fully started, or stopping.
 
 ```ini
 [Unit]
@@ -120,7 +121,12 @@ AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
 DynamicUser=true
 ExecStart=/usr/local/bin/corerad -c=/etc/corerad/corerad.toml
+LimitNOFILE=1048576
+LimitNPROC=512
+NoNewPrivileges=true
+NotifyAccess=main
 Restart=on-failure
+Type=notify
 ```
 
 If any errors occur during operation, they will be noted in both CoreRAD's logs
