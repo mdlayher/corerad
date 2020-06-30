@@ -11,7 +11,7 @@ menu:
 Protocol](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol) router
 advertisement daemon, released under the Apache 2.0 License.
 
-[![CoreRAD Grafana + Prometheus dashboard](/corerad-grafana.png)](/corerad-grafana.png)
+[![CoreRAD Grafana + Prometheus dashboard](/img/grafana.png)](/img/grafana.png)
 
 ## Features
 
