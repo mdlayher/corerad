@@ -22,4 +22,4 @@ To learn more about CoreRAD, check out [my introductory blog post](https://mdlay
 
 A sample Grafana + Prometheus dashboard for CoreRAD can be found at [`corerad-grafana.json`](https://github.com/mdlayher/corerad/blob/master/corerad-grafana.json).
 
-![CoreRAD Grafana + Prometheus dashboard](https://raw.githubusercontent.com/mdlayher/corerad/master/corerad-grafana.png)
+![CoreRAD Grafana + Prometheus dashboard](https://raw.githubusercontent.com/mdlayher/corerad/master/website/static/grafana.png)
