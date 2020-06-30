@@ -1,0 +1,11 @@
+[build]
+publish = "public"
+command = "hugo --minify"
+
+[build.environment]
+HUGO_VERSION = "0.73.0"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
