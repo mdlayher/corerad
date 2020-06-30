@@ -131,6 +131,9 @@ func (s *Server) BuildTasks(cfg config.Config) []Task {
 
 	// Optionally configure the debug HTTP server task.
 	if d := cfg.Debug; d.Address != "" {
+		s.ll.Printf("starting HTTP debug listener on %q: prometheus: %t, pprof: %t",
+			d.Address, d.Prometheus, d.PProf)
+
 		tasks = append(tasks, &httpTask{
 			addr: d.Address,
 			h: crhttp.NewHandler(
