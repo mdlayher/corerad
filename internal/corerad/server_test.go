@@ -81,7 +81,7 @@ func TestServerBuildTasks(t *testing.T) {
 			srv := NewServer(log.New(os.Stderr, "", 0))
 
 			var ss []string
-			for _, task := range srv.BuildTasks(tt.cfg, nil) {
+			for _, task := range srv.BuildTasks(tt.cfg) {
 				ss = append(ss, task.String())
 			}
 
@@ -163,30 +163,28 @@ func TestServerServeBasicTasks(t *testing.T) {
 			})
 			defer timer.Stop()
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			// Run the Server until a signal is sent and verify it actually halts.
+			sigC := make(chan os.Signal, 1)
 
-			// Run the Server until the context is canceled and verify it
-			// actually halts.
 			var wg sync.WaitGroup
 			wg.Add(1)
 			defer func() {
-				cancel()
+				sigC <- os.Interrupt
 				wg.Wait()
 			}()
 
-			sigC := make(chan struct{})
+			readyC := make(chan struct{})
 
 			go func() {
 				defer wg.Done()
-				close(sigC)
+				close(readyC)
 
-				if err := NewServer(ll).Serve(ctx, nil, []Task{tt.task}); err != nil {
+				if err := NewServer(ll).Serve(sigC, nil, []Task{tt.task}); err != nil {
 					panicf("failed to serve: %v", err)
 				}
 			}()
 
-			<-sigC
+			<-readyC
 			if tt.check != nil {
 				tt.check(t)
 			}

@@ -1,4 +1,4 @@
-// Copyright 2019 Matt Layher
+// Copyright 2020 Matt Layher
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -13,12 +13,12 @@
 
 //+build windows
 
-package main
+package corerad
 
 import "os"
 
-// signals returns a list of signals which can interrupt this program.
-func signals() []os.Signal {
+// Signals returns a list of signals which can interrupt this program.
+func Signals() []os.Signal {
 	return []os.Signal{os.Interrupt}
 }
 

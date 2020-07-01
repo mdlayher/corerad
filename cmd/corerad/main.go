@@ -16,7 +16,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -24,7 +23,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
@@ -87,68 +85,12 @@ func main() {
 	}
 	_ = f.Close()
 
-	// TODO: move as much of this logic as possible into the corerad package.
+	// Wait for signals (configurable per-platform) to shut down the server.
+	sigC := make(chan os.Signal, 1)
+	signal.Notify(sigC, corerad.Signals()...)
 
-	// Use a context to handle cancelation on signal.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Keep track of which signal is used to terminate the process in order to
-	// trigger some alternate logic on shutdown.
-	var t terminator
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	defer wg.Wait()
-
-	go func() {
-		defer wg.Done()
-
-		// Wait for signals (configurable per-platform) and then cancel the
-		// context to indicate that the process should shut down.
-		sigC := make(chan os.Signal, 1)
-		signal.Notify(sigC, signals()...)
-
-		s := <-sigC
-		t.set(s)
-
-		msg := fmt.Sprintf("received %s, shutting down", s)
-		ll.Print(msg)
-		_ = n.Notify(sdnotify.Statusf(msg), sdnotify.Stopping)
-		cancel()
-
-		// Stop handling signals at this point to allow the user to forcefully
-		// terminate the binary.
-		signal.Stop(sigC)
-	}()
-
-	// Start the server's goroutines and run until context cancelation.
 	s := corerad.NewServer(ll)
-	if err := s.Serve(ctx, n, s.BuildTasks(*cfg, t.terminate)); err != nil {
+	if err := s.Serve(sigC, n, s.BuildTasks(*cfg)); err != nil {
 		ll.Fatalf("failed to run: %v", err)
 	}
-}
-
-// A terminator uses a termination signal to determine whether the server is
-// halting completely or is being reloaded by a process supervisor.
-type terminator struct {
-	mu   sync.Mutex
-	term bool
-}
-
-// set uses the input signal to determine termination state.
-func (t *terminator) set(s os.Signal) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.term = isTerminal(s)
-}
-
-// terminate tells server components whether or not they should completely
-// terminate.
-func (t *terminator) terminate() bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	return t.term
 }

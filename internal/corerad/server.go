@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 // CoreRAD server.
 type Server struct {
 	state system.State
+	t     *terminator
 	w     *netstate.Watcher
 
 	ll  *log.Logger
@@ -65,6 +67,7 @@ func NewServer(ll *log.Logger) *Server {
 
 	return &Server{
 		state: state,
+		t:     &terminator{},
 		w:     netstate.NewWatcher(),
 
 		ll:  ll,
@@ -90,7 +93,7 @@ type Task interface {
 // and termination check function. terminate reports whether the process should
 // expect to be terminated and stopped or immediately reloaded by a supervision
 // daemon.
-func (s *Server) BuildTasks(cfg config.Config, terminate func() bool) []Task {
+func (s *Server) BuildTasks(cfg config.Config) []Task {
 	mm := NewMetrics(metricslite.NewPrometheus(s.reg), s.state, cfg.Interfaces)
 
 	// Serve on each specified interface.
@@ -118,7 +121,7 @@ func (s *Server) BuildTasks(cfg config.Config, terminate func() bool) []Task {
 
 			tasks = append(
 				tasks,
-				NewAdvertiser(ifi, dialer, s.state, watchC, terminate, s.ll, mm),
+				NewAdvertiser(ifi, dialer, s.state, watchC, s.t.terminate, s.ll, mm),
 			)
 		case ifi.Monitor:
 			dialer := system.NewDialer(ifi.Name, s.state, system.Monitor, s.ll)
@@ -163,11 +166,26 @@ func (s *Server) BuildTasks(cfg config.Config, terminate func() bool) []Task {
 	return tasks
 }
 
-// Serve starts the CoreRAD server and runs Tasks until the context is canceled.
-func (s *Server) Serve(ctx context.Context, n *sdnotify.Notifier, tasks []Task) error {
-	// Attach the context to the errgroup so that goroutines are canceled when
-	// one of them returns an error.
-	eg, ctx := errgroup.WithContext(ctx)
+// Serve starts the CoreRAD server and runs Tasks until a signal is received,
+// indicating a shutdown.
+func (s *Server) Serve(sigC chan os.Signal, n *sdnotify.Notifier, tasks []Task) error {
+	// Attach a context to the errgroup so that goroutines are canceled when one
+	// of them returns an error.
+	//
+	// The inner context provides cancelation support for the signal watcher,
+	// which is also implemented as an additional Task to control the lifetime
+	// of the Serve function as a whole.
+	eg, ctx := errgroup.WithContext(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	tasks = append(tasks, &signalTask{
+		sigC:   sigC,
+		cancel: cancel,
+		ll:     s.ll,
+		n:      n,
+		t:      s.t,
+	})
 
 	var wg sync.WaitGroup
 	wg.Add(len(tasks))
@@ -350,4 +368,74 @@ func linkStateWatcher(ctx context.Context, watchC <-chan netstate.Change) func()
 			return system.ErrLinkChange
 		}
 	}
+}
+
+// A watcherTask is a Task which controls Server cancelation when a signal is
+// received.
+type signalTask struct {
+	sigC   chan os.Signal
+	cancel func()
+	ll     *log.Logger
+	n      *sdnotify.Notifier
+	t      *terminator
+}
+
+// Run implements Task.
+func (t *signalTask) Run(ctx context.Context) error {
+	var sig os.Signal
+	select {
+	case <-ctx.Done():
+		// Another goroutine returned an error.
+		return nil
+	case sig = <-t.sigC:
+		// We received a shutdown signal.
+	}
+
+	t.t.set(sig)
+	msg := fmt.Sprintf("received %s, shutting down", sig)
+	t.ll.Print(msg)
+	_ = t.n.Notify(sdnotify.Statusf(msg), sdnotify.Stopping)
+	t.cancel()
+
+	// Stop handling signals at this point to allow the user to forcefully
+	// terminate the binary. It seems there is no harm in calling this function
+	// with a channel that was never used with signal.Notify, so this is also
+	// fine in test code.
+	signal.Stop(t.sigC)
+	return nil
+}
+
+// Ready implements Task.
+func (*signalTask) Ready() <-chan struct{} {
+	// No readiness notification, so immediately close the channel.
+	c := make(chan struct{})
+	close(c)
+	return c
+}
+
+// String implements Task.
+func (*signalTask) String() string { return "signal watcher" }
+
+// A terminator uses a termination signal to determine whether the server is
+// halting completely or is being reloaded by a process supervisor.
+type terminator struct {
+	mu   sync.Mutex
+	term bool
+}
+
+// set uses the input signal to determine termination state.
+func (t *terminator) set(s os.Signal) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.term = isTerminal(s)
+}
+
+// terminate tells server components whether or not they should completely
+// terminate.
+func (t *terminator) terminate() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	return t.term
 }
