@@ -1,10 +1,5 @@
 ---
 layout: default
-title: Home
-menu:
-  main:
-    title: "Home"
-    weight: 1
 ---
 
 **CoreRAD** is an extensible and observable [IPv6 Neighbor Discovery

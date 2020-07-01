@@ -3,6 +3,10 @@ img {
     width: 100%;
 }
 
+header {
+    font-size: 20pt !important;
+}
+
 footer {
     text-align: center;
 }
