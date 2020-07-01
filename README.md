@@ -5,6 +5,8 @@ advertisement daemon.
 
 Apache 2.0 Licensed.
 
+To get started with CoreRAD, [check out corerad.net](https://corerad.net/)!
+
 ## Overview
 
 CoreRAD is currently a **beta** project, and will remain as such for the
