@@ -56,6 +56,9 @@ type testConfig struct {
 
 	// An optional hook for Advertiser.OnInconsistentRA.
 	onInconsistentRA func(ours, theirs *ndp.RouterAdvertisement)
+
+	// An optional hook for Advertiser.terminate.
+	terminate func() bool
 }
 
 type clientContext struct {
@@ -192,32 +195,56 @@ func TestAdvertiserUnsolicitedShutdown(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		fn   testAdvertiserFunc
+		name      string
+		fn        testAdvertiserFunc
+		terminate bool
 	}{
 		{
-			name: "simulated",
+			name: "simulated restart",
 			fn:   testSimulatedAdvertiserClient,
 		},
 		{
-			name: "real",
+			name:      "simulated stop",
+			fn:        testSimulatedAdvertiserClient,
+			terminate: true,
+		},
+		{
+			name: "real restart",
 			fn:   testAdvertiserClient,
+		},
+		{
+			name:      "real stop",
+			fn:        testAdvertiserClient,
+			terminate: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// The advertiser will act as a default router until it shuts down.
+			// The advertiser will act as a default router until it shuts down,
+			// assuming a forceful termination.
 			const lifetime = 3 * time.Second
 			cfg := &config.Interface{
 				DefaultLifetime: lifetime,
 			}
 
-			done := tt.fn(t, cfg, nil, func(cancel func(), cctx *clientContext) {
-				// Read the RA the advertiser sends on startup, then stop it and capture the
-				// one it sends on shutdown.
+			// Indicate whether or not the server is terminating to vary the
+			// number of router advertisements sent, since terminate == true
+			// will result in a second advertisement on cancelation.
+			tcfg := &testConfig{
+				terminate: func() bool { return tt.terminate },
+			}
+
+			n := 1
+			if tt.terminate {
+				n = 2
+			}
+
+			done := tt.fn(t, cfg, tcfg, func(cancel func(), cctx *clientContext) {
+				// Read the RA the advertiser sends on startup, then stop it and
+				// capture the one it sends on shutdown.
 				var got []*ndp.RouterAdvertisement
-				for i := 0; i < 2; i++ {
+				for i := 0; i < n; i++ {
 					m, _, _, err := cctx.c.ReadFrom()
 					if err != nil {
 						t.Fatalf("failed to read RA: %v", err)
@@ -227,11 +254,14 @@ func TestAdvertiserUnsolicitedShutdown(t *testing.T) {
 					cancel()
 				}
 
-				// Expect only the first message to contain a RouterLifetime field as it
-				// should be cleared on shutdown.
+				// Expect only the first message to contain a RouterLifetime
+				// field as it should be cleared on shutdown.
 				want := []*ndp.RouterAdvertisement{
 					{RouterLifetime: lifetime},
-					{RouterLifetime: 0},
+				}
+
+				if tt.terminate {
+					want = append(want, &ndp.RouterAdvertisement{RouterLifetime: 0})
 				}
 
 				if diff := cmp.Diff(want, got); diff != "" {
@@ -369,6 +399,7 @@ func TestAdvertiserVerifyRAs(t *testing.T) {
 			raC := make(chan *ndp.RouterAdvertisement)
 			tcfg := &testConfig{
 				onInconsistentRA: func(_, theirs *ndp.RouterAdvertisement) {
+					log.Printf("inconsistent: %v", theirs)
 					raC <- theirs
 				},
 			}
@@ -589,6 +620,14 @@ func testSimulatedAdvertiserClient(
 		cfg = &config.Interface{}
 	}
 
+	if tcfg == nil {
+		tcfg = &testConfig{}
+	}
+	if tcfg.terminate == nil {
+		// Assume a complete termination.
+		tcfg.terminate = func() bool { return true }
+	}
+
 	// Fixed interval for multicast advertisements.
 	cfg.MinInterval = 1 * time.Second
 	cfg.MaxInterval = 1 * time.Second
@@ -619,6 +658,7 @@ func testSimulatedAdvertiserClient(
 		},
 		ts,
 		nil,
+		tcfg.terminate,
 		log.New(os.Stderr, "", 0),
 		mm,
 	)
@@ -626,7 +666,7 @@ func testSimulatedAdvertiserClient(
 	// Override RFC parameters to speed up tests.
 	ad.minDelayBetweenRAs = testMinDelayBetweenRAs
 
-	if tcfg != nil && tcfg.onInconsistentRA != nil {
+	if tcfg.onInconsistentRA != nil {
 		ad.OnInconsistentRA = tcfg.onInconsistentRA
 	}
 
@@ -753,6 +793,10 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	if tcfg == nil {
 		tcfg = &testConfig{}
 	}
+	if tcfg.terminate == nil {
+		// Assume a complete termination.
+		tcfg.terminate = func() bool { return true }
+	}
 
 	var (
 		r     = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -809,6 +853,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		system.NewDialer(router.Name, state, system.Advertise, ll),
 		state,
 		nil,
+		tcfg.terminate,
 		ll,
 		mm,
 	)

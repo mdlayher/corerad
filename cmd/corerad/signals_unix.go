@@ -22,5 +22,12 @@ import (
 
 // signals returns a list of signals which can interrupt this program.
 func signals() []os.Signal {
-	return []os.Signal{os.Interrupt, syscall.SIGTERM}
+	return []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP}
+}
+
+// isTerminal determines if a signal intends to completely stop the program
+// rather than restarting it.
+func isTerminal(s os.Signal) bool {
+	// SIGHUP indicates a restart.
+	return s != syscall.SIGHUP
 }

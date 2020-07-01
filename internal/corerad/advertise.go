@@ -55,6 +55,12 @@ type Advertiser struct {
 	readyOnce sync.Once
 	readyC    chan struct{}
 
+	// terminate reports whether or not the Advertiser should fully terminate on
+	// shutdown by sending a final router advertisement with a default lifetime
+	// of zero, indicating to clients that they should not use this router for
+	// their default route.
+	terminate func() bool
+
 	// Parameters which have defaults but may be explicitly overridden to speed
 	// up tests.
 	minDelayBetweenRAs time.Duration
@@ -67,6 +73,7 @@ func NewAdvertiser(
 	dialer *system.Dialer,
 	state system.State,
 	watchC <-chan netstate.Change,
+	terminate func() bool,
 	ll *log.Logger,
 	mm *Metrics,
 ) *Advertiser {
@@ -78,13 +85,14 @@ func NewAdvertiser(
 	}
 
 	return &Advertiser{
-		cfg:    cfg,
-		ll:     ll,
-		mm:     mm,
-		dialer: dialer,
-		state:  state,
-		watchC: watchC,
-		readyC: make(chan struct{}),
+		cfg:       cfg,
+		ll:        ll,
+		mm:        mm,
+		dialer:    dialer,
+		state:     state,
+		watchC:    watchC,
+		readyC:    make(chan struct{}),
+		terminate: terminate,
 
 		// RFC defaults which can be overridden.
 		minDelayBetweenRAs: minDelayBetweenRAs,
@@ -131,7 +139,8 @@ func (a *Advertiser) Run(ctx context.Context) error {
 		switch {
 		case errors.Is(err, context.Canceled):
 			// Intentional shutdown.
-			return a.shutdown(dctx.Conn)
+			a.shutdown(dctx.Conn)
+			return nil
 		case err == nil:
 			panic("corerad: advertise must never return nil error")
 		default:
@@ -426,24 +435,26 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 }
 
 // shutdown indicates to hosts that this host is no longer a router.
-func (a *Advertiser) shutdown(conn system.Conn) error {
-	// In general, many of these actions are best-effort and should not halt
-	// shutdown on failure.
+func (a *Advertiser) shutdown(conn system.Conn) {
+	if !a.terminate() {
+		// A supervisor daemon has indicated that the process will be restarted
+		// after shutdown, so we should not force all clients to drop their
+		// default route to this router.
+		return
+	}
 
-	// Send a final router advertisement (TODO: more than one) with a router
-	// lifetime of 0 to indicate that hosts should not use this router as a
-	// default router.
+	// It's expected that the process will terminate and not be restarted. Send
+	// a final router advertisement with a router lifetime of 0 to indicate that
+	// hosts should not use this router as a default router.
 	//
-	// a.cfg is copied in case any delayed send workers are outstanding and
-	// the server's context is canceled.
+	// a.cfg is copied in case any delayed send workers are outstanding and the
+	// server's context is canceled.
 	cfg := a.cfg
 	cfg.DefaultLifetime = 0
 
 	if err := a.send(conn, netaddr.IPv6LinkLocalAllNodes(), cfg); err != nil {
 		a.logf("failed to send final multicast router advertisement: %v", err)
 	}
-
-	return nil
 }
 
 // logf prints a formatted log with the Advertiser's interface name.

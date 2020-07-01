@@ -87,9 +87,15 @@ func main() {
 	}
 	_ = f.Close()
 
+	// TODO: move as much of this logic as possible into the corerad package.
+
 	// Use a context to handle cancelation on signal.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Keep track of which signal is used to terminate the process in order to
+	// trigger some alternate logic on shutdown.
+	var t terminator
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -104,6 +110,8 @@ func main() {
 		signal.Notify(sigC, signals()...)
 
 		s := <-sigC
+		t.set(s)
+
 		msg := fmt.Sprintf("received %s, shutting down", s)
 		ll.Print(msg)
 		_ = n.Notify(sdnotify.Statusf(msg), sdnotify.Stopping)
@@ -116,7 +124,31 @@ func main() {
 
 	// Start the server's goroutines and run until context cancelation.
 	s := corerad.NewServer(ll)
-	if err := s.Serve(ctx, n, s.BuildTasks(*cfg)); err != nil {
+	if err := s.Serve(ctx, n, s.BuildTasks(*cfg, t.terminate)); err != nil {
 		ll.Fatalf("failed to run: %v", err)
 	}
+}
+
+// A terminator uses a termination signal to determine whether the server is
+// halting completely or is being reloaded by a process supervisor.
+type terminator struct {
+	mu   sync.Mutex
+	term bool
+}
+
+// set uses the input signal to determine termination state.
+func (t *terminator) set(s os.Signal) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.term = isTerminal(s)
+}
+
+// terminate tells server components whether or not they should completely
+// terminate.
+func (t *terminator) terminate() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	return t.term
 }

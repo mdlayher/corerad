@@ -81,7 +81,7 @@ func TestServerBuildTasks(t *testing.T) {
 			srv := NewServer(log.New(os.Stderr, "", 0))
 
 			var ss []string
-			for _, task := range srv.BuildTasks(tt.cfg) {
+			for _, task := range srv.BuildTasks(tt.cfg, nil) {
 				ss = append(ss, task.String())
 			}
 

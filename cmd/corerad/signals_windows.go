@@ -21,3 +21,10 @@ import "os"
 func signals() []os.Signal {
 	return []os.Signal{os.Interrupt}
 }
+
+// isTerminal determines if a signal intends to completely stop the program
+// rather than restarting it.
+func isTerminal(s os.Signal) bool {
+	// TODO: determine if there's a SIGHUP equivalent on Windows.
+	return true
+}

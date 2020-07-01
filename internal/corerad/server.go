@@ -86,8 +86,11 @@ type Task interface {
 	fmt.Stringer
 }
 
-// BuildTasks produces Tasks for the Server to run from the input configuration.
-func (s *Server) BuildTasks(cfg config.Config) []Task {
+// BuildTasks produces Tasks for the Server to run from the input configuration
+// and termination check function. terminate reports whether the process should
+// expect to be terminated and stopped or immediately reloaded by a supervision
+// daemon.
+func (s *Server) BuildTasks(cfg config.Config, terminate func() bool) []Task {
 	mm := NewMetrics(metricslite.NewPrometheus(s.reg), s.state, cfg.Interfaces)
 
 	// Serve on each specified interface.
@@ -115,7 +118,7 @@ func (s *Server) BuildTasks(cfg config.Config) []Task {
 
 			tasks = append(
 				tasks,
-				NewAdvertiser(ifi, dialer, s.state, watchC, s.ll, mm),
+				NewAdvertiser(ifi, dialer, s.state, watchC, terminate, s.ll, mm),
 			)
 		case ifi.Monitor:
 			dialer := system.NewDialer(ifi.Name, s.state, system.Monitor, s.ll)
