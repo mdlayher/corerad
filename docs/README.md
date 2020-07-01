@@ -1,3 +1,0 @@
-# docs
-
-Documentation for CoreRAD.
