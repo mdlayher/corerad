@@ -58,6 +58,14 @@ func TestParse(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad interface",
+			s: `
+			[[interfaces]]
+			name = "eth0"
+			default_lifetime = "yes"
+			`,
+		},
+		{
 			name: "bad debug address",
 			s: `
 			[[interfaces]]

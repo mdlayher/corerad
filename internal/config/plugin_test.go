@@ -514,6 +514,14 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad servers address",
+			s: `
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["foo"]
+			`,
+		},
+		{
 			name: "bad servers IPv4",
 			s: `
 			[[interfaces]]
