@@ -145,6 +145,11 @@ func TestParse(t *testing.T) {
 			monitor = true
 			verbose = true
 
+			[[interfaces]]
+			name = "eth4"
+			advertise = true
+			default_lifetime = ""
+
 			[debug]
 			address = "localhost:9430"
 			prometheus = true
@@ -223,6 +228,14 @@ func TestParse(t *testing.T) {
 						Name:    "eth3",
 						Monitor: true,
 						Verbose: true,
+					},
+					{
+						Name:        "eth4",
+						Advertise:   true,
+						MinInterval: 3*time.Minute + 18*time.Second,
+						MaxInterval: 10 * time.Minute,
+						HopLimit:    64,
+						Plugins:     []plugin.Plugin{&plugin.LLA{}},
 					},
 				},
 				Debug: config.Debug{
