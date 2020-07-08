@@ -861,7 +861,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	// Override RFC parameters to speed up tests.
 	ad.minDelayBetweenRAs = testMinDelayBetweenRAs
 
-	if tcfg != nil && tcfg.onInconsistentRA != nil {
+	if tcfg.onInconsistentRA != nil {
 		ad.OnInconsistentRA = tcfg.onInconsistentRA
 	}
 
