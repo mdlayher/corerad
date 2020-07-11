@@ -11,5 +11,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package netstate provides notification of network interface state changes.
+// Package netstate2 provides notification of network interface state changes.
 package netstate2
