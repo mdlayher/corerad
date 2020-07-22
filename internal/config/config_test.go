@@ -115,6 +115,7 @@ func TestParse(t *testing.T) {
 			  [[interfaces.prefix]]
 			  prefix = "2001:db8::/64"
 			  autonomous = false
+			  deprecated = true
 
 			  [[interfaces.route]]
 			  prefix = "2001:db8:ffff::/64"
@@ -188,6 +189,7 @@ func TestParse(t *testing.T) {
 								Autonomous:        false,
 								ValidLifetime:     24 * time.Hour,
 								PreferredLifetime: 4 * time.Hour,
+								Deprecated:        true,
 							},
 							&plugin.Route{
 								Prefix:     crtest.MustIPPrefix("2001:db8:ffff::/64"),

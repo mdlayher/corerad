@@ -124,6 +124,7 @@ type Prefix struct {
 	Autonomous        bool
 	ValidLifetime     time.Duration
 	PreferredLifetime time.Duration
+	Deprecated        bool
 	Addrs             func() ([]net.Addr, error)
 }
 
@@ -133,6 +134,12 @@ func (p *Prefix) Name() string { return "prefix" }
 // String implements Plugin.
 func (p *Prefix) String() string {
 	var flags []string
+
+	// Note deprecated as a flag.
+	if p.Deprecated {
+		flags = append(flags, "DEPRECATED")
+	}
+
 	if p.OnLink {
 		flags = append(flags, "on-link")
 	}

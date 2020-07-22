@@ -107,6 +107,14 @@ preference = "medium"
   preferred_lifetime = "auto"
   valid_lifetime = "auto"
 
+  # Specifies whether this prefix should be deprecated. When true, the preferred
+  # and valid lifetime values will be interpreted as deadlines (added to the
+  # current time) for clients using this prefix. The preferred and valid
+  # lifetime values will count down to zero until CoreRAD is restarted,
+  # at which point the deprecated prefix can be completely removed from its
+  # configuration. Defaults to false.
+  deprecated = false
+
   # Alternatively, serve an explicit IPv6 prefix.
   [[interfaces.prefix]]
   prefix = "2001:db8::/64"

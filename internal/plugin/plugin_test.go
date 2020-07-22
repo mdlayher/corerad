@@ -56,8 +56,9 @@ func TestPluginString(t *testing.T) {
 				Autonomous:        true,
 				PreferredLifetime: 15 * time.Minute,
 				ValidLifetime:     ndp.Infinity,
+				Deprecated:        true,
 			},
-			s: "::/64 [on-link, autonomous], preferred: 15m0s, valid: infinite",
+			s: "::/64 [DEPRECATED, on-link, autonomous], preferred: 15m0s, valid: infinite",
 		},
 		{
 			name: "Route",

@@ -203,6 +203,7 @@ func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
 		Autonomous:        auto,
 		ValidLifetime:     valid,
 		PreferredLifetime: preferred,
+		Deprecated:        p.Deprecated,
 	}, nil
 }
 
