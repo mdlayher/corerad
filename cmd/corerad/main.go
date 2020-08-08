@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
@@ -84,7 +85,9 @@ func main() {
 		ll.Fatalf("failed to open configuration file: %v", err)
 	}
 
-	cfg, err := config.Parse(f)
+	// Parse the config with this startup time as the CoreRAD epoch, which is
+	// used to control the deprecation of various RA parameters.
+	cfg, err := config.Parse(f, time.Now())
 	if err != nil {
 		ll.Fatalf("failed to parse %q: %v", f.Name(), err)
 	}

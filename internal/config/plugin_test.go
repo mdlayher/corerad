@@ -313,6 +313,7 @@ func Test_parsePrefix(t *testing.T) {
 			[[interfaces]]
 			  [[interfaces.prefix]]
 			  prefix = "::/64"
+			  deprecated = true
 			  autonomous = false
 			  on_link = true
 			  preferred_lifetime = "30s"
@@ -323,6 +324,7 @@ func Test_parsePrefix(t *testing.T) {
 				OnLink:            true,
 				PreferredLifetime: 30 * time.Second,
 				ValidLifetime:     60 * time.Second,
+				Deprecated:        true,
 			},
 			ok: true,
 		},
@@ -602,7 +604,7 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 	// Defaults used when computing automatic values.
 	const maxInterval = 10 * time.Minute
 
-	got, err := parsePlugins(f.Interfaces[0], maxInterval)
+	got, err := parsePlugins(f.Interfaces[0], maxInterval, time.Time{})
 	if ok && err != nil {
 		t.Fatalf("failed to parse Plugin: %v", err)
 	}

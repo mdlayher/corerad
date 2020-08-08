@@ -228,6 +228,84 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
+			name: "deprecated preferred and valid",
+			plugin: &Prefix{
+				Prefix:            crtest.MustIPPrefix("2001:db8::/64"),
+				Autonomous:        true,
+				OnLink:            true,
+				PreferredLifetime: 10 * time.Second,
+				ValidLifetime:     20 * time.Second,
+
+				Deprecated: true,
+				Epoch:      time.Unix(1, 0),
+				TimeNow:    func() time.Time { return time.Unix(5, 0) },
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.PrefixInformation{
+						PrefixLength:                   64,
+						AutonomousAddressConfiguration: true,
+						OnLink:                         true,
+						PreferredLifetime:              6 * time.Second,
+						ValidLifetime:                  16 * time.Second,
+						Prefix:                         mustIP("2001:db8::"),
+					},
+				},
+			},
+		},
+		{
+			name: "deprecated valid",
+			plugin: &Prefix{
+				Prefix:            crtest.MustIPPrefix("2001:db8::/64"),
+				Autonomous:        true,
+				OnLink:            true,
+				PreferredLifetime: 10 * time.Second,
+				ValidLifetime:     20 * time.Second,
+
+				Deprecated: true,
+				Epoch:      time.Unix(1, 0),
+				TimeNow:    func() time.Time { return time.Unix(11, 0) },
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.PrefixInformation{
+						PrefixLength:                   64,
+						AutonomousAddressConfiguration: true,
+						OnLink:                         true,
+						PreferredLifetime:              0 * time.Second,
+						ValidLifetime:                  10 * time.Second,
+						Prefix:                         mustIP("2001:db8::"),
+					},
+				},
+			},
+		},
+		{
+			name: "deprecated invalid",
+			plugin: &Prefix{
+				Prefix:            crtest.MustIPPrefix("2001:db8::/64"),
+				Autonomous:        true,
+				OnLink:            true,
+				PreferredLifetime: 10 * time.Second,
+				ValidLifetime:     20 * time.Second,
+
+				Deprecated: true,
+				Epoch:      time.Unix(1, 0),
+				TimeNow:    func() time.Time { return time.Unix(21, 0) },
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.PrefixInformation{
+						PrefixLength:                   64,
+						AutonomousAddressConfiguration: true,
+						OnLink:                         true,
+						PreferredLifetime:              0 * time.Second,
+						ValidLifetime:                  0 * time.Second,
+						Prefix:                         mustIP("2001:db8::"),
+					},
+				},
+			},
+		},
+		{
 			name: "route",
 			plugin: &Route{
 				Prefix:     crtest.MustIPPrefix("2001:db8::/32"),

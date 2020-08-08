@@ -22,7 +22,7 @@ import (
 )
 
 // parseInterfaces parses a rawInterface into an Interface.
-func parseInterface(ifi rawInterface) (*Interface, error) {
+func parseInterface(ifi rawInterface, epoch time.Time) (*Interface, error) {
 	// monitor and advertise are mutually exclusive.
 	if ifi.Monitor && ifi.Advertise {
 		return nil, errors.New("monitor and advertise mode are mutually exclusive")
@@ -108,7 +108,7 @@ func parseInterface(ifi rawInterface) (*Interface, error) {
 	}
 
 	// Parse plugins using the remaining rawInterface fields.
-	plugins, err := parsePlugins(ifi, maxInterval)
+	plugins, err := parsePlugins(ifi, maxInterval, epoch)
 	if err != nil {
 		return nil, err
 	}

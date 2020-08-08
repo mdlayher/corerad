@@ -13,7 +13,10 @@
 
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func Test_parseInterfaceErrors(t *testing.T) {
 	tests := []struct {
@@ -153,7 +156,7 @@ func Test_parseInterfaceErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseInterface(tt.ifi)
+			_, err := parseInterface(tt.ifi, time.Time{})
 			if err == nil {
 				t.Fatal("expected an error, but none occurred")
 			}

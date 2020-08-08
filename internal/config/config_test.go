@@ -260,7 +260,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := config.Parse(strings.NewReader(tt.s))
+			c, err := config.Parse(strings.NewReader(tt.s), time.Time{})
 			if tt.ok && err != nil {
 				t.Fatalf("failed to parse config: %v", err)
 			}
@@ -305,11 +305,11 @@ func TestParseDefaults(t *testing.T) {
 		address = "localhost:9430"
 	`
 
-	min, err := config.Parse(strings.NewReader(minimal))
+	min, err := config.Parse(strings.NewReader(minimal), time.Time{})
 	if err != nil {
 		t.Fatalf("failed to parse minimal config: %v", err)
 	}
-	defaults, err := config.Parse(strings.NewReader(config.Default))
+	defaults, err := config.Parse(strings.NewReader(config.Default), time.Time{})
 	if err != nil {
 		t.Fatalf("failed to parse default config: %v", err)
 	}

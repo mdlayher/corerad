@@ -24,10 +24,10 @@ import (
 )
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
-func parsePlugins(ifi rawInterface, maxInterval time.Duration) ([]plugin.Plugin, error) {
+func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) ([]plugin.Plugin, error) {
 	var prefixes []*plugin.Prefix
 	for _, p := range ifi.Prefixes {
-		pfx, err := parsePrefix(p)
+		pfx, err := parsePrefix(p, epoch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse prefix %q: %v", p.Prefix, err)
 		}
@@ -143,7 +143,7 @@ func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
 }
 
 // parsePrefix parses a Prefix plugin.
-func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
+func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 	prefix, err := parseIPPrefix(p.Prefix)
 	if err != nil {
 		return nil, err
@@ -204,6 +204,7 @@ func parsePrefix(p rawPrefix) (*plugin.Prefix, error) {
 		ValidLifetime:     valid,
 		PreferredLifetime: preferred,
 		Deprecated:        p.Deprecated,
+		Epoch:             epoch,
 	}, nil
 }
 

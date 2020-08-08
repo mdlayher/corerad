@@ -119,13 +119,21 @@ func (m *MTU) Apply(ra *ndp.RouterAdvertisement) error {
 
 // A Prefix configures a NDP Prefix Information option.
 type Prefix struct {
+	// Parameters from configuration.
 	Prefix            netaddr.IPPrefix
 	OnLink            bool
 	Autonomous        bool
 	ValidLifetime     time.Duration
 	PreferredLifetime time.Duration
-	Deprecated        bool
-	Addrs             func() ([]net.Addr, error)
+
+	// Whether or not this prefix will be treated as deprecated when the Prefix
+	// is applied, and the time used to calculate the expiration time.
+	Epoch      time.Time
+	Deprecated bool
+
+	// Functions which can be swapped for tests.
+	TimeNow func() time.Time
+	Addrs   func() ([]net.Addr, error)
 }
 
 // Name implements Plugin.
@@ -157,6 +165,9 @@ func (p *Prefix) String() string {
 
 // Prepare implements Plugin.
 func (p *Prefix) Prepare(ifi *net.Interface) error {
+	// Use the real system time.
+	p.TimeNow = time.Now
+
 	// Fetch addresses from the specified interface whenever invoked.
 	p.Addrs = ifi.Addrs
 	return nil
@@ -223,17 +234,52 @@ func (p *Prefix) applyPrefixes(prefixes []netaddr.IP, ra *ndp.RouterAdvertisemen
 	// Pre-allocate space for prefixes since we know how many are needed.
 	opts := make([]ndp.Option, 0, len(prefixes))
 	for _, pfx := range prefixes {
+		valid, pref := p.lifetimes()
+
 		opts = append(opts, &ndp.PrefixInformation{
 			PrefixLength:                   p.Prefix.Bits,
 			OnLink:                         p.OnLink,
 			AutonomousAddressConfiguration: p.Autonomous,
-			ValidLifetime:                  p.ValidLifetime,
-			PreferredLifetime:              p.PreferredLifetime,
+			ValidLifetime:                  valid,
+			PreferredLifetime:              pref,
 			Prefix:                         pfx.IPAddr().IP,
 		})
 	}
 
 	ra.Options = append(ra.Options, opts...)
+}
+
+// lifetimes calculates a Prefix's lifetimes as either fixed values or dynamic
+// ones when a Prefix is deprecated.
+func (p *Prefix) lifetimes() (valid, pref time.Duration) {
+	if !p.Deprecated {
+		return p.ValidLifetime, p.PreferredLifetime
+	}
+
+	if p.Epoch.IsZero() {
+		panic("plugin: cannot calculate deprecated Prefix lifetimes with zero epoch")
+	}
+
+	now := p.TimeNow()
+
+	var (
+		validT = p.Epoch.Add(p.ValidLifetime)
+		prefT  = p.Epoch.Add(p.PreferredLifetime)
+	)
+
+	if now.Equal(validT) || now.After(validT) {
+		valid = 0
+	} else {
+		valid = validT.Sub(now)
+	}
+
+	if now.Equal(prefT) || now.After(prefT) {
+		pref = 0
+	} else {
+		pref = prefT.Sub(now)
+	}
+
+	return valid, pref
 }
 
 // A Route configures a NDP Route Information option.

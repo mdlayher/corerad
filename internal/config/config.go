@@ -155,8 +155,9 @@ type Debug struct {
 }
 
 // Parse parses a Config in TOML format from an io.Reader and verifies that
-// the configuration is valid.
-func Parse(r io.Reader) (*Config, error) {
+// the configuration is valid. If the epoch is not zero, it is used to calculate
+// deprecation times for certain parameters.
+func Parse(r io.Reader, epoch time.Time) (*Config, error) {
 	var f file
 	md, err := toml.DecodeReader(r, &f)
 	if err != nil {
@@ -190,7 +191,7 @@ func Parse(r io.Reader) (*Config, error) {
 			return nil, fmt.Errorf("interface %d: empty interface name", i)
 		}
 
-		iface, err := parseInterface(ifi)
+		iface, err := parseInterface(ifi, epoch)
 		if err != nil {
 			// Narrow down the location of a configuration error.
 			return nil, fmt.Errorf("interface %d/%q: %v", i, ifi.Name, err)
