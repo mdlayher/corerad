@@ -20,4 +20,4 @@ echo $TIMESTAMP > .gittagtime
 set -x
 
 git commit --date $TIMESTAMP -a -s -v -S -m "corerad: tag $1"
-git -s $1 tag -m "$1"
+git tag -s $1 -m "$1"
