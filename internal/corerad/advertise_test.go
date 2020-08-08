@@ -639,10 +639,13 @@ func testSimulatedAdvertiserClient(
 	// Swap out the underlying connections for a UDP socket pair.
 	sc, cc, cDone := testConnPair(t)
 
-	// Set up metrics node so we can inspect its contents at a later time.
 	ts := system.TestState{Forwarding: true}
 	mm := NewMetrics(metricslite.NewMemory(), ts, []config.Interface{*cfg})
+
+	crctx := NewContext(log.New(os.Stderr, "", 0), mm, ts)
+
 	ad := NewAdvertiser(
+		crctx,
 		*cfg,
 		&system.Dialer{
 			DialFunc: func() (*system.DialContext, error) {
@@ -656,11 +659,8 @@ func testSimulatedAdvertiserClient(
 				}, nil
 			},
 		},
-		ts,
 		nil,
 		tcfg.terminate,
-		log.New(os.Stderr, "", 0),
-		mm,
 	)
 
 	// Override RFC parameters to speed up tests.
@@ -843,19 +843,17 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	}
 
 	ll := log.New(os.Stderr, "", 0)
-
 	state := system.NewState()
-
-	// Set up metrics node so we can inspect its contents at a later time.
 	mm := NewMetrics(metricslite.NewMemory(), state, []config.Interface{*cfg})
+
+	crctx := NewContext(ll, mm, state)
+
 	ad := NewAdvertiser(
+		crctx,
 		*cfg,
 		system.NewDialer(router.Name, state, system.Advertise, ll),
-		state,
 		nil,
 		tcfg.terminate,
-		ll,
-		mm,
 	)
 
 	// Override RFC parameters to speed up tests.

@@ -78,10 +78,10 @@ func TestServerBuildTasks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srv := NewServer(log.New(os.Stderr, "", 0))
+			srv := NewServer(NewContext(nil, nil, nil))
 
 			var ss []string
-			for _, task := range srv.BuildTasks(tt.cfg) {
+			for _, task := range srv.BuildTasks(tt.cfg, nil) {
 				ss = append(ss, task.String())
 			}
 
@@ -179,7 +179,8 @@ func TestServerServeBasicTasks(t *testing.T) {
 				defer wg.Done()
 				close(readyC)
 
-				if err := NewServer(ll).Serve(sigC, nil, []Task{tt.task}); err != nil {
+				crctx := NewContext(ll, nil, nil)
+				if err := NewServer(crctx).Serve(sigC, nil, []Task{tt.task}); err != nil {
 					panicf("failed to serve: %v", err)
 				}
 			}()

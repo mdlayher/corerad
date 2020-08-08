@@ -24,8 +24,6 @@ import (
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/system"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Common HTTP content types.
@@ -36,40 +34,37 @@ const (
 
 // A Handler provides the HTTP debug API handler for CoreRAD.
 type Handler struct {
-	h      http.Handler
 	ll     *log.Logger
-	ifaces []config.Interface
 	state  system.State
+	ifaces []config.Interface
+	h      http.Handler
 }
 
 // NewHandler creates a Handler with the specified configuration.
 func NewHandler(
 	ll *log.Logger,
 	state system.State,
-	ifaces []config.Interface,
-	usePrometheus, usePProf bool,
-	reg *prometheus.Registry,
+	cfg config.Config,
+	prom http.Handler,
 ) *Handler {
 	mux := http.NewServeMux()
 
 	h := &Handler{
-		h: mux,
-
-		// TODO(mdlayher): use to build out other API handlers.
 		ll:     ll,
-		ifaces: ifaces,
 		state:  state,
+		ifaces: cfg.Interfaces,
+		h:      mux,
 	}
 
 	// Plumb in debugging API handlers.
 	mux.HandleFunc("/api/interfaces", h.interfaces)
 
 	// Optionally enable Prometheus and pprof support.
-	if usePrometheus {
-		mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	if cfg.Debug.Prometheus {
+		mux.Handle("/metrics", prom)
 	}
 
-	if usePProf {
+	if cfg.Debug.PProf {
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
 		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)

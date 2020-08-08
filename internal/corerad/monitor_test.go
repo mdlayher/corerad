@@ -16,9 +16,7 @@ package corerad
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -148,8 +146,13 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 	const iface = "test0"
 
 	// Set up metrics node so we can inspect its contents at a later time.
-	mm := NewMetrics(metricslite.NewMemory(), system.TestState{Forwarding: true}, nil)
+	state := system.TestState{Forwarding: true}
+	mm := NewMetrics(metricslite.NewMemory(), state, nil)
+
+	crctx := NewContext(nil, mm, state)
+
 	mon := NewMonitor(
+		crctx,
 		iface,
 		&system.Dialer{
 			DialFunc: func() (*system.DialContext, error) {
@@ -166,8 +169,6 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 		nil,
 		// Enable verbose logs for better debuggability.
 		true,
-		log.New(os.Stderr, "", 0),
-		mm,
 	)
 
 	mon.OnMessage = onMessage

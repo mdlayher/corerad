@@ -33,6 +33,7 @@ import (
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"inet.af/netaddr"
 )
 
@@ -259,10 +260,14 @@ func TestHandlerRoutes(t *testing.T) {
 				NewHandler(
 					log.New(ioutil.Discard, "", 0),
 					tt.state,
-					tt.ifaces,
-					tt.prometheus,
-					tt.pprof,
-					reg,
+					config.Config{
+						Interfaces: tt.ifaces,
+						Debug: config.Debug{
+							Prometheus: tt.prometheus,
+							PProf:      tt.pprof,
+						},
+					},
+					promhttp.HandlerFor(reg, promhttp.HandlerOpts{}),
 				),
 			)
 			defer srv.Close()

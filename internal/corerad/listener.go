@@ -17,8 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net"
 	"time"
 
@@ -40,26 +38,17 @@ var (
 // A listener instruments a system.Conn and adds retry functionality for
 // receiving NDP messages.
 type listener struct {
+	cctx  *Context
 	iface string
 	c     system.Conn
-	ll    *log.Logger
-	mm    *Metrics
 }
 
 // newListener constructs a listener with optional logger and metrics.
-func newListener(iface string, conn system.Conn, ll *log.Logger, mm *Metrics) *listener {
-	if ll == nil {
-		ll = log.New(ioutil.Discard, "", 0)
-	}
-	if mm == nil {
-		mm = NewMetrics(nil, nil, nil)
-	}
-
+func newListener(cctx *Context, iface string, conn system.Conn) *listener {
 	return &listener{
+		cctx:  cctx,
 		iface: iface,
 		c:     conn,
-		ll:    ll,
-		mm:    mm,
 	}
 }
 
@@ -156,7 +145,7 @@ func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netaddr.IP, e
 		// Ensure this message has a valid hop limit.
 		if cm.HopLimit != ndp.HopLimit {
 			l.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
-			l.mm.MessagesReceivedInvalidTotal(l.iface, m.Type().String())
+			l.cctx.mm.MessagesReceivedInvalidTotal(l.iface, m.Type().String())
 			continue
 		}
 
@@ -168,5 +157,5 @@ func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netaddr.IP, e
 
 // logf prints a formatted log with the listener's interface name.
 func (l *listener) logf(format string, v ...interface{}) {
-	l.ll.Println(l.iface + ": " + fmt.Sprintf(format, v...))
+	l.cctx.ll.Printf(l.iface+": "+format, v...)
 }

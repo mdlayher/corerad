@@ -17,8 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -42,13 +40,11 @@ type Advertiser struct {
 	OnInconsistentRA func(ours, theirs *ndp.RouterAdvertisement)
 
 	// Static configuration.
-	cfg config.Interface
-	ll  *log.Logger
-	mm  *Metrics
+	cctx *Context
+	cfg  config.Interface
 
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
-	state  system.State
 	watchC <-chan netstate.Change
 
 	// Readiness notification.
@@ -69,27 +65,16 @@ type Advertiser struct {
 // NewAdvertiser creates an Advertiser for the specified interface. If ll is
 // nil, logs are discarded. If mm is nil, metrics are discarded.
 func NewAdvertiser(
+	cctx *Context,
 	cfg config.Interface,
 	dialer *system.Dialer,
-	state system.State,
 	watchC <-chan netstate.Change,
 	terminate func() bool,
-	ll *log.Logger,
-	mm *Metrics,
 ) *Advertiser {
-	if ll == nil {
-		ll = log.New(ioutil.Discard, "", 0)
-	}
-	if mm == nil {
-		mm = NewMetrics(nil, nil, nil)
-	}
-
 	return &Advertiser{
+		cctx:      cctx,
 		cfg:       cfg,
-		ll:        ll,
-		mm:        mm,
 		dialer:    dialer,
-		state:     state,
 		watchC:    watchC,
 		readyC:    make(chan struct{}),
 		terminate: terminate,
@@ -184,7 +169,7 @@ func (a *Advertiser) advertise(ctx context.Context, conn system.Conn) error {
 
 	// Listener which issues RAs in response to RS messages.
 	eg.Go(func() error {
-		l := newListener(a.cfg.Name, conn, a.ll, a.mm)
+		l := newListener(a.cctx, a.cfg.Name, conn)
 		return l.Listen(ctx, func(msg message) error {
 			ip, err := a.handle(msg.Message, msg.Host)
 			if err != nil {
@@ -246,7 +231,7 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 
 // handle handles an incoming NDP message from a remote host.
 func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error) {
-	a.mm.AdvMessagesReceivedTotal(a.cfg.Name, m.Type().String())
+	a.cctx.mm.AdvMessagesReceivedTotal(a.cfg.Name, m.Type().String())
 
 	switch m := m.(type) {
 	case *ndp.RouterSolicitation:
@@ -289,7 +274,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 			}
 
 			a.logf("inconsistency %d: %q: %s%s", i, p.Field, details, p.Message)
-			a.mm.AdvRouterAdvertisementInconsistenciesTotal(a.cfg.Name, p.Details, p.Field)
+			a.cctx.mm.AdvRouterAdvertisementInconsistenciesTotal(a.cfg.Name, p.Details, p.Field)
 		}
 
 		if a.OnInconsistentRA != nil {
@@ -297,7 +282,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 		}
 	default:
 		a.logf("advertiser received NDP message of type %T from %s, ignoring", m, host)
-		a.mm.MessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
+		a.cctx.mm.MessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
 	}
 
 	// No response necessary.
@@ -381,17 +366,17 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
 	if err := a.send(conn, ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
-		a.mm.AdvErrorsTotal(a.cfg.Name, "transmit")
+		a.cctx.mm.AdvErrorsTotal(a.cfg.Name, "transmit")
 		return err
 	}
 
 	typ := "unicast"
 	if ip.IsMulticast() {
 		typ = "multicast"
-		a.mm.AdvLastMulticastTime(float64(time.Now().Unix()), a.cfg.Name)
+		a.cctx.mm.AdvLastMulticastTime(float64(time.Now().Unix()), a.cfg.Name)
 	}
 
-	a.mm.AdvRouterAdvertisementsTotal(a.cfg.Name, typ)
+	a.cctx.mm.AdvRouterAdvertisementsTotal(a.cfg.Name, typ)
 	return nil
 }
 
@@ -421,7 +406,7 @@ func (a *Advertiser) send(conn system.Conn, dst netaddr.IP, cfg config.Interface
 func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, error) {
 	// Check for any system state changes which could impact the router
 	// advertisement, and then build it using an interface configuration.
-	forwarding, err := a.state.IPv6Forwarding(ifi.Name)
+	forwarding, err := a.cctx.state.IPv6Forwarding(ifi.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get IPv6 forwarding state: %w", err)
 	}
@@ -459,7 +444,7 @@ func (a *Advertiser) shutdown(conn system.Conn) {
 
 // logf prints a formatted log with the Advertiser's interface name.
 func (a *Advertiser) logf(format string, v ...interface{}) {
-	a.ll.Println(a.cfg.Name + ": " + fmt.Sprintf(format, v...))
+	a.cctx.ll.Printf(a.cfg.Name+": "+format, v...)
 }
 
 // multicastDelay selects an appropriate delay duration for unsolicited

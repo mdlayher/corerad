@@ -45,7 +45,9 @@ func Test_listenerReceiveRetryMetrics(t *testing.T) {
 
 	mm := NewMetrics(metricslite.NewMemory(), nil, nil)
 
-	l := newListener(iface, conn, nil, mm)
+	cctx := NewContext(nil, mm, nil)
+
+	l := newListener(cctx, iface, conn)
 	if _, _, err := l.receiveRetry(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		t.Fatalf("failed to receive: %v", err)
 	}
@@ -153,7 +155,7 @@ func Test_listenerReceiveRetryErrors(t *testing.T) {
 			ctx, cancel := tt.mkCtx()
 			defer cancel()
 
-			l := newListener("test0", tt.conn, nil, nil)
+			l := newListener(nil, "test0", tt.conn)
 			if _, _, err := l.receiveRetry(ctx); !errors.Is(err, tt.err) {
 				t.Fatalf("unexpected error: %v", err)
 			}

@@ -17,7 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -27,51 +26,27 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
-	"github.com/mdlayher/corerad/internal/crhttp"
 	"github.com/mdlayher/corerad/internal/netstate"
 	"github.com/mdlayher/corerad/internal/system"
-	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/sdnotify"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 )
 
 // A Server coordinates the goroutines that handle various pieces of the
 // CoreRAD server.
 type Server struct {
-	state system.State
-	t     *terminator
-	w     *netstate.Watcher
-
-	ll  *log.Logger
-	reg *prometheus.Registry
+	cctx *Context
+	t    *terminator
+	w    *netstate.Watcher
 }
 
 // NewServer creates a Server with the input configuration and logger. If ll
 // is nil, logs are discarded.
-func NewServer(ll *log.Logger) *Server {
-	if ll == nil {
-		ll = log.New(ioutil.Discard, "", 0)
-	}
-
-	// TODO: parameterize if needed.
-	state := system.NewState()
-
-	// Set up Prometheus instrumentation using the typical Go collectors.
-	reg := prometheus.NewPedanticRegistry()
-	reg.MustRegister(
-		prometheus.NewBuildInfoCollector(),
-		prometheus.NewGoCollector(),
-		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
-	)
-
+func NewServer(cctx *Context) *Server {
 	return &Server{
-		state: state,
-		t:     &terminator{},
-		w:     netstate.NewWatcher(),
-
-		ll:  ll,
-		reg: reg,
+		cctx: cctx,
+		t:    &terminator{},
+		w:    netstate.NewWatcher(),
 	}
 }
 
@@ -93,14 +68,12 @@ type Task interface {
 // and termination check function. terminate reports whether the process should
 // expect to be terminated and stopped or immediately reloaded by a supervision
 // daemon.
-func (s *Server) BuildTasks(cfg config.Config) []Task {
-	mm := NewMetrics(metricslite.NewPrometheus(s.reg), s.state, cfg.Interfaces)
-
+func (s *Server) BuildTasks(cfg config.Config, debug http.Handler) []Task {
 	// Serve on each specified interface.
 	var tasks []Task
 	for _, ifi := range cfg.Interfaces {
 		if !ifi.Advertise && !ifi.Monitor {
-			s.ll.Printf("%s: interface is not advertising or monitoring, skipping initialization", ifi.Name)
+			s.cctx.ll.Printf("%s: interface is not advertising or monitoring, skipping initialization", ifi.Name)
 			continue
 		}
 
@@ -117,18 +90,18 @@ func (s *Server) BuildTasks(cfg config.Config) []Task {
 
 		switch {
 		case ifi.Advertise:
-			dialer := system.NewDialer(ifi.Name, s.state, system.Advertise, s.ll)
+			dialer := system.NewDialer(ifi.Name, s.cctx.state, system.Advertise, s.cctx.ll)
 
 			tasks = append(
 				tasks,
-				NewAdvertiser(ifi, dialer, s.state, watchC, s.t.terminate, s.ll, mm),
+				NewAdvertiser(s.cctx, ifi, dialer, watchC, s.t.terminate),
 			)
 		case ifi.Monitor:
-			dialer := system.NewDialer(ifi.Name, s.state, system.Monitor, s.ll)
+			dialer := system.NewDialer(ifi.Name, s.cctx.state, system.Monitor, s.cctx.ll)
 
 			tasks = append(
 				tasks,
-				NewMonitor(ifi.Name, dialer, watchC, ifi.Verbose, s.ll, mm),
+				NewMonitor(s.cctx, ifi.Name, dialer, watchC, ifi.Verbose),
 			)
 		default:
 			panicf("corerad: Server interface %q is not advertising or monitoring", ifi.Name)
@@ -137,20 +110,13 @@ func (s *Server) BuildTasks(cfg config.Config) []Task {
 
 	// Optionally configure the debug HTTP server task.
 	if d := cfg.Debug; d.Address != "" {
-		s.ll.Printf("starting HTTP debug listener on %q: prometheus: %t, pprof: %t",
+		s.cctx.ll.Printf("starting HTTP debug listener on %q: prometheus: %t, pprof: %t",
 			d.Address, d.Prometheus, d.PProf)
 
 		tasks = append(tasks, &httpTask{
-			addr: d.Address,
-			h: crhttp.NewHandler(
-				s.ll,
-				s.state,
-				cfg.Interfaces,
-				d.Prometheus,
-				d.PProf,
-				s.reg,
-			),
-			ll:     s.ll,
+			addr:   d.Address,
+			h:      debug,
+			ll:     s.cctx.ll,
 			readyC: make(chan struct{}),
 		})
 	}
@@ -159,7 +125,7 @@ func (s *Server) BuildTasks(cfg config.Config) []Task {
 	if s.w != nil {
 		tasks = append(tasks, &watcherTask{
 			watch: s.w.Watch,
-			ll:    s.ll,
+			ll:    s.cctx.ll,
 		})
 	}
 
@@ -182,7 +148,7 @@ func (s *Server) Serve(sigC chan os.Signal, n *sdnotify.Notifier, tasks []Task) 
 	tasks = append(tasks, &signalTask{
 		sigC:   sigC,
 		cancel: cancel,
-		ll:     s.ll,
+		ll:     s.cctx.ll,
 		n:      n,
 		t:      s.t,
 	})

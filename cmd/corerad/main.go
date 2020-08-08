@@ -27,7 +27,12 @@ import (
 	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/corerad"
+	"github.com/mdlayher/corerad/internal/crhttp"
+	"github.com/mdlayher/corerad/internal/system"
+	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/sdnotify"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const cfgFile = "corerad.toml"
@@ -89,8 +94,27 @@ func main() {
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, corerad.Signals()...)
 
-	s := corerad.NewServer(ll)
-	if err := s.Serve(sigC, n, s.BuildTasks(*cfg)); err != nil {
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(
+		prometheus.NewBuildInfoCollector(),
+		prometheus.NewGoCollector(),
+		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
+	)
+
+	var (
+		// Construct the types to produce a Context for the Server.
+		state = system.NewState()
+		mm    = corerad.NewMetrics(metricslite.NewPrometheus(reg), state, cfg.Interfaces)
+
+		// Construct a Context and plumb it throughout the HTTP handler and
+		// Server.
+		cctx = corerad.NewContext(ll, mm, state)
+
+		h = crhttp.NewHandler(ll, state, *cfg, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+		s = corerad.NewServer(cctx)
+	)
+
+	if err := s.Serve(sigC, n, s.BuildTasks(*cfg, h)); err != nil {
 		ll.Fatalf("failed to run: %v", err)
 	}
 }

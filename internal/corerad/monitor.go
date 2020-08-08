@@ -17,8 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"sync"
 	"time"
 
@@ -35,10 +33,9 @@ type Monitor struct {
 	OnMessage func(m ndp.Message)
 
 	// Static configuration.
+	cctx    *Context
 	iface   string
 	verbose bool
-	ll      *log.Logger
-	mm      *Metrics
 
 	// Socket creation and system state manipulation.
 	dialer *system.Dialer
@@ -55,25 +52,16 @@ type Monitor struct {
 // NewMonitor creates a Monitor for the specified interface. If ll is nil, logs
 // are discarded. If mm is nil, metrics are discarded.
 func NewMonitor(
+	cctx *Context,
 	iface string,
 	dialer *system.Dialer,
 	watchC <-chan netstate.Change,
 	verbose bool,
-	ll *log.Logger,
-	mm *Metrics,
 ) *Monitor {
-	if ll == nil {
-		ll = log.New(ioutil.Discard, "", 0)
-	}
-	if mm == nil {
-		mm = NewMetrics(nil, nil, nil)
-	}
-
 	return &Monitor{
+		cctx:    cctx,
 		iface:   iface,
 		verbose: verbose,
-		ll:      ll,
-		mm:      mm,
 		dialer:  dialer,
 		watchC:  watchC,
 		readyC:  make(chan struct{}),
@@ -122,7 +110,7 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn) error {
 
 	// Listener which listens for and reports on NDP traffic.
 	eg.Go(func() error {
-		l := newListener(m.iface, conn, m.ll, m.mm)
+		l := newListener(m.cctx, m.iface, conn)
 		return l.Listen(ctx, func(msg message) error {
 			m.handle(msg.Message, msg.Host.String())
 
@@ -150,7 +138,7 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn) error {
 func (m *Monitor) handle(msg ndp.Message, host string) {
 	m.debugf("monitor received %q from %s", msg.Type(), host)
 
-	m.mm.MonMessagesReceivedTotal(m.iface, host, msg.Type().String())
+	m.cctx.mm.MonMessagesReceivedTotal(m.iface, host, msg.Type().String())
 
 	// TODO(mdlayher): expand type switch.
 	switch msg := msg.(type) {
@@ -160,7 +148,7 @@ func (m *Monitor) handle(msg ndp.Message, host string) {
 		if msg.RouterLifetime != 0 {
 			// This is an advertisement from a default router. Calculate the
 			// UNIX timestamp of when the default route will expire.
-			m.mm.MonDefaultRouteExpirationTime(
+			m.cctx.mm.MonDefaultRouteExpirationTime(
 				float64(now.Add(msg.RouterLifetime).Unix()),
 				m.iface, host,
 			)
@@ -170,22 +158,22 @@ func (m *Monitor) handle(msg ndp.Message, host string) {
 		for _, p := range pickPrefixes(msg.Options) {
 			str := cidrStr(p.Prefix, p.PrefixLength)
 
-			m.mm.MonPrefixAutonomous(
+			m.cctx.mm.MonPrefixAutonomous(
 				boolFloat(p.AutonomousAddressConfiguration),
 				m.iface, str, host,
 			)
 
-			m.mm.MonPrefixOnLink(
+			m.cctx.mm.MonPrefixOnLink(
 				boolFloat(p.OnLink),
 				m.iface, str, host,
 			)
 
-			m.mm.MonPrefixPreferredLifetimeExpirationTime(
+			m.cctx.mm.MonPrefixPreferredLifetimeExpirationTime(
 				float64(now.Add(p.PreferredLifetime).Unix()),
 				m.iface, str, host,
 			)
 
-			m.mm.MonPrefixValidLifetimeExpirationTime(
+			m.cctx.mm.MonPrefixValidLifetimeExpirationTime(
 				float64(now.Add(p.ValidLifetime).Unix()),
 				m.iface, str, host,
 			)
@@ -195,7 +183,7 @@ func (m *Monitor) handle(msg ndp.Message, host string) {
 
 // logf prints a formatted log with the Monitor's interface name.
 func (m *Monitor) logf(format string, v ...interface{}) {
-	m.ll.Println(m.iface + ": " + fmt.Sprintf(format, v...))
+	m.cctx.ll.Printf(m.iface+": "+format, v...)
 }
 
 // debugf prints a formatted debug log if verbose mode is configured.
