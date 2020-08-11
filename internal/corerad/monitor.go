@@ -138,7 +138,7 @@ func (m *Monitor) monitor(ctx context.Context, conn system.Conn) error {
 func (m *Monitor) handle(msg ndp.Message, host string) {
 	m.debugf("monitor received %q from %s", msg.Type(), host)
 
-	m.cctx.mm.MonMessagesReceivedTotal(m.iface, host, msg.Type().String())
+	m.cctx.mm.MonMessagesReceivedTotal(1.0, m.iface, host, msg.Type().String())
 
 	// TODO(mdlayher): expand type switch.
 	switch msg := msg.(type) {

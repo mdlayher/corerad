@@ -231,7 +231,7 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 
 // handle handles an incoming NDP message from a remote host.
 func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error) {
-	a.cctx.mm.AdvMessagesReceivedTotal(a.cfg.Name, m.Type().String())
+	a.cctx.mm.AdvMessagesReceivedTotal(1.0, a.cfg.Name, m.Type().String())
 
 	switch m := m.(type) {
 	case *ndp.RouterSolicitation:
@@ -274,7 +274,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 			}
 
 			a.logf("inconsistency %d: %q: %s%s", i, p.Field, details, p.Message)
-			a.cctx.mm.AdvRouterAdvertisementInconsistenciesTotal(a.cfg.Name, p.Details, p.Field)
+			a.cctx.mm.AdvRouterAdvertisementInconsistenciesTotal(1.0, a.cfg.Name, p.Details, p.Field)
 		}
 
 		if a.OnInconsistentRA != nil {
@@ -282,7 +282,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 		}
 	default:
 		a.logf("advertiser received NDP message of type %T from %s, ignoring", m, host)
-		a.cctx.mm.MessagesReceivedInvalidTotal(a.cfg.Name, m.Type().String())
+		a.cctx.mm.MessagesReceivedInvalidTotal(1.0, a.cfg.Name, m.Type().String())
 	}
 
 	// No response necessary.
@@ -366,7 +366,7 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
 	if err := a.send(conn, ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
-		a.cctx.mm.AdvErrorsTotal(a.cfg.Name, "transmit")
+		a.cctx.mm.AdvErrorsTotal(1.0, a.cfg.Name, "transmit")
 		return err
 	}
 
@@ -376,7 +376,7 @@ func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
 		a.cctx.mm.AdvLastMulticastTime(float64(time.Now().Unix()), a.cfg.Name)
 	}
 
-	a.cctx.mm.AdvRouterAdvertisementsTotal(a.cfg.Name, typ)
+	a.cctx.mm.AdvRouterAdvertisementsTotal(1.0, a.cfg.Name, typ)
 	return nil
 }
 

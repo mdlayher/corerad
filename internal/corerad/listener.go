@@ -145,7 +145,7 @@ func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netaddr.IP, e
 		// Ensure this message has a valid hop limit.
 		if cm.HopLimit != ndp.HopLimit {
 			l.logf("received NDP message with IPv6 hop limit %d from %s, ignoring", cm.HopLimit, host)
-			l.cctx.mm.MessagesReceivedInvalidTotal(l.iface, m.Type().String())
+			l.cctx.mm.MessagesReceivedInvalidTotal(1.0, l.iface, m.Type().String())
 			continue
 		}
 
