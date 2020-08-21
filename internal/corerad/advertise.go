@@ -456,7 +456,7 @@ func multicastDelay(r *rand.Rand, i int, min, max time.Duration) time.Duration {
 	var d time.Duration
 	if min == max {
 		// Identical min/max, use a static interval.
-		d = (time.Duration(max) * time.Nanosecond).Round(time.Second)
+		d = (max * time.Nanosecond).Round(time.Second)
 	} else {
 		// min <= wait <= max, rounded to 1 second granularity.
 		d = (min + time.Duration(
