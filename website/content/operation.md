@@ -151,8 +151,15 @@ LimitNPROC=512
 NoNewPrivileges=true
 NotifyAccess=main
 Restart=on-failure
+RestartKillSignal=SIGHUP
 Type=notify
 ```
+
+Note also the use of `RestartKillSignal=SIGHUP`. This allows the service to be
+restarted without causing IPv6 clients to drop their default route when the
+daemon is restarted via `systemctl restart corerad`. This is useful for quickly
+changing the configuration or deprecating prefixes which should no longer be
+used.
 
 Here is an example of CoreRAD running under systemd supervision on Matt Layher's
 NixOS router. Note the `Status` line, indicating that [systemd readiness
