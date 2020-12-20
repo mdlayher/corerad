@@ -235,6 +235,9 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 
 	switch m := m.(type) {
 	case *ndp.RouterSolicitation:
+		a.debugf("received router solicitation from IP %q, source link-layer address %q",
+			host, sourceLLA(m.Options))
+
 		// Issue a unicast RA for clients with valid addresses, or a multicast
 		// RA for any client contacting us via the IPv6 unspecified address,
 		// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
@@ -246,6 +249,9 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 		// a multicast RA in response.
 		return &host, nil
 	case *ndp.RouterAdvertisement:
+		a.debugf("received router advertisement from IP %q, source link-layer address %q, router lifetime %s",
+			host, sourceLLA(m.Options), m.RouterLifetime)
+
 		// Received a router advertisement from a different router on this
 		// LAN, verify its consistency with our own.
 		want, err := a.buildRA(a.cfg)
@@ -445,6 +451,15 @@ func (a *Advertiser) shutdown(conn system.Conn) {
 // logf prints a formatted log with the Advertiser's interface name.
 func (a *Advertiser) logf(format string, v ...interface{}) {
 	a.cctx.ll.Printf(a.cfg.Name+": "+format, v...)
+}
+
+// debugf prints a formatted debug log if verbose mode is configured.
+func (a *Advertiser) debugf(format string, v ...interface{}) {
+	if !a.cfg.Verbose {
+		return
+	}
+
+	a.logf("debug: %s", fmt.Sprintf(format, v...))
 }
 
 // multicastDelay selects an appropriate delay duration for unsolicited
