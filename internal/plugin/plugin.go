@@ -208,13 +208,9 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 			continue
 		}
 
-		// Found a match, mask and keep the prefix bits of the address.
-		pfx, err := ipp.IP.Prefix(ipp.Bits)
-		if err != nil {
-			panicf("corerad: failed to produce prefix: %v", err)
-		}
-
-		// Only add each prefix once.
+		// Found a match, mask and keep the prefix bits of the address, and only
+		// add each prefix once.
+		pfx := ipp.Masked()
 		if _, ok := seen[pfx]; ok {
 			continue
 		}
