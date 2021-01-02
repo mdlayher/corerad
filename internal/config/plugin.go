@@ -272,24 +272,22 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 // parseIPPrefix parses s an IPv6 prefix. It returns an error if the prefix is
 // invalid, refers to an address within a prefix, or is an IPv4 prefix.
 func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
-	p, err := netaddr.ParseIPPrefix(s)
+	p1, err := netaddr.ParseIPPrefix(s)
 	if err != nil {
 		return netaddr.IPPrefix{}, err
 	}
 
-	// Don't allow individual IP addresses.
-	ip, err := p.IP.Prefix(p.Bits)
-	if err != nil {
-		return netaddr.IPPrefix{}, err
-	}
-	if p.IP != ip.IP {
-		return netaddr.IPPrefix{}, fmt.Errorf("%q is not a CIDR prefix", ip)
+	// Don't allow individual IP addresses such as 2001:db8::1/64 or similar
+	// which a user may mistake for a prefix.
+	p2 := p1.Masked()
+	if p1 != p2 || p2.IsSingleIP() {
+		return netaddr.IPPrefix{}, fmt.Errorf("%q is not a CIDR prefix", p1)
 	}
 
 	// Only allow IPv6 addresses.
-	if !p.IP.Is6() || p.IP.Is4in6() {
-		return netaddr.IPPrefix{}, fmt.Errorf("%q is not an IPv6 CIDR prefix", p.IP)
+	if !p1.IP.Is6() || p1.IP.Is4in6() {
+		return netaddr.IPPrefix{}, fmt.Errorf("%q is not an IPv6 CIDR prefix", p1)
 	}
 
-	return p, nil
+	return p1, nil
 }
