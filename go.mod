@@ -11,7 +11,6 @@ require (
 	github.com/mdlayher/netlink v1.2.0
 	github.com/mdlayher/schedgroup v0.0.0-20200506182200-45678742bdc7
 	github.com/mdlayher/sdnotify v0.0.0-20200625151349-e4a4f32afc4a
-	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/prometheus/client_golang v1.9.0
 	go4.org/intern v0.0.0-20210101040507-675a39332050 // indirect
 	golang.org/x/net v0.0.0-20201224014010-6772e930b67b

@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/plugin"
-	"github.com/mikioh/ipaddr"
 	"inet.af/netaddr"
 )
 
@@ -38,12 +37,9 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 	// For sanity, configured prefixes on a given interface must not overlap.
 	for _, pfx1 := range prefixes {
 		for _, pfx2 := range prefixes {
-			var (
-				p1 = ipaddr.NewPrefix(pfx1.Prefix.IPNet())
-				p2 = ipaddr.NewPrefix(pfx2.Prefix.IPNet())
-			)
-
-			if !p1.Equal(p2) && p1.Overlaps(p2) {
+			// Skip when pfx1 and pfx2 are identical, but make sure they don't
+			// overlap otherwise.
+			if pfx1 != pfx2 && pfx1.Prefix.Overlaps(pfx2.Prefix) {
 				return nil, fmt.Errorf("prefixes overlap: %s and %s",
 					pfx1.Prefix, pfx2.Prefix)
 			}
@@ -69,12 +65,9 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 	// For sanity, configured routes on a given interface must not overlap.
 	for _, rt1 := range routes {
 		for _, rt2 := range routes {
-			var (
-				p1 = ipaddr.NewPrefix(rt1.Prefix.IPNet())
-				p2 = ipaddr.NewPrefix(rt2.Prefix.IPNet())
-			)
-
-			if !p1.Equal(p2) && p1.Overlaps(p2) {
+			// Skip when rt1 and rt2 are identical, but make sure they don't
+			// overlap otherwise.
+			if rt1 != rt2 && rt1.Prefix.Overlaps(rt2.Prefix) {
 				return nil, fmt.Errorf("routes overlap: %s and %s",
 					rt1.Prefix, rt2.Prefix)
 			}
