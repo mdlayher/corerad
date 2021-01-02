@@ -13,12 +13,11 @@ require (
 	github.com/mdlayher/sdnotify v0.0.0-20200625151349-e4a4f32afc4a
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/prometheus/client_golang v1.9.0
-	go4.org/intern v0.0.0-20201222190253-c7b5a8ce75ca // indirect
-	go4.org/unsafe/assume-no-moving-gc v0.0.0-20201222180813-1025295fd063 // indirect
-	golang.org/x/net v0.0.0-20201216054612-986b41b23924
+	go4.org/intern v0.0.0-20210101040507-675a39332050 // indirect
+	golang.org/x/net v0.0.0-20201224014010-6772e930b67b
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
-	golang.org/x/sys v0.0.0-20201221093633-bc327ba9c2f0
+	golang.org/x/sys v0.0.0-20201231184435-2d18734c6014
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
-	inet.af/netaddr v0.0.0-20201222221711-c9bc69c385b2
+	inet.af/netaddr v0.0.0-20210101043548-c5e71b4f334a
 )
