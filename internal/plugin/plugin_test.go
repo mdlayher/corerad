@@ -65,8 +65,9 @@ func TestPluginString(t *testing.T) {
 				Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
 				Preference: ndp.High,
 				Lifetime:   15 * time.Minute,
+				Deprecated: true,
 			},
-			s: "2001:db8::/64, preference: High, lifetime: 15m0s",
+			s: "2001:db8::/64 [DEPRECATED], preference: High, lifetime: 15m0s",
 		},
 		{
 			name: "RDNSS",
@@ -227,7 +228,7 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "deprecated preferred and valid",
+			name: "prefix deprecated preferred and valid",
 			plugin: &Prefix{
 				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
 				Autonomous:        true,
@@ -253,7 +254,7 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "deprecated valid",
+			name: "prefix deprecated valid",
 			plugin: &Prefix{
 				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
 				Autonomous:        true,
@@ -279,7 +280,7 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "deprecated invalid",
+			name: "prefix deprecated invalid",
 			plugin: &Prefix{
 				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
 				Autonomous:        true,
@@ -317,6 +318,46 @@ func TestBuild(t *testing.T) {
 						PrefixLength:  32,
 						Preference:    ndp.High,
 						RouteLifetime: 10 * time.Second,
+						Prefix:        mustIP("2001:db8::"),
+					},
+				},
+			},
+		},
+		{
+			name: "route deprecated valid",
+			plugin: &Route{
+				Prefix:   netaddr.MustParseIPPrefix("2001:db8::/32"),
+				Lifetime: 10 * time.Second,
+
+				Deprecated: true,
+				Epoch:      time.Unix(1, 0),
+				TimeNow:    func() time.Time { return time.Unix(5, 0) },
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  32,
+						RouteLifetime: 6 * time.Second,
+						Prefix:        mustIP("2001:db8::"),
+					},
+				},
+			},
+		},
+		{
+			name: "route deprecated invalid",
+			plugin: &Route{
+				Prefix:   netaddr.MustParseIPPrefix("2001:db8::/32"),
+				Lifetime: 10 * time.Second,
+
+				Deprecated: true,
+				Epoch:      time.Unix(1, 0),
+				TimeNow:    func() time.Time { return time.Unix(11, 0) },
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  32,
+						RouteLifetime: 0 * time.Second,
 						Prefix:        mustIP("2001:db8::"),
 					},
 				},

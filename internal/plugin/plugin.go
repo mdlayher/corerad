@@ -280,9 +280,18 @@ func (p *Prefix) lifetimes() (valid, pref time.Duration) {
 
 // A Route configures a NDP Route Information option.
 type Route struct {
+	// Parameters from configuration.
 	Prefix     netaddr.IPPrefix
 	Preference ndp.Preference
 	Lifetime   time.Duration
+
+	// Whether or not this route will be treated as deprecated when the Route
+	// is applied, and the time used to calculate the expiration time.
+	Epoch      time.Time
+	Deprecated bool
+
+	// Functions which can be swapped for tests.
+	TimeNow func() time.Time
 }
 
 // Name implements Plugin.
@@ -290,26 +299,59 @@ func (*Route) Name() string { return "route" }
 
 // String implements Plugin.
 func (r *Route) String() string {
-	return fmt.Sprintf("%s, preference: %s, lifetime: %s",
+	// Note deprecation similar to Prefix if applicable.
+	var deprecated string
+	if r.Deprecated {
+		deprecated = " [DEPRECATED]"
+	}
+
+	return fmt.Sprintf("%s%s, preference: %s, lifetime: %s",
 		r.Prefix,
+		deprecated,
 		r.Preference.String(),
 		durString(r.Lifetime),
 	)
 }
 
 // Prepare implements Plugin.
-func (*Route) Prepare(_ *net.Interface) error { return nil }
+func (r *Route) Prepare(_ *net.Interface) error {
+	// Use the real system time.
+	r.TimeNow = time.Now
+
+	return nil
+}
 
 // Apply implements Plugin.
 func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
 	ra.Options = append(ra.Options, &ndp.RouteInformation{
 		PrefixLength:  r.Prefix.Bits,
 		Preference:    r.Preference,
-		RouteLifetime: r.Lifetime,
+		RouteLifetime: r.lifetime(),
 		Prefix:        r.Prefix.IP.IPAddr().IP,
 	})
 
 	return nil
+}
+
+// lifetimes calculates a Route's lifetime as either a fixed or dynamic value
+// when a Route is deprecated.
+func (r *Route) lifetime() time.Duration {
+	if !r.Deprecated {
+		return r.Lifetime
+	}
+
+	if r.Epoch.IsZero() {
+		panic("plugin: cannot calculate deprecated Route lifetimes with zero epoch")
+	}
+
+	now := r.TimeNow()
+	lt := r.Epoch.Add(r.Lifetime)
+
+	if now.Equal(lt) || now.After(lt) {
+		return 0
+	}
+
+	return lt.Sub(now)
 }
 
 // RDNSS configures a NDP Recursive DNS Servers option.
