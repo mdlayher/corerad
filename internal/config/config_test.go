@@ -368,7 +368,6 @@ func TestInterfaceRouterAdvertisement(t *testing.T) {
 			if diff := cmp.Diff(tt.ra, ra); diff != "" {
 				t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
 			}
-
 		})
 	}
 }

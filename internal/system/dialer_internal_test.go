@@ -114,6 +114,7 @@ func (as *autoconfState) IPv6Autoconf(_ string) (bool, error) { return true, as.
 func (*autoconfState) IPv6Forwarding(_ string) (bool, error) {
 	panic("should not call IPv6Forwarding")
 }
+
 func (as *autoconfState) SetIPv6Autoconf(_ string, _ bool) error {
 	defer func() { as.calls++ }()
 
