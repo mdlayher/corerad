@@ -28,7 +28,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
-	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
@@ -134,14 +133,14 @@ func TestHandlerRoutes(t *testing.T) {
 							Autonomous:        true,
 							ValidLifetime:     10 * time.Minute,
 							PreferredLifetime: 5 * time.Minute,
-							Prefix:            crtest.MustIPPrefix("2001:db8::/64"),
+							Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
 						},
 						&plugin.Prefix{
 							OnLink:            true,
 							Autonomous:        true,
 							ValidLifetime:     10 * time.Minute,
 							PreferredLifetime: 5 * time.Minute,
-							Prefix:            crtest.MustIPPrefix("fdff:dead:beef:dead::/64"),
+							Prefix:            netaddr.MustParseIPPrefix("fdff:dead:beef:dead::/64"),
 						},
 						&plugin.DNSSL{
 							Lifetime:    1 * time.Hour,
@@ -150,12 +149,12 @@ func TestHandlerRoutes(t *testing.T) {
 						&plugin.RDNSS{
 							Lifetime: 1 * time.Hour,
 							Servers: []netaddr.IP{
-								crtest.MustIP("2001:db8::1"),
-								crtest.MustIP("2001:db8::2"),
+								netaddr.MustParseIP("2001:db8::1"),
+								netaddr.MustParseIP("2001:db8::2"),
 							},
 						},
 						&plugin.Route{
-							Prefix:     crtest.MustIPPrefix("2001:db8:ffff::/48"),
+							Prefix:     netaddr.MustParseIPPrefix("2001:db8:ffff::/48"),
 							Preference: ndp.High,
 							Lifetime:   10 * time.Minute,
 						},

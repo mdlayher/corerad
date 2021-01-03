@@ -20,7 +20,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/google/go-cmp/cmp"
-	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
@@ -149,7 +148,7 @@ func Test_parsePrefix(t *testing.T) {
 	t.Parallel()
 
 	defaults := &plugin.Prefix{
-		Prefix:            crtest.MustIPPrefix("::/64"),
+		Prefix:            netaddr.MustParseIPPrefix("::/64"),
 		OnLink:            true,
 		Autonomous:        true,
 		PreferredLifetime: 4 * time.Hour,
@@ -307,7 +306,7 @@ func Test_parsePrefix(t *testing.T) {
 			  valid_lifetime = "infinite"
 			`,
 			p: &plugin.Prefix{
-				Prefix:            crtest.MustIPPrefix("::/64"),
+				Prefix:            netaddr.MustParseIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: ndp.Infinity,
@@ -328,7 +327,7 @@ func Test_parsePrefix(t *testing.T) {
 			  valid_lifetime = "60s"
 			`,
 			p: &plugin.Prefix{
-				Prefix:            crtest.MustIPPrefix("::/64"),
+				Prefix:            netaddr.MustParseIPPrefix("::/64"),
 				OnLink:            true,
 				PreferredLifetime: 30 * time.Second,
 				ValidLifetime:     60 * time.Second,
@@ -349,7 +348,7 @@ func Test_parseRoute(t *testing.T) {
 	t.Parallel()
 
 	defaults := &plugin.Route{
-		Prefix:     crtest.MustIPPrefix("2001:db8::/64"),
+		Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
 		Preference: ndp.Medium,
 		Lifetime:   24 * time.Hour,
 	}
@@ -467,7 +466,7 @@ func Test_parseRoute(t *testing.T) {
 			  lifetime = "infinite"
 			`,
 			r: &plugin.Route{
-				Prefix:     crtest.MustIPPrefix("2001:db8::/64"),
+				Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
 				Preference: ndp.Medium,
 				Lifetime:   ndp.Infinity,
 			},
@@ -483,7 +482,7 @@ func Test_parseRoute(t *testing.T) {
 			  lifetime = "30s"
 			`,
 			r: &plugin.Route{
-				Prefix:     crtest.MustIPPrefix("2001:db8::/64"),
+				Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
 				Preference: ndp.High,
 				Lifetime:   30 * time.Second,
 			},
@@ -499,7 +498,7 @@ func Test_parseRoute(t *testing.T) {
 			  prefix = "::1/128"
 			`,
 			r: &plugin.Route{
-				Prefix:     crtest.MustIPPrefix("::1/128"),
+				Prefix:     netaddr.MustParseIPPrefix("::1/128"),
 				Preference: ndp.Medium,
 				Lifetime:   24 * time.Hour,
 			},
@@ -566,8 +565,8 @@ func Test_parseRDNSS(t *testing.T) {
 			r: &plugin.RDNSS{
 				Lifetime: 30 * time.Second,
 				Servers: []netaddr.IP{
-					crtest.MustIP("2001:db8::1"),
-					crtest.MustIP("2001:db8::2"),
+					netaddr.MustParseIP("2001:db8::1"),
+					netaddr.MustParseIP("2001:db8::2"),
 				},
 			},
 			ok: true,
@@ -581,7 +580,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
-				Servers:  []netaddr.IP{crtest.MustIP("2001:db8::1")},
+				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::1")},
 			},
 			ok: true,
 		},
@@ -595,7 +594,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
-				Servers:  []netaddr.IP{crtest.MustIP("2001:db8::1")},
+				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::1")},
 			},
 			ok: true,
 		},

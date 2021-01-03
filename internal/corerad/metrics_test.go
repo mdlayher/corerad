@@ -20,10 +20,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
-	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
+	"inet.af/netaddr"
 )
 
 func TestMetrics(t *testing.T) {
@@ -107,9 +107,9 @@ func TestMetrics(t *testing.T) {
 					Name:      "eth1",
 					Advertise: true,
 					Plugins: []plugin.Plugin{
-						&plugin.Prefix{Prefix: crtest.MustIPPrefix("2001:db8::/64")},
+						&plugin.Prefix{Prefix: netaddr.MustParseIPPrefix("2001:db8::/64")},
 						&plugin.Prefix{
-							Prefix:            crtest.MustIPPrefix("fdff:dead:beef:dead::/64"),
+							Prefix:            netaddr.MustParseIPPrefix("fdff:dead:beef:dead::/64"),
 							Autonomous:        true,
 							OnLink:            true,
 							ValidLifetime:     20 * time.Minute,
