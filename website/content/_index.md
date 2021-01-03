@@ -6,6 +6,8 @@ layout: default
 Protocol](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol) router
 advertisement daemon, released under the Apache 2.0 License.
 
+[You can find the source code at `github.com/mdlayher/corerad`.](https://github.com/mdlayher/corerad)
+
 [![CoreRAD Grafana + Prometheus dashboard](/img/grafana.png)](/img/grafana.png)
 
 ## Features
