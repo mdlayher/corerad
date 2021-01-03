@@ -255,13 +255,24 @@ func Test_parsePrefix(t *testing.T) {
 			`,
 		},
 		{
-			name: "bad lifetimes",
+			name: "bad valid lifetime shorter than preferred",
 			s: `
 			[[interfaces]]
 			  [[interfaces.prefix]]
 			  prefix = "::/64"
 			  preferred_lifetime = "2s"
 			  valid_lifetime = "1s"
+			`,
+		},
+		{
+			name: "bad deprecated with infinite lifetimes",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			  prefix = "::/64"
+			  deprecated = true
+			  preferred_lifetime = "infinite"
+			  valid_lifetime = "infinite"
 			`,
 		},
 		{

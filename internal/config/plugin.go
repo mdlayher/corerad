@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/mdlayher/corerad/internal/plugin"
+	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
 )
 
@@ -184,6 +185,11 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 	if preferred > valid {
 		return nil, fmt.Errorf("preferred lifetime of %s exceeds valid lifetime of %s",
 			preferred, valid)
+	}
+
+	// Deprecated prefixes cannot have infinite lifetimes.
+	if p.Deprecated && (preferred == ndp.Infinity || valid == ndp.Infinity) {
+		return nil, errors.New("prefix is deprecated and cannot have infinite preferred or valid lifetimes")
 	}
 
 	onLink := true
