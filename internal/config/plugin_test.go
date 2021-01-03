@@ -489,6 +489,22 @@ func Test_parseRoute(t *testing.T) {
 			},
 			ok: true,
 		},
+		{
+			// This input doesn't make sense for prefixes but advertising /128
+			// routes (while potentially strange) should be doable.
+			name: "OK single IP",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "::1/128"
+			`,
+			r: &plugin.Route{
+				Prefix:     crtest.MustIPPrefix("::1/128"),
+				Preference: ndp.Medium,
+				Lifetime:   24 * time.Hour,
+			},
+			ok: true,
+		},
 	}
 
 	for _, tt := range tests {

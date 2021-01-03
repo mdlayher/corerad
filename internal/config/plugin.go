@@ -142,6 +142,12 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 		return nil, err
 	}
 
+	// Don't permit /128 "prefixes". This input is valid as a route but not
+	// as a prefix.
+	if prefix.IsSingleIP() {
+		return nil, errors.New("/128 is a single IP address, not a prefix")
+	}
+
 	// Only permit ::/64 as a special case. It isn't clear if other prefix
 	// lengths with :: would be useful, so throw an error for now.
 	if prefix.IP == netaddr.IPv6Unspecified() && prefix.Bits != 64 {
@@ -277,16 +283,18 @@ func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
 		return netaddr.IPPrefix{}, err
 	}
 
-	// Don't allow individual IP addresses such as 2001:db8::1/64 or similar
-	// which a user may mistake for a prefix.
+	// Make sure that once masked (e.g. 2001:db8::1/64 becomes 2001:db8::/64)
+	// the prefix is still identical. We do permit /128s because it's possible
+	// to advertise routes that way, so prefixes and routes have their own
+	// validation logic for that case.
 	p2 := p1.Masked()
-	if p1 != p2 || p2.IsSingleIP() {
-		return netaddr.IPPrefix{}, fmt.Errorf("%q is not a CIDR prefix", p1)
+	if p1 != p2 {
+		return netaddr.IPPrefix{}, errors.New("individual IP address, not a CIDR prefix")
 	}
 
 	// Only allow IPv6 addresses.
 	if !p1.IP.Is6() || p1.IP.Is4in6() {
-		return netaddr.IPPrefix{}, fmt.Errorf("%q is not an IPv6 CIDR prefix", p1)
+		return netaddr.IPPrefix{}, errors.New("not an IPv6 CIDR prefix")
 	}
 
 	return p1, nil
