@@ -55,7 +55,7 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 
 	var routes []*plugin.Route
 	for _, r := range ifi.Routes {
-		rt, err := parseRoute(r)
+		rt, err := parseRoute(r, epoch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse route %q: %v", r.Prefix, err)
 		}
@@ -213,8 +213,8 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 	}, nil
 }
 
-// parsePrefix parses a Prefix plugin.
-func parseRoute(r rawRoute) (*plugin.Route, error) {
+// parseRoute parses a Route plugin.
+func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
 	prefix, err := parseIPPrefix(r.Prefix)
 	if err != nil {
 		return nil, err
@@ -238,10 +238,17 @@ func parseRoute(r rawRoute) (*plugin.Route, error) {
 		lt = 24 * time.Hour
 	}
 
+	// Deprecated routes cannot have an infinite lifetime.
+	if r.Deprecated && lt == ndp.Infinity {
+		return nil, errors.New("route is deprecated and cannot have an infinite lifetime")
+	}
+
 	return &plugin.Route{
 		Prefix:     prefix,
 		Preference: pref,
 		Lifetime:   lt,
+		Deprecated: r.Deprecated,
+		Epoch:      epoch,
 	}, nil
 }
 

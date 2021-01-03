@@ -438,6 +438,16 @@ func Test_parseRoute(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad deprecated with infinite lifetime",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			  deprecated = true
+			  lifetime = "infinite"
+			`,
+		},
+		{
 			name: "bad prefix overlap",
 			s: `
 			[[interfaces]]
@@ -491,11 +501,13 @@ func Test_parseRoute(t *testing.T) {
 			  prefix = "2001:db8::/64"
 			  preference = "high"
 			  lifetime = "30s"
+			  deprecated = true
 			`,
 			r: &plugin.Route{
 				Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
 				Preference: ndp.High,
 				Lifetime:   30 * time.Second,
+				Deprecated: true,
 			},
 			ok: true,
 		},

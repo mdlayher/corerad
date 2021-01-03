@@ -133,6 +133,14 @@ preference = "medium"
   # "auto" uses the defaults. "infinite" means this route should be used forever.
   lifetime = "auto"
 
+  # Specifies whether this route should be deprecated. When true, the lifetime
+  # value will be interpreted as a deadline (added to the current time) for
+  # clients using this route. The lifetime value will count down to zero until
+  # CoreRAD is restarted, at which point the deprecated route can be completely
+  # removed from its configuration. Note that a deprecated route cannot have an
+  # infinite lifetime. Defaults to false.
+  deprecated = false
+
   # RDNSS: attaches a NDP Recursive DNS Servers option to the router advertisement.
   [[interfaces.rdnss]]
   # The maximum time these RDNSS addresses may be used for name resolution.
