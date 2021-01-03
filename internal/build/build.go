@@ -50,7 +50,7 @@ func Banner() string {
 		tstr = t.Format("2006-01-02")
 	}
 
-	return fmt.Sprintf("CoreRAD %s BETA (%s)",
+	return fmt.Sprintf("CoreRAD %s (%s)",
 		Version(),
 		tstr,
 	)
