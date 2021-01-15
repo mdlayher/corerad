@@ -16,6 +16,7 @@ package plugin
 import (
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"time"
 
@@ -141,6 +142,21 @@ func (p *Prefix) Name() string { return "prefix" }
 
 // String implements Plugin.
 func (p *Prefix) String() string {
+	prefix := p.Prefix.String()
+	if p.wildcard() {
+		// Make a best-effort to note the current prefixes if the user is using
+		// the wildcard syntax. If this returns an error, we'll return "::/N"
+		// with no further information.
+		if ps, err := p.currentPrefixes(); err == nil {
+			ss := make([]string, 0, len(ps))
+			for _, p := range ps {
+				ss = append(ss, p.String())
+			}
+
+			prefix = fmt.Sprintf("%s (%s)", prefix, strings.Join(ss, ", "))
+		}
+	}
+
 	var flags []string
 
 	// Note deprecated as a flag.
@@ -156,7 +172,7 @@ func (p *Prefix) String() string {
 	}
 
 	return fmt.Sprintf("%s [%s], preferred: %s, valid: %s",
-		p.Prefix,
+		prefix,
 		strings.Join(flags, ", "),
 		durString(p.PreferredLifetime),
 		durString(p.ValidLifetime),
@@ -175,20 +191,39 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 
 // Apply implements Plugin.
 func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
-	if p.Prefix.IP != netaddr.IPv6Unspecified() {
+	if !p.wildcard() {
 		// User specified an exact prefix so apply it directly.
-		p.applyPrefixes([]netaddr.IP{p.Prefix.IP}, ra)
+		p.applyPrefixes([]netaddr.IPPrefix{p.Prefix}, ra)
 		return nil
 	}
 
+	// User specified the ::/N wildcard syntax, fetch all of the current
+	// prefixes on the interface.
+	prefixes, err := p.currentPrefixes()
+	if err != nil {
+		return err
+	}
+
+	// Produce a PrefixInformation option for each configured prefix.
+	// All prefixes expanded from ::/N have the same configuration.
+	p.applyPrefixes(prefixes, ra)
+	return nil
+}
+
+// wildcard determines if the prefix is configured with the ::/N wildcard
+// syntax.
+func (p *Prefix) wildcard() bool { return p.Prefix.IP == netaddr.IPv6Unspecified() }
+
+// currentPrefixes fetches the current prefix IPs from the interface.
+func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
 	// Expand ::/N to all unique, non-link local prefixes with matching length
 	// on this interface.
 	addrs, err := p.Addrs()
 	if err != nil {
-		return fmt.Errorf("failed to fetch IP addresses: %v", err)
+		return nil, fmt.Errorf("failed to fetch IP addresses: %v", err)
 	}
 
-	var prefixes []netaddr.IP
+	var prefixes []netaddr.IPPrefix
 	seen := make(map[netaddr.IPPrefix]struct{})
 	for _, a := range addrs {
 		ipn, ok := a.(*net.IPNet)
@@ -216,29 +251,31 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 		}
 		seen[pfx] = struct{}{}
 
-		prefixes = append(prefixes, pfx.IP)
+		prefixes = append(prefixes, pfx)
 	}
 
-	// Produce a PrefixInformation option for each configured prefix.
-	// All prefixes expanded from ::/N have the same configuration.
-	p.applyPrefixes(prefixes, ra)
-	return nil
+	// For output consistency.
+	sort.SliceStable(prefixes, func(i, j int) bool {
+		return prefixes[i].IP.Less(prefixes[j].IP)
+	})
+
+	return prefixes, nil
 }
 
 // applyPrefixes unpacks prefixes into ndp.PrefixInformation options within ra.
-func (p *Prefix) applyPrefixes(prefixes []netaddr.IP, ra *ndp.RouterAdvertisement) {
+func (p *Prefix) applyPrefixes(prefixes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement) {
 	// Pre-allocate space for prefixes since we know how many are needed.
 	opts := make([]ndp.Option, 0, len(prefixes))
 	for _, pfx := range prefixes {
 		valid, pref := p.lifetimes()
 
 		opts = append(opts, &ndp.PrefixInformation{
-			PrefixLength:                   p.Prefix.Bits,
+			PrefixLength:                   pfx.Bits,
 			OnLink:                         p.OnLink,
 			AutonomousAddressConfiguration: p.Autonomous,
 			ValidLifetime:                  valid,
 			PreferredLifetime:              pref,
-			Prefix:                         pfx.IPAddr().IP,
+			Prefix:                         pfx.IP.IPAddr().IP,
 		})
 	}
 

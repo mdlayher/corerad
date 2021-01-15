@@ -56,8 +56,20 @@ func TestPluginString(t *testing.T) {
 				PreferredLifetime: 15 * time.Minute,
 				ValidLifetime:     ndp.Infinity,
 				Deprecated:        true,
+				Addrs: func() ([]net.Addr, error) {
+					return []net.Addr{
+						&net.IPNet{
+							IP:   net.ParseIP("2001:db8::"),
+							Mask: net.CIDRMask(64, 128),
+						},
+						&net.IPNet{
+							IP:   net.ParseIP("fdff::"),
+							Mask: net.CIDRMask(64, 128),
+						},
+					}, nil
+				},
 			},
-			s: "::/64 [DEPRECATED, on-link, autonomous], preferred: 15m0s, valid: infinite",
+			s: "::/64 (2001:db8::/64, fdff::/64) [DEPRECATED, on-link, autonomous], preferred: 15m0s, valid: infinite",
 		},
 		{
 			name: "Route",
