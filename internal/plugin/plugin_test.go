@@ -69,7 +69,7 @@ func TestPluginString(t *testing.T) {
 					}, nil
 				},
 			},
-			s: "::/64 (2001:db8::/64, fdff::/64) [DEPRECATED, on-link, autonomous], preferred: 15m0s, valid: infinite",
+			s: "::/64 [2001:db8::/64, fdff::/64] [DEPRECATED, on-link, autonomous], preferred: 15m0s, valid: infinite",
 		},
 		{
 			name: "Route",

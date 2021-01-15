@@ -153,7 +153,7 @@ func (p *Prefix) String() string {
 				ss = append(ss, p.String())
 			}
 
-			prefix = fmt.Sprintf("%s (%s)", prefix, strings.Join(ss, ", "))
+			prefix = fmt.Sprintf("%s [%s]", prefix, strings.Join(ss, ", "))
 		}
 	}
 
