@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
+	"github.com/pelletier/go-toml"
 	"inet.af/netaddr"
 )
 
@@ -634,9 +634,10 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 	t.Helper()
 
 	var f file
-	if _, err := toml.DecodeReader(strings.NewReader(s), &f); err != nil {
+	if err := toml.NewDecoder(strings.NewReader(s)).Strict(true).Decode(&f); err != nil {
 		t.Fatalf("failed to decode TOML: %v", err)
 	}
+
 	if l := len(f.Interfaces); l != 1 {
 		t.Fatalf("expected one configured interface, but got: %d", l)
 	}

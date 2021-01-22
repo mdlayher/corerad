@@ -20,9 +20,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
+	"github.com/pelletier/go-toml"
 )
 
 //go:generate embed file -var Default --source default.toml
@@ -160,12 +160,8 @@ type Debug struct {
 // deprecation times for certain parameters.
 func Parse(r io.Reader, epoch time.Time) (*Config, error) {
 	var f file
-	md, err := toml.DecodeReader(r, &f)
-	if err != nil {
+	if err := toml.NewDecoder(r).Strict(true).Decode(&f); err != nil {
 		return nil, err
-	}
-	if u := md.Undecoded(); len(u) > 0 {
-		return nil, fmt.Errorf("unrecognized configuration keys: %s", u)
 	}
 
 	// Must configure at least one interface.
