@@ -163,23 +163,8 @@ func parseMinInterval(s string, max time.Duration) (time.Duration, error) {
 // parseDefaultLifetime parses a default_lifetime string and computes its value
 // based on user input or the relationship with max.
 func parseDefaultLifetime(s *string, max time.Duration) (time.Duration, error) {
-	auto := 3 * max
-
-	if s == nil {
-		return auto, nil
-	}
-
-	switch *s {
-	case "":
-		// No value specified, no default lifetime.
-		return 0, nil
-	case "auto":
-		// Compute a sane default per the RFC.
-		return auto, nil
-	}
-
 	// Use the user's value, but validate it per the RFC.
-	lt, err := time.ParseDuration(*s)
+	lt, err := parseDuration(s, 3*max)
 	if err != nil {
 		return 0, fmt.Errorf("invalid default lifetime: %v", err)
 	}
