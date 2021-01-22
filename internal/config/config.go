@@ -200,22 +200,22 @@ func Parse(r io.Reader, epoch time.Time) (*Config, error) {
 	return c, nil
 }
 
-// durationAuto implies that a value should be automatically computed.
-const durationAuto = -1 * time.Second
-
 // parseDuration parses a duration while also recognizing special values such
-// as auto and infinite.
-func parseDuration(s *string) (time.Duration, error) {
+// as auto and infinite. If the key is unset or auto, def is used.
+func parseDuration(s *string, def time.Duration) (time.Duration, error) {
 	if s == nil {
-		return durationAuto, nil
+		// Nil implies the key is not set at all, so use the default.
+		return def, nil
 	}
 
 	switch *s {
 	case "infinite":
 		return ndp.Infinity, nil
 	case "auto":
-		return durationAuto, nil
+		return def, nil
 	case "":
+		// Empty string implies the key is set but has no value, therefore we
+		// should use zero.
 		return 0, nil
 	}
 

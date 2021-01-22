@@ -116,14 +116,10 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 
 // parseDNSSL parses a DNSSL plugin.
 func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
-	lifetime, err := parseDuration(d.Lifetime)
+	// By default, compute lifetime as recommended by radvd.
+	lifetime, err := parseDuration(d.Lifetime, 2*maxInterval)
 	if err != nil {
 		return nil, fmt.Errorf("invalid lifetime: %v", err)
-	}
-
-	// If auto, compute lifetime as recommended by radvd.
-	if lifetime == durationAuto {
-		lifetime = 2 * maxInterval
 	}
 
 	if len(d.DomainNames) == 0 {
@@ -155,30 +151,23 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 		return nil, errors.New("only ::/64 is permitted for inferring prefixes from interface addresses")
 	}
 
-	valid, err := parseDuration(p.ValidLifetime)
+	valid, err := parseDuration(p.ValidLifetime, 24*time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("invalid valid lifetime: %v", err)
 	}
 
-	// Use defaults for auto values.
-	switch valid {
-	case 0:
+	if valid == 0 {
 		return nil, errors.New("valid lifetime must be non-zero")
-	case durationAuto:
-		valid = 24 * time.Hour
 	}
 
-	preferred, err := parseDuration(p.PreferredLifetime)
+	preferred, err := parseDuration(p.PreferredLifetime, 4*time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("invalid preferred lifetime: %v", err)
 	}
 
 	// Use defaults for auto values.
-	switch preferred {
-	case 0:
+	if preferred == 0 {
 		return nil, errors.New("preferred lifetime must be non-zero")
-	case durationAuto:
-		preferred = 4 * time.Hour
 	}
 
 	// See: https://tools.ietf.org/html/rfc4861#section-4.6.2.
@@ -225,17 +214,13 @@ func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
 		return nil, err
 	}
 
-	lt, err := parseDuration(r.Lifetime)
+	lt, err := parseDuration(r.Lifetime, 24*time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("invalid lifetime: %v", err)
 	}
 
-	// Use defaults for auto values.
-	switch lt {
-	case 0:
+	if lt == 0 {
 		return nil, errors.New("lifetime must be non-zero")
-	case durationAuto:
-		lt = 24 * time.Hour
 	}
 
 	// Deprecated routes cannot have an infinite lifetime.
@@ -254,14 +239,10 @@ func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
 
 // parseDNSSL parses a DNSSL plugin.
 func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
-	lifetime, err := parseDuration(d.Lifetime)
+	// If auto, compute lifetime as recommended by radvd.
+	lifetime, err := parseDuration(d.Lifetime, 2*maxInterval)
 	if err != nil {
 		return nil, fmt.Errorf("invalid lifetime: %v", err)
-	}
-
-	// If auto, compute lifetime as recommended by radvd.
-	if lifetime == durationAuto {
-		lifetime = 2 * maxInterval
 	}
 
 	if len(d.Servers) == 0 {
