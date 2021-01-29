@@ -256,7 +256,7 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse IP address %q: %v", s, err)
 		}
-		if !ip.Is6() {
+		if !ip.Is6() || ip.Is4in6() {
 			return nil, fmt.Errorf("string %q is not an IPv6 address", s)
 		}
 

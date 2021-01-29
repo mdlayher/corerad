@@ -402,6 +402,14 @@ func Test_parseRoute(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad prefix IPv6-mapped-IPv4",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "::ffff:192.0.2.0/24"
+			`,
+		},
+		{
 			name: "bad preference",
 			s: `
 			[[interfaces]]
@@ -575,6 +583,14 @@ func Test_parseRDNSS(t *testing.T) {
 			[[interfaces]]
 			  [[interfaces.rdnss]]
 			  servers = ["192.0.2.1"]
+			`,
+		},
+		{
+			name: "bad servers IPv6-mapped-IPv4",
+			s: `
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["::ffff:192.0.2.1"]
 			`,
 		},
 		{
