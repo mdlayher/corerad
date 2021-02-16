@@ -25,6 +25,9 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v1
 
+    - name: Download staticcheck module
+      run: go mod download honnef.co/go/tools
+
     - name: Print staticcheck version
       run: go run honnef.co/go/tools/cmd/staticcheck -version
 
