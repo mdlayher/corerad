@@ -13,7 +13,7 @@ CoreRAD is considered **stable** as of the v0.3.x series and major breaking
 changes will only occur if deemed necessary. CoreRAD is currently deployed and
 running on several home LAN networks. Early adopters are welcome to join us in
 `#corerad` on [Gophers Slack](https://invite.slack.golangbridge.org) or [the
-Freenode IRC network](https://webchat.freenode.net/).
+Libera.Chat IRC network](https://web.libera.chat/).
 
 CoreRAD is inspired by the [CoreDNS](https://coredns.io/) and
 [CoreDHCP](https://coredhcp.io/) projects.

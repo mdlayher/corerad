@@ -39,8 +39,8 @@ Future goals include:
 CoreRAD is currently deployed and running on several home LAN networks. Early
 adopters are welcome to join us on:
 
-- [`#corerad` on Freenode](https://webchat.freenode.net/)
 - [`#corerad` on Gophers Slack](https://invite.slack.golangbridge.org/)
+- [`#corerad` on Libera.Chat](https://web.libera.chat/)
 
 For more information, you can also check out:
 
