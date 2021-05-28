@@ -10,7 +10,7 @@ menu:
 CoreRAD is a stateless service that reads its configuration file on startup and
 will continue to operate indefinitely from that point on. You can [view the full
 configuration file
-online](https://github.com/mdlayher/corerad/blob/master/internal/config/default.toml),
+online](https://github.com/mdlayher/corerad/blob/main/internal/config/default.toml),
 but the vast majority of these settings are not required for typical home use.
 
 This guide will provide operational information for running CoreRAD on a Linux
