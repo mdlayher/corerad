@@ -271,7 +271,11 @@ func TestParse(t *testing.T) {
 				return
 			}
 
-			if diff := cmp.Diff(tt.c, c, cmp.Comparer(compareNetaddrIP)); diff != "" {
+			opts := []cmp.Option{
+				cmp.Comparer(compareNetaddrIP), cmp.Comparer(compareNetaddrIPPrefix),
+			}
+
+			if diff := cmp.Diff(tt.c, c, opts...); diff != "" {
 				t.Fatalf("unexpected Config (-want +got):\n%s", diff)
 			}
 		})
@@ -313,7 +317,11 @@ func TestParseDefaults(t *testing.T) {
 		t.Fatalf("failed to parse default config: %v", err)
 	}
 
-	if diff := cmp.Diff(defaults, min, cmp.Comparer(compareNetaddrIP)); diff != "" {
+	opts := []cmp.Option{
+		cmp.Comparer(compareNetaddrIP), cmp.Comparer(compareNetaddrIPPrefix),
+	}
+
+	if diff := cmp.Diff(defaults, min, opts...); diff != "" {
 		t.Fatalf("unexpected default Config (-want +got):\n%s", diff)
 	}
 }
@@ -371,4 +379,5 @@ func TestInterfaceRouterAdvertisement(t *testing.T) {
 	}
 }
 
-func compareNetaddrIP(x, y netaddr.IP) bool { return x == y }
+func compareNetaddrIP(x, y netaddr.IP) bool             { return x == y }
+func compareNetaddrIPPrefix(x, y netaddr.IPPrefix) bool { return x == y }

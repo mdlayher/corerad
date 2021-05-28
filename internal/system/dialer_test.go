@@ -179,7 +179,7 @@ func testDialer(t *testing.T, privileged bool) *system.Dialer {
 				panicf("system: invalid net.IPNet: %+v", a)
 			}
 
-			if ipp.IP.IsLinkLocalUnicast() || ipp.IP.Is6() {
+			if ipp.IP().IsLinkLocalUnicast() || ipp.IP().Is6() {
 				hasLLA = true
 				break
 			}

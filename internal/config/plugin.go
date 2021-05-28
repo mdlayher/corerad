@@ -147,7 +147,7 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 
 	// Only permit ::/64 as a special case. It isn't clear if other prefix
 	// lengths with :: would be useful, so throw an error for now.
-	if prefix.IP == netaddr.IPv6Unspecified() && prefix.Bits != 64 {
+	if prefix.IP() == netaddr.IPv6Unspecified() && prefix.Bits() != 64 {
 		return nil, errors.New("only ::/64 is permitted for inferring prefixes from interface addresses")
 	}
 
@@ -287,7 +287,7 @@ func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
 	}
 
 	// Only allow IPv6 addresses.
-	if !p1.IP.Is6() || p1.IP.Is4in6() {
+	if !p1.IP().Is6() || p1.IP().Is4in6() {
 		return netaddr.IPPrefix{}, errors.New("not an IPv6 CIDR prefix")
 	}
 

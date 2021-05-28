@@ -679,9 +679,14 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 		return
 	}
 
-	if diff := cmp.Diff([]plugin.Plugin{want}, got, cmp.Comparer(compareNetaddrIP)); diff != "" {
+	opts := []cmp.Option{
+		cmp.Comparer(compareNetaddrIP), cmp.Comparer(compareNetaddrIPPrefix),
+	}
+
+	if diff := cmp.Diff([]plugin.Plugin{want}, got, opts...); diff != "" {
 		t.Fatalf("unexpected Plugin (-want +got):\n%s", diff)
 	}
 }
 
-func compareNetaddrIP(x, y netaddr.IP) bool { return x == y }
+func compareNetaddrIP(x, y netaddr.IP) bool             { return x == y }
+func compareNetaddrIPPrefix(x, y netaddr.IPPrefix) bool { return x == y }

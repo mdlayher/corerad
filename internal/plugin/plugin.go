@@ -212,7 +212,7 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 
 // wildcard determines if the prefix is configured with the ::/N wildcard
 // syntax.
-func (p *Prefix) wildcard() bool { return p.Prefix.IP == netaddr.IPv6Unspecified() }
+func (p *Prefix) wildcard() bool { return p.Prefix.IP() == netaddr.IPv6Unspecified() }
 
 // currentPrefixes fetches the current prefix IPs from the interface.
 func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
@@ -239,7 +239,7 @@ func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
 		// Only advertise non-link-local IPv6 prefixes that also have a
 		// matching mask:
 		// https://tools.ietf.org/html/rfc4861#section-4.6.2.
-		if ipp.IP.Is4() || ipp.IP.IsLinkLocalUnicast() || ipp.Bits != p.Prefix.Bits {
+		if ipp.IP().Is4() || ipp.IP().IsLinkLocalUnicast() || ipp.Bits() != p.Prefix.Bits() {
 			continue
 		}
 
@@ -256,7 +256,7 @@ func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
 
 	// For output consistency.
 	sort.SliceStable(prefixes, func(i, j int) bool {
-		return prefixes[i].IP.Less(prefixes[j].IP)
+		return prefixes[i].IP().Less(prefixes[j].IP())
 	})
 
 	return prefixes, nil
@@ -270,12 +270,12 @@ func (p *Prefix) applyPrefixes(prefixes []netaddr.IPPrefix, ra *ndp.RouterAdvert
 		valid, pref := p.lifetimes()
 
 		opts = append(opts, &ndp.PrefixInformation{
-			PrefixLength:                   pfx.Bits,
+			PrefixLength:                   pfx.Bits(),
 			OnLink:                         p.OnLink,
 			AutonomousAddressConfiguration: p.Autonomous,
 			ValidLifetime:                  valid,
 			PreferredLifetime:              pref,
-			Prefix:                         pfx.IP.IPAddr().IP,
+			Prefix:                         pfx.IP().IPAddr().IP,
 		})
 	}
 
@@ -361,10 +361,10 @@ func (r *Route) Prepare(_ *net.Interface) error {
 // Apply implements Plugin.
 func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
 	ra.Options = append(ra.Options, &ndp.RouteInformation{
-		PrefixLength:  r.Prefix.Bits,
+		PrefixLength:  r.Prefix.Bits(),
 		Preference:    r.Preference,
 		RouteLifetime: r.lifetime(),
-		Prefix:        r.Prefix.IP.IPAddr().IP,
+		Prefix:        r.Prefix.IP().IPAddr().IP,
 	})
 
 	return nil
