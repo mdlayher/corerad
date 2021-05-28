@@ -1,8 +1,10 @@
 # CHANGELOG
 
-## Unreleased
+## v0.3.1
 
-- n/a
+- Prefixes advertised automatically via `::/64` are pulled from each configured
+  interface and logged on startup
+- Additional checks to prevent the use of IPv6-mapped-IPv4 addresses
 
 ## v0.3.0
 
