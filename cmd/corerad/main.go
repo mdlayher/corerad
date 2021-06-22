@@ -33,6 +33,7 @@ import (
 	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/sdnotify"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -99,9 +100,9 @@ func main() {
 
 	reg := prometheus.NewPedanticRegistry()
 	reg.MustRegister(
-		prometheus.NewBuildInfoCollector(),
-		prometheus.NewGoCollector(),
-		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
+		collectors.NewBuildInfoCollector(),
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 
 	var (

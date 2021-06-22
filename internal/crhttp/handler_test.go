@@ -32,6 +32,7 @@ import (
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"inet.af/netaddr"
 )
@@ -253,7 +254,7 @@ func TestHandlerRoutes(t *testing.T) {
 			// that we can check for when the Prometheus functionality is
 			// enabled.
 			reg := prometheus.NewPedanticRegistry()
-			reg.MustRegister(prometheus.NewGoCollector())
+			reg.MustRegister(collectors.NewGoCollector())
 
 			srv := httptest.NewServer(
 				NewHandler(
