@@ -18,8 +18,8 @@ Some of the project's key features include:
 
 - support for [Prometheus metrics](https://prometheus.io/) for dashboards and
   alerting
-- monitoring of upstream (WAN-facing) router advertisements to determine if and when an IPv6
-  default route will expire
+- monitoring of upstream (WAN-facing) router advertisements to determine if and
+  when an IPv6 default route will expire
 - monitoring of downstream (LAN-facing) router advertisements to ensure they do
   not conflict with CoreRAD's own configuration
 - an HTTP API for troubleshooting and debugging
@@ -29,7 +29,6 @@ Some of the project's key features include:
 Future goals include:
 
 - dynamic router advertisement configuration via HTTP and/or gRPC APIs
-- online configuration reload when `SIGHUP` is received
 - expanded HTTP API capabilities
 - better support for *BSD and other platforms (these mostly work today, with
   some caveats)
@@ -47,4 +46,4 @@ For more information, you can also check out:
 - [CoreRAD a new IPv6 router advertisement
   daemon (Matt Layher, February 2020)](https://mdlayher.com/blog/corerad-a-new-ipv6-router-advertisement-daemon/)
   - Matt's blog introduces CoreRAD and provides comparisons with [the `radvd`
-    project](https://github.com/reubenhwk/radvd).
+    project](https://github.com/radvd-project/radvd).

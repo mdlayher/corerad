@@ -61,16 +61,16 @@ is resolved before retry attempts run out:
 
 ```text
 $ corerad -c ./corerad.toml 
-CoreRAD v0.2.7 BETA (2020-06-24) starting with configuration file "./corerad.toml"
-starting HTTP debug listener on "localhost:9430": prometheus: true, pprof: true
+CoreRAD v0.3.1 (2021-05-28) starting with configuration file "corerad.toml"
+starting HTTP debug listener on "localhost:9430": prometheus: true, pprof: false
 eth0: interface not ready, reinitializing
 eth0: retrying initialization in 250ms, 49 attempt(s) remaining: interface "eth0" is not up: link not ready
 eth0: retrying initialization in 500ms, 48 attempt(s) remaining: interface "eth0" is not up: link not ready
 eth0: retrying initialization in 750ms, 47 attempt(s) remaining: interface "eth0" is not up: link not ready
-eth0: retrying initialization in 1s, 46 attempt(s) remaining: listen ip6:ipv6-icmp fe80::8c5e:aff:fe27:6e22%eth0: bind: cannot assign requested address
-eth0: "prefix": ::/64 [on-link, autonomous], preferred: 4h0m0s, valid: 24h0m0s
-eth0: "lla": source link-layer address: 8e:5e:0a:27:6e:22
-eth0: initialized, advertising from fe80::8c5e:aff:fe27:6e22
+eth0: retrying initialization in 1s, 46 attempt(s) remaining: listen ip6:ipv6-icmp fe80::20d:b9ff:fe53:eacd%eth0: bind: cannot assign requested address
+eth0: "prefix": ::/64 [2600:6c4a:787f:d100::/64, fd9e:1a04:f01d::/64] [on-link, autonomous], preferred: 4h0m0s, valid: 24h0m0s
+eth0: "lla": source link-layer address: 00:0d:b9:53:ea:cd
+eth0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
 ```
 
 ## HTTP debug server
@@ -94,11 +94,11 @@ You can verify the server is running with `curl`:
 ```text
 $ curl -i localhost:9430
 HTTP/1.1 200 OK
-Date: Wed, 01 Jul 2020 14:30:51 GMT
-Content-Length: 33
+Date: Tue, 22 Jun 2021 11:25:29 GMT
+Content-Length: 28
 Content-Type: text/plain; charset=utf-8
 
-CoreRAD v0.2.7 BETA (2020-06-24)
+CoreRAD v0.3.1 (2021-05-28)
 ```
 
 If enabled, you can also check the Prometheus metrics output:
@@ -168,19 +168,21 @@ notifications](https://www.freedesktop.org/software/systemd/man/sd_notify.html) 
 ```text
 $ systemctl status corerad
 ● corerad.service - CoreRAD IPv6 NDP RA daemon
-   Loaded: loaded (/nix/store/60n0lpw54mgr2zyxpc9h8cyy5i7v5g5x-unit-corerad.service/corerad.service; enabled; vendor preset: enabled)
-   Active: active (running) since Wed 2020-07-01 04:49:58 EDT; 5h 10min ago
- Main PID: 3678 (corerad)
-   Status: "server started, all tasks running"
-       IP: 1.9M in, 3.9M out
-    Tasks: 12 (limit: 4691)
-   Memory: 15.7M
-      CPU: 58.583s
-   CGroup: /system.slice/corerad.service
-           └─3678 /nix/store/zvls0b2f3hpvkgj766sr3hk1zrighrj3-corerad-0.2.7/bin/corerad -c=/nix/store/52n6z272f0ybpq0dgysmk9lzrbc1w1ii-corerad.toml
+     Loaded: loaded (/nix/store/8zkfcmn39l2i04jd0j44vyqqj75561jl-unit-corerad.service/corerad.service; enabled; vendor preset: enabled)
+     Active: active (running) since Tue 2021-06-22 07:20:00 EDT; 6min ago
+   Main PID: 4004482 (corerad)
+     Status: "server started, all tasks running"
+         IP: 31.6K in, 108.9K out
+         IO: 44.0K read, 0B written
+      Tasks: 10 (limit: 4690)
+     Memory: 11.0M
+        CPU: 1.422s
+     CGroup: /system.slice/corerad.service
+             └─4004482 /nix/store/hyfx8za34rjx2061hrkiv3jvqdx6wxs7-corerad-0.3.1/bin/corerad -c=/nix/store/738wciz9f4lxzjz1bx4dwlyafarw95gc-corerad.toml
 
-Jul 01 04:49:58 routnerr-2 corerad[3678]: lan0: "rdnss": servers: [fd9e:1a04:f01d:10::1], lifetime: 20m0s
-Jul 01 04:49:58 routnerr-2 corerad[3678]: lan0: "lla": source link-layer address: 00:0d:b9:53:ea:cd
-Jul 01 04:49:58 routnerr-2 corerad[3678]: lan0: initialized, advertising from fe80::1
-Jul 01 04:49:58 routnerr-2 systemd[1]: Started CoreRAD IPv6 NDP RA daemon.
+Jun 22 07:20:00 routnerr-2 corerad[4004482]: lan0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+Jun 22 07:20:00 routnerr-2 corerad[4004482]: tengb0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+Jun 22 07:20:00 routnerr-2 corerad[4004482]: iot0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+Jun 22 07:20:00 routnerr-2 corerad[4004482]: lab0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+Jun 22 07:20:00 routnerr-2 systemd[1]: Started CoreRAD IPv6 NDP RA daemon.
 ```

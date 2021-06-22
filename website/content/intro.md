@@ -46,14 +46,14 @@ prometheus = true
 ```
 
 Download and build [the latest CoreRAD release from
-source](https://github.com/mdlayher/corerad/releases). A Go 1.14+ compiler is
-required. As of June 2020, only [NixOS unstable has a packaged version of
-CoreRAD](https://nixos.org/nixos/packages.html?attr=corerad&channel=nixpkgs-unstable&query=corerad).
+source](https://github.com/mdlayher/corerad/releases). A Go 1.16+ compiler is
+required. As of June 2021, only [NixOS has a packaged version of
+CoreRAD](https://search.nixos.org/packages?query=corerad).
 
 ```text
 $ go build ./cmd/corerad/
 $ ./corerad -h
-CoreRAD v0.2.7 BETA (2020-06-24)
+CoreRAD v0.3.1 (2021-05-28)
 flags:
   -c string
         path to configuration file (default "corerad.toml")
@@ -74,9 +74,9 @@ Finally, start CoreRAD with the configuration file:
 
 ```text
 $ ./corerad -c ./corerad.toml
-CoreRAD v0.2.7 BETA (2020-06-24) starting with configuration file "corerad.toml"
+CoreRAD v0.3.1 (2021-05-28) starting with configuration file "corerad.toml"
 starting HTTP debug listener on "localhost:9430": prometheus: true, pprof: false
-eth0: "prefix": ::/64 [on-link, autonomous], preferred: 4h0m0s, valid: 24h0m0s
+eth0: "prefix": ::/64 [2600:6c4a:787f:d100::/64, fd9e:1a04:f01d::/64] [on-link, autonomous], preferred: 4h0m0s, valid: 24h0m0s
 eth0: "lla": source link-layer address: 00:0d:b9:53:ea:cd
 eth0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
 ```
