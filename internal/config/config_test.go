@@ -140,6 +140,9 @@ func TestParse(t *testing.T) {
 			source_lla = true
 			preference = "low"
 
+			  [[interfaces.rdnss]]
+			  servers = ["::"]
+
 			[[interfaces]]
 			name = "eth2"
 			verbose = true
@@ -219,7 +222,13 @@ func TestParse(t *testing.T) {
 						RetransmitTimer: 5 * time.Second,
 						DefaultLifetime: 8 * time.Second,
 						Preference:      ndp.Low,
-						Plugins:         []plugin.Plugin{&plugin.LLA{}},
+						Plugins: []plugin.Plugin{
+							&plugin.RDNSS{
+								Lifetime: 8 * time.Second,
+								Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+							},
+							&plugin.LLA{},
+						},
 					},
 					{
 						Name:            "eth2",
@@ -299,7 +308,7 @@ func TestParseDefaults(t *testing.T) {
 		  prefix = "2001:db8:ffff::/64"
 
 		  [[interfaces.rdnss]]
-		  servers = ["2001:db8::1", "2001:db8::2"]
+		  servers = ["::"]
 
 		  [[interfaces.dnssl]]
 		  domain_names = ["foo.example.com"]

@@ -637,6 +637,19 @@ func Test_parseRDNSS(t *testing.T) {
 			},
 			ok: true,
 		},
+		{
+			name: "OK wildcard server",
+			s: `
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["::"]
+			`,
+			r: &plugin.RDNSS{
+				Lifetime: 20 * time.Minute,
+				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+			},
+			ok: true,
+		},
 	}
 
 	for _, tt := range tests {

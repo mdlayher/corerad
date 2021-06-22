@@ -246,6 +246,8 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	}
 
 	if len(d.Servers) == 0 {
+		// TODO(mdlayher): should this imply the :: wildcard support? If so
+		// consider also implying ::/64 for empty prefix option.
 		return nil, errors.New("must specify one or more DNS server IPv6 addresses")
 	}
 
