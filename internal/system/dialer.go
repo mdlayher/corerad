@@ -297,7 +297,7 @@ func (d *Dialer) logf(format string, v ...interface{}) {
 
 // dialNDP creates an ndp.Conn which is ready to serve router advertisements.
 func dialNDP(ifi *net.Interface) (*ndp.Conn, net.IP, error) {
-	c, ip, err := ndp.Dial(ifi, ndp.LinkLocal)
+	c, ip, err := ndp.Listen(ifi, ndp.LinkLocal)
 	if err != nil {
 		return nil, nil, err
 	}

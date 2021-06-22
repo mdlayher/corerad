@@ -7,7 +7,7 @@ require (
 	github.com/google/go-cmp v0.5.6
 	github.com/jsimonetti/rtnetlink v0.0.0-20210614053835-9c52e516c709
 	github.com/mdlayher/metricslite v0.0.0-20200705182329-f8b577e97896
-	github.com/mdlayher/ndp v0.0.0-20200602162440-17ab9e3e5567
+	github.com/mdlayher/ndp v0.0.0-20210622191408-2604448b6a14
 	github.com/mdlayher/netlink v1.4.1
 	github.com/mdlayher/schedgroup v0.0.0-20200506182200-45678742bdc7
 	github.com/mdlayher/sdnotify v0.0.0-20210228150836-ea3ec207d697

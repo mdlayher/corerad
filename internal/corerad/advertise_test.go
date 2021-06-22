@@ -862,9 +862,9 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		ad.OnInconsistentRA = tcfg.onInconsistentRA
 	}
 
-	cconn, _, err := ndp.Dial(client, ndp.LinkLocal)
+	cconn, _, err := ndp.Listen(client, ndp.LinkLocal)
 	if err != nil {
-		t.Fatalf("failed to dial client connection: %v", err)
+		t.Fatalf("failed to open client connection: %v", err)
 	}
 
 	// Only accept RAs.
