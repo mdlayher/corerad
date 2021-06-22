@@ -143,12 +143,18 @@ preference = "medium"
 
   # RDNSS: attaches a NDP Recursive DNS Servers option to the router advertisement.
   [[interfaces.rdnss]]
+  # The DNS servers which should be advertised. Explicit IPv6 addresses may be
+  # specified, but the special :: wildcard will choose a suitable IPv6 address
+  # (preferring Unique Local Addresses, then Global Unicast Addresses, then
+  # Link-Local Addresses) from this interface to serve in the event that the DNS
+  # server resides on the same interface as CoreRAD.
+  servers = ["::"]
+
   # The maximum time these RDNSS addresses may be used for name resolution.
   # An empty string or 0 means these servers should no longer be used.
   # "auto" will compute a sane default. "infinite" means these servers should
   # be used forever.
   lifetime = "auto"
-  servers = ["2001:db8::1", "2001:db8::2"]
 
   # DNSSL: attaches a NDP DNS Search List option to the router advertisement.
   [[interfaces.dnssl]]

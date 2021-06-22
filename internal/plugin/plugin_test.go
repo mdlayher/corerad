@@ -24,6 +24,38 @@ import (
 )
 
 func TestPluginString(t *testing.T) {
+	// A function which returns synthesized interface addresses. Address
+	// prefixes are duplicated and of different address types to exercise
+	// different test cases for wildcard options.
+	addrs := func() ([]net.Addr, error) {
+		return []net.Addr{
+			&net.IPNet{
+				IP:   net.ParseIP("2001:db8::"),
+				Mask: net.CIDRMask(64, 128),
+			},
+			&net.IPNet{
+				IP:   net.ParseIP("2001:db8::1"),
+				Mask: net.CIDRMask(64, 128),
+			},
+			&net.IPNet{
+				IP:   net.ParseIP("fdff::"),
+				Mask: net.CIDRMask(64, 128),
+			},
+			&net.IPNet{
+				IP:   net.ParseIP("fdff::1"),
+				Mask: net.CIDRMask(64, 128),
+			},
+			&net.IPNet{
+				IP:   net.ParseIP("fe80::"),
+				Mask: net.CIDRMask(64, 128),
+			},
+			&net.IPNet{
+				IP:   net.ParseIP("fe80::1"),
+				Mask: net.CIDRMask(64, 128),
+			},
+		}, nil
+	}
+
 	tests := []struct {
 		name string
 		p    Plugin
@@ -50,24 +82,24 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "Prefix",
 			p: &Prefix{
+				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
+				OnLink:            true,
+				Autonomous:        true,
+				PreferredLifetime: 15 * time.Minute,
+				ValidLifetime:     ndp.Infinity,
+			},
+			s: "2001:db8::/64 [on-link, autonomous], preferred: 15m0s, valid: infinite",
+		},
+		{
+			name: "Prefix wildcard",
+			p: &Prefix{
 				Prefix:            netaddr.MustParseIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: 15 * time.Minute,
 				ValidLifetime:     ndp.Infinity,
 				Deprecated:        true,
-				Addrs: func() ([]net.Addr, error) {
-					return []net.Addr{
-						&net.IPNet{
-							IP:   net.ParseIP("2001:db8::"),
-							Mask: net.CIDRMask(64, 128),
-						},
-						&net.IPNet{
-							IP:   net.ParseIP("fdff::"),
-							Mask: net.CIDRMask(64, 128),
-						},
-					}, nil
-				},
+				Addrs:             addrs,
 			},
 			s: "::/64 [2001:db8::/64, fdff::/64] [DEPRECATED, on-link, autonomous], preferred: 15m0s, valid: infinite",
 		},
@@ -92,6 +124,15 @@ func TestPluginString(t *testing.T) {
 			},
 			s: "servers: [2001:db8::1, 2001:db8::2], lifetime: 30s",
 		},
+		{
+			name: "RDNSS wildcard",
+			p: &RDNSS{
+				Lifetime: 30 * time.Second,
+				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+				Addrs:    addrs,
+			},
+			s: "servers: :: [fdff::], lifetime: 30s",
+		},
 	}
 
 	for _, tt := range tests {
@@ -109,6 +150,7 @@ func TestBuild(t *testing.T) {
 		plugin Plugin
 		ifi    *net.Interface
 		ra     *ndp.RouterAdvertisement
+		ok     bool
 	}{
 		{
 			name: "DNSSL",
@@ -130,6 +172,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name:   "LLA",
@@ -145,6 +188,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name:   "MTU",
@@ -152,6 +196,7 @@ func TestBuild(t *testing.T) {
 			ra: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{ndp.NewMTU(1500)},
 			},
+			ok: true,
 		},
 		{
 			name: "static prefix",
@@ -172,6 +217,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name: "automatic prefixes /64",
@@ -215,6 +261,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name: "automatic prefixes /32",
@@ -238,6 +285,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name: "prefix deprecated preferred and valid",
@@ -264,6 +312,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name: "prefix deprecated valid",
@@ -290,6 +339,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name: "prefix deprecated invalid",
@@ -316,6 +366,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name: "route",
@@ -334,6 +385,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name: "route deprecated valid",
@@ -354,6 +406,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
 			name: "route deprecated invalid",
@@ -374,9 +427,10 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
 		},
 		{
-			name: "RDNSS",
+			name: "static RDNSS",
 			plugin: &RDNSS{
 				Lifetime: 10 * time.Second,
 				Servers: []netaddr.IP{
@@ -395,6 +449,59 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
+			ok: true,
+		},
+		{
+			name: "automatic RDNSS no addresses",
+			plugin: &RDNSS{
+				Lifetime: 10 * time.Second,
+				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+				Addrs:    func() ([]net.Addr, error) { return nil, nil },
+			},
+		},
+		{
+			name: "automatic RDNSS one address",
+			plugin: &RDNSS{
+				Lifetime: 10 * time.Second,
+				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+				Addrs: func() ([]net.Addr, error) {
+					return []net.Addr{mustCIDR("2001:db8::1/64")}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{
+						Lifetime: 10 * time.Second,
+						Servers:  []net.IP{mustIP("2001:db8::1")},
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "automatic RDNSS many addresses",
+			plugin: &RDNSS{
+				Lifetime: 10 * time.Second,
+				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+				Addrs: func() ([]net.Addr, error) {
+					return []net.Addr{
+						// Populate some addresses which should be ignored.
+						&net.TCPAddr{},
+						mustCIDR("192.0.2.1/32"),
+						mustCIDR("fdff::1/64"),
+						mustCIDR("2001:db8::1/64"),
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{
+						Lifetime: 10 * time.Second,
+						Servers:  []net.IP{mustIP("fdff::1")},
+					},
+				},
+			},
+			ok: true,
 		},
 	}
 
@@ -408,13 +515,22 @@ func TestBuild(t *testing.T) {
 				}
 			}
 
-			if err := tt.plugin.Apply(ra); err != nil {
+			err := tt.plugin.Apply(ra)
+			if tt.ok && err != nil {
 				t.Fatalf("failed to apply: %v", err)
+			}
+			if !tt.ok && err == nil {
+				t.Fatal("expected an error, but none occurred")
+			}
+			if err != nil {
+				t.Logf("err: %v", err)
+				return
 			}
 
 			if diff := cmp.Diff(tt.ra, ra); diff != "" {
 				t.Fatalf("unexpected RA (-want +got):\n%s", diff)
 			}
+
 		})
 	}
 }
@@ -429,10 +545,12 @@ func mustIP(s string) net.IP {
 }
 
 func mustCIDR(s string) *net.IPNet {
-	_, ipn, err := net.ParseCIDR(s)
+	ip, ipn, err := net.ParseCIDR(s)
 	if err != nil {
 		panicf("failed to parse CIDR: %v", err)
 	}
 
+	// Remove masking to simulate 2001:db8::1/64 and etc. properly.
+	ipn.IP = ip
 	return ipn
 }

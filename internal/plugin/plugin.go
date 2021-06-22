@@ -14,6 +14,7 @@
 package plugin
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -393,8 +394,12 @@ func (r *Route) lifetime() time.Duration {
 
 // RDNSS configures a NDP Recursive DNS Servers option.
 type RDNSS struct {
+	// Parameters from configuration.
 	Lifetime time.Duration
 	Servers  []netaddr.IP
+
+	// Functions which can be swapped for tests.
+	Addrs func() ([]net.Addr, error)
 }
 
 // Name implements Plugin.
@@ -407,17 +412,50 @@ func (r *RDNSS) String() string {
 		ips = append(ips, s.String())
 	}
 
-	return fmt.Sprintf("servers: [%s], lifetime: %s",
-		strings.Join(ips, ", "), durString(r.Lifetime))
+	servers := fmt.Sprintf("[%s]", strings.Join(ips, ", "))
+	if r.wildcard() {
+		// Make a best-effort to note the current server if the user is using
+		// the wildcard syntax. If this returns an error, we'll return "::"
+		// with no further information.
+		if s, err := r.currentServer(); err == nil {
+			servers = fmt.Sprintf(":: [%s]", s.String())
+		}
+	}
+
+	return fmt.Sprintf("servers: %s, lifetime: %s", servers, durString(r.Lifetime))
 }
 
 // Prepare implements Plugin.
-func (*RDNSS) Prepare(_ *net.Interface) error { return nil }
+func (r *RDNSS) Prepare(ifi *net.Interface) error {
+	// Fetch addresses from the specified interface whenever invoked.
+	r.Addrs = ifi.Addrs
+	return nil
+}
 
 // Apply implements Plugin.
 func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
-	ips := make([]net.IP, 0, len(r.Servers))
-	for _, s := range r.Servers {
+	if !r.wildcard() {
+		// User specified exact servers so apply them directly.
+		r.applyServers(r.Servers, ra)
+		return nil
+	}
+
+	// User specified the :: wildcard syntax, automatically choose a DNS server
+	// address from this interface.
+	server, err := r.currentServer()
+	if err != nil {
+		return err
+	}
+
+	// Produce a RecursiveDNSServers option for this server.
+	r.applyServers([]netaddr.IP{server}, ra)
+	return nil
+}
+
+// applyServers unpacks servers into an ndp.RecursiveDNSServer option within ra.
+func (r *RDNSS) applyServers(servers []netaddr.IP, ra *ndp.RouterAdvertisement) {
+	ips := make([]net.IP, 0, len(servers))
+	for _, s := range servers {
 		ips = append(ips, s.IPAddr().IP)
 	}
 
@@ -425,8 +463,97 @@ func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
 		Lifetime: r.Lifetime,
 		Servers:  ips,
 	})
+}
 
-	return nil
+// wildcard determines if the RDNSS option is configured with the :: wildcard
+// syntax.
+func (r *RDNSS) wildcard() bool {
+	// TODO(mdlayher): allow both wildcard and non-wildcard servers?
+	return len(r.Servers) == 1 && r.Servers[0] == netaddr.IPv6Unspecified()
+}
+
+// currentServer fetches the current DNS server IP from the interface.
+func (r *RDNSS) currentServer() (netaddr.IP, error) {
+	// Expand :: to one of the IPv6 addresses on this interface.
+	addrs, err := r.Addrs()
+	if err != nil {
+		return netaddr.IP{}, fmt.Errorf("failed to fetch IP addresses: %v", err)
+	}
+
+	var ips []netaddr.IP
+	for _, a := range addrs {
+		ipn, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+
+		ipp, ok := netaddr.FromStdIPNet(ipn)
+		if !ok {
+			panicf("corerad: invalid net.IPNet: %+v", a)
+		}
+
+		// Only consider IPv6 addresses.
+		if ipp.IP().Is4() {
+			continue
+		}
+
+		ips = append(ips, ipp.IP())
+	}
+
+	switch len(ips) {
+	case 0:
+		// No IPv6 addresses, cannot use wildcard syntax.
+		return netaddr.IP{}, errors.New("interface has no IPv6 addresses")
+	case 1:
+		// One IPv6 address, use that one.
+		return ips[0], nil
+	}
+
+	// More than one IPv6 address was found. Now that we've gathered the
+	// addresses on this interface, select one as follows:
+	//
+	// 1) Unique Local Address (ULA)
+	//   - if assigned, high probability of use for internal-only services.
+	// 2) Global Unicast Address (GUA)
+	//   - de-facto choice when ULA is not available.
+	// 3) Link-Local Address (LLA)
+	//   - last resort, doesn't work across subnets but since this machine is
+	//     also running CoreRAD that may not be a problem.
+	//
+	// In the event of a tie, the lesser address by byte comparison wins.
+	//
+	// TODO(mdlayher): actually consider OS-specific data like
+	// temporary/deprecated address flags.
+	//
+	// TODO(mdlayher): infer permanence of an address from EUI-64 format.
+	sort.SliceStable(ips, func(i, j int) bool {
+		// Prefer ULA.
+		if isI, isJ := isULA(ips[i]), isULA(ips[j]); isI && !isJ {
+			return true
+		} else if isJ && !isI {
+			return false
+		}
+
+		// Prefer GUA.
+		if isI, isJ := isGUA(ips[i]), isGUA(ips[j]); isI && !isJ {
+			return true
+		} else if isJ && !isI {
+			return false
+		}
+
+		// Prefer LLA.
+		if isI, isJ := ips[i].IsLinkLocalUnicast(), ips[j].IsLinkLocalUnicast(); isI && !isJ {
+			return true
+		} else if isJ && !isI {
+			return false
+		}
+
+		// Tie-breaker: prefer lowest address.
+		return ips[i].Less(ips[j])
+	})
+
+	// The first address wins.
+	return ips[0], nil
 }
 
 // durString converts a time.Duration into a string while also recognizing
@@ -439,6 +566,14 @@ func durString(d time.Duration) string {
 		return d.String()
 	}
 }
+
+// TODO(mdlayher): upstream into inet.af/netaddr.
+
+func isGUA(ip netaddr.IP) bool { return ip.IPAddr().IP.IsGlobalUnicast() }
+
+var ula = netaddr.MustParseIPPrefix("fc00::/7")
+
+func isULA(ip netaddr.IP) bool { return ula.Contains(ip) }
 
 func panicf(format string, a ...interface{}) {
 	panic(fmt.Sprintf(format, a...))
