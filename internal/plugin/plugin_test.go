@@ -591,7 +591,7 @@ func Test_betterRDNSS(t *testing.T) {
 		{
 			name:    "GUA vs ULA",
 			current: gua1,
-			best:    ula2,
+			best:    ula1,
 			ok:      false,
 		},
 		{
@@ -609,7 +609,7 @@ func Test_betterRDNSS(t *testing.T) {
 		{
 			name:    "LLA vs ULA",
 			current: lla1,
-			best:    ula2,
+			best:    ula1,
 			ok:      false,
 		},
 		{
