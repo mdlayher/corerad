@@ -537,6 +537,8 @@ func TestBuild(t *testing.T) {
 
 func Test_betterRDNSS(t *testing.T) {
 	var (
+		lo = netaddr.MustParseIP("::1")
+
 		ula1 = netaddr.MustParseIP("fdff::1")
 		ula2 = netaddr.MustParseIP("fdff::2")
 
@@ -569,6 +571,12 @@ func Test_betterRDNSS(t *testing.T) {
 			current: netaddr.IP{},
 			best:    netaddr.IP{},
 			ok:      true,
+		},
+		{
+			name:    "lo vs lo",
+			current: lo,
+			best:    lo,
+			ok:      false,
 		},
 		{
 			name:    "ULA vs ULA",

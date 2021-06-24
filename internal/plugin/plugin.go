@@ -559,9 +559,9 @@ func betterRDNSS(best, current netaddr.IP) bool {
 		}
 	}
 
-	// Pretty sure this is impossible as all netaddr.IPs would match at least
-	// one of the comparison functions above. It's probably worth fuzzing this!
-	panic(fmt.Sprintf("unreachable betterRDNSS: best: %v, current: %v", best, current))
+	// None of the comparison functions were matched (perhaps due to an input
+	// like localhost ::1), so do a final byte comparison.
+	return current.Less(best)
 }
 
 // durString converts a time.Duration into a string while also recognizing
