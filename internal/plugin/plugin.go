@@ -474,13 +474,15 @@ func (r *RDNSS) wildcard() bool {
 
 // currentServer fetches the current DNS server IP from the interface.
 func (r *RDNSS) currentServer() (netaddr.IP, error) {
-	// Expand :: to one of the IPv6 addresses on this interface.
+	// Expand :: to one of the IPv6 addresses on this interface. The "best"
+	// address will be chosen by comparing all addresses on the interface for
+	// desired properties.
 	addrs, err := r.Addrs()
 	if err != nil {
 		return netaddr.IP{}, fmt.Errorf("failed to fetch IP addresses: %v", err)
 	}
 
-	var ips []netaddr.IP
+	var best netaddr.IP
 	for _, a := range addrs {
 		ipn, ok := a.(*net.IPNet)
 		if !ok {
@@ -493,24 +495,34 @@ func (r *RDNSS) currentServer() (netaddr.IP, error) {
 		}
 
 		// Only consider IPv6 addresses.
-		if ipp.IP().Is4() {
+		ip := ipp.IP()
+		if ip.Is4() {
 			continue
 		}
 
-		ips = append(ips, ipp.IP())
+		// Is ip better than our current best?
+		if betterRDNSS(best, ip) {
+			best = ip
+		}
 	}
 
-	switch len(ips) {
-	case 0:
+	if best.IsZero() {
 		// No IPv6 addresses, cannot use wildcard syntax.
 		return netaddr.IP{}, errors.New("interface has no IPv6 addresses")
-	case 1:
-		// One IPv6 address, use that one.
-		return ips[0], nil
 	}
 
-	// More than one IPv6 address was found. Now that we've gathered the
-	// addresses on this interface, select one as follows:
+	return best, nil
+}
+
+// betterRDNSS compares two IPv6 addresses and returns whether the current
+// input address is considered a better choice than the existing best address.
+func betterRDNSS(best, current netaddr.IP) bool {
+	if best.IsZero() {
+		// When best is zero, current always wins.
+		return true
+	}
+
+	// The best IPv6 address selection algorithm for RDNSS is as follows:
 	//
 	// 1) Unique Local Address (ULA)
 	//   - if assigned, high probability of use for internal-only services.
@@ -518,42 +530,38 @@ func (r *RDNSS) currentServer() (netaddr.IP, error) {
 	//   - de-facto choice when ULA is not available.
 	// 3) Link-Local Address (LLA)
 	//   - last resort, doesn't work across subnets but since this machine is
-	//     also running CoreRAD that may not be a problem.
+	//     also running CoreRAD (and sending router advertisements on-link) that
+	//     may not be a problem.
 	//
 	// In the event of a tie, the lesser address by byte comparison wins.
 	//
 	// TODO(mdlayher): actually consider OS-specific data like
 	// temporary/deprecated address flags.
 	//
-	// TODO(mdlayher): infer permanence of an address from EUI-64 format.
-	sort.SliceStable(ips, func(i, j int) bool {
-		// Prefer ULA.
-		if isI, isJ := isULA(ips[i]), isULA(ips[j]); isI && !isJ {
+	// TODO(mdlayher): infer permanence of an address from EUI-64 format. Prefer
+	// ULA.
+	for _, fn := range []func(netaddr.IP) bool{
+		isULA, // TODO: (netaddr.IP).IsPrivate,
+		isGUA, // TODO: (netaddr.IP).IsGlobalUnicast,
+		(netaddr.IP).IsLinkLocalUnicast,
+	} {
+		okC, okB := fn(current), fn(best)
+		switch {
+		case okC && !okB:
+			// current wins.
 			return true
-		} else if isJ && !isI {
+		case !okC && okB:
+			// best wins.
 			return false
+		case okC && okB:
+			// Tie, break using byte comparison.
+			return current.Less(best)
 		}
+	}
 
-		// Prefer GUA.
-		if isI, isJ := isGUA(ips[i]), isGUA(ips[j]); isI && !isJ {
-			return true
-		} else if isJ && !isI {
-			return false
-		}
-
-		// Prefer LLA.
-		if isI, isJ := ips[i].IsLinkLocalUnicast(), ips[j].IsLinkLocalUnicast(); isI && !isJ {
-			return true
-		} else if isJ && !isI {
-			return false
-		}
-
-		// Tie-breaker: prefer lowest address.
-		return ips[i].Less(ips[j])
-	})
-
-	// The first address wins.
-	return ips[0], nil
+	// Pretty sure this is impossible as all netaddr.IPs would match at least
+	// one of the comparison functions above. It's probably worth fuzzing this!
+	panic(fmt.Sprintf("unreachable betterRDNSS: best: %v, current: %v", best, current))
 }
 
 // durString converts a time.Duration into a string while also recognizing

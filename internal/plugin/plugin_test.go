@@ -535,6 +535,106 @@ func TestBuild(t *testing.T) {
 	}
 }
 
+func Test_betterRDNSS(t *testing.T) {
+	var (
+		ula1 = netaddr.MustParseIP("fdff::1")
+		ula2 = netaddr.MustParseIP("fdff::2")
+
+		gua1 = netaddr.MustParseIP("2001:db8::1")
+		gua2 = netaddr.MustParseIP("2001:db8::2")
+
+		lla1 = netaddr.MustParseIP("fe80::1")
+		lla2 = netaddr.MustParseIP("fe80::2")
+	)
+
+	tests := []struct {
+		name          string
+		best, current netaddr.IP
+		ok            bool
+	}{
+		{
+			name:    "zero best",
+			current: ula1,
+			best:    netaddr.IP{},
+			ok:      true,
+		},
+		{
+			name:    "self best",
+			current: ula1,
+			best:    ula1,
+			ok:      false,
+		},
+		{
+			name:    "zero vs zero",
+			current: netaddr.IP{},
+			best:    netaddr.IP{},
+			ok:      true,
+		},
+		{
+			name:    "ULA vs ULA",
+			current: ula1,
+			best:    ula2,
+			ok:      true,
+		},
+		{
+			name:    "ULA vs GUA",
+			current: ula1,
+			best:    gua1,
+			ok:      true,
+		},
+		{
+			name:    "ULA vs LLA",
+			current: ula1,
+			best:    lla1,
+			ok:      true,
+		},
+		{
+			name:    "GUA vs ULA",
+			current: gua1,
+			best:    ula2,
+			ok:      false,
+		},
+		{
+			name:    "GUA vs GUA",
+			current: gua1,
+			best:    gua2,
+			ok:      true,
+		},
+		{
+			name:    "GUA vs LLA",
+			current: gua1,
+			best:    lla1,
+			ok:      true,
+		},
+		{
+			name:    "LLA vs ULA",
+			current: lla1,
+			best:    ula2,
+			ok:      false,
+		},
+		{
+			name:    "LLA vs GUA",
+			current: lla1,
+			best:    gua1,
+			ok:      false,
+		},
+		{
+			name:    "LLA vs LLA",
+			current: lla1,
+			best:    lla2,
+			ok:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if diff := cmp.Diff(tt.ok, betterRDNSS(tt.best, tt.current)); diff != "" {
+				t.Fatalf("unexpected better result for %s vs %s (-want +got):\n%s", tt.best, tt.current, diff)
+			}
+		})
+	}
+}
+
 func mustIP(s string) net.IP {
 	ip := net.ParseIP(s)
 	if ip == nil {
