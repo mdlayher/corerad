@@ -40,6 +40,30 @@ type Plugin interface {
 	Apply(ra *ndp.RouterAdvertisement) error
 }
 
+// CaptivePortal configures a NDP Captive Portal option.
+type CaptivePortal string
+
+// NewCaptivePortal creates a CaptivePortal from a string.
+func NewCaptivePortal(uri string) *CaptivePortal {
+	cp := CaptivePortal(uri)
+	return &cp
+}
+
+// Name implements Plugin.
+func (*CaptivePortal) Name() string { return "captive-portal" }
+
+// String implements Plugin.
+func (cp *CaptivePortal) String() string { return fmt.Sprintf("URI: %q", *cp) }
+
+// Prepare implements Plugin.
+func (*CaptivePortal) Prepare(_ *net.Interface) error { return nil }
+
+// Apply implements Plugin.
+func (cp *CaptivePortal) Apply(ra *ndp.RouterAdvertisement) error {
+	ra.Options = append(ra.Options, ndp.NewCaptivePortal(string(*cp)))
+	return nil
+}
+
 // DNSSL configures a NDP DNS Search List option.
 type DNSSL struct {
 	Lifetime    time.Duration

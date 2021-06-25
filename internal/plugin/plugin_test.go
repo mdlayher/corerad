@@ -62,6 +62,11 @@ func TestPluginString(t *testing.T) {
 		s    string
 	}{
 		{
+			name: "Captive Portal",
+			p:    NewCaptivePortal("http://router/portal"),
+			s:    `URI: "http://router/portal"`,
+		},
+		{
 			name: "DNSSL",
 			p: &DNSSL{
 				Lifetime:    30 * time.Second,
@@ -152,6 +157,14 @@ func TestBuild(t *testing.T) {
 		ra     *ndp.RouterAdvertisement
 		ok     bool
 	}{
+		{
+			name:   "CaptivePortal",
+			plugin: NewCaptivePortal("http://router/portal"),
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{ndp.NewCaptivePortal("http://router/portal")},
+			},
+			ok: true,
+		},
 		{
 			name: "DNSSL",
 			plugin: &DNSSL{

@@ -59,12 +59,13 @@ type rawInterface struct {
 	// Plugins.
 	//
 	// TOML tags for slices are explicitly singular.
-	Prefixes  []rawPrefix `toml:"prefix"`
-	Routes    []rawRoute  `toml:"route"`
-	RDNSS     []rawRDNSS  `toml:"rdnss"`
-	DNSSL     []rawDNSSL  `toml:"dnssl"`
-	MTU       int         `toml:"mtu"`
-	SourceLLA *bool       `toml:"source_lla"`
+	Prefixes      []rawPrefix `toml:"prefix"`
+	Routes        []rawRoute  `toml:"route"`
+	RDNSS         []rawRDNSS  `toml:"rdnss"`
+	DNSSL         []rawDNSSL  `toml:"dnssl"`
+	MTU           int         `toml:"mtu"`
+	SourceLLA     *bool       `toml:"source_lla"`
+	CaptivePortal *string     `toml:"captive_portal"`
 }
 
 // A rawPrefix is the raw configuration file representation of a Prefix plugin.

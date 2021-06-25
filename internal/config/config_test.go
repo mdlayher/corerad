@@ -138,6 +138,7 @@ func TestParse(t *testing.T) {
 			reachable_time = "30s"
 			retransmit_timer = "5s"
 			source_lla = true
+			captive_portal = ""
 			preference = "low"
 
 			  [[interfaces.rdnss]]
@@ -149,6 +150,7 @@ func TestParse(t *testing.T) {
 			hop_limit = 0
 			unicast_only = true
 			source_lla = false
+			captive_portal = "http://router/portal"
 			preference = "high"
 
 			[[interfaces]]
@@ -240,7 +242,7 @@ func TestParse(t *testing.T) {
 						DefaultLifetime: 30 * time.Minute,
 						UnicastOnly:     true,
 						Preference:      ndp.High,
-						Plugins:         []plugin.Plugin{},
+						Plugins:         []plugin.Plugin{plugin.NewCaptivePortal("http://router/portal")},
 					},
 					{
 						Name:    "eth3",

@@ -79,6 +79,10 @@ mtu = 0
 # router advertisement. Defaults to true when omitted.
 source_lla = true
 
+# Attaches a NDP captive portal option to the router advertisement. Only set
+# when a URI value is present and not an empty string.
+captive_portal = ""
+
 # Indicates whether or not CoreRAD will issue multicast router advertisements.
 # In this mode, machines on this interface's LAN must issue individual router
 # solicitations in order to receive router advertisements.

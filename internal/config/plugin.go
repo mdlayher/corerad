@@ -102,13 +102,17 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		return nil, fmt.Errorf("MTU (%d) must be between 0 and 65536", ifi.MTU)
 	}
 	if ifi.MTU != 0 {
-		m := plugin.MTU(ifi.MTU)
-		plugins = append(plugins, &m)
+		plugins = append(plugins, plugin.NewMTU(ifi.MTU))
 	}
 
 	// Always set unless explicitly false.
 	if ifi.SourceLLA == nil || *ifi.SourceLLA {
 		plugins = append(plugins, &plugin.LLA{})
+	}
+
+	// Only set when key is present and not empty.
+	if cp := ifi.CaptivePortal; cp != nil && *cp != "" {
+		plugins = append(plugins, plugin.NewCaptivePortal(*cp))
 	}
 
 	return plugins, nil
