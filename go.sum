@@ -167,8 +167,8 @@ github.com/mdlayher/genetlink v1.0.0 h1:OoHN1OdyEIkScEmRgxLEe2M9U8ClMytqA5niynLt
 github.com/mdlayher/genetlink v1.0.0/go.mod h1:0rJ0h4itni50A86M2kHcgS85ttZazNt7a8H2a2cw0Gc=
 github.com/mdlayher/metricslite v0.0.0-20200705182329-f8b577e97896 h1:djVxW0T4zIZbgtddHiEyhxbOjIP/POvyBAFlOtw6MJI=
 github.com/mdlayher/metricslite v0.0.0-20200705182329-f8b577e97896/go.mod h1:B5OyX1tRjuvYgmN1pyX11/zyuTea5pO+9gk3oPu/UvU=
-github.com/mdlayher/ndp v0.0.0-20210622191408-2604448b6a14 h1:0xMXvUJ/Gjdn1D4I21jm9buqjercv7isfqwAn2V+KOI=
-github.com/mdlayher/ndp v0.0.0-20210622191408-2604448b6a14/go.mod h1:32w/5dDZWVSEOxyniAgKK4d7dHTuO6TCxWmUznQe3f8=
+github.com/mdlayher/ndp v0.0.0-20210623142709-5d20bbb4b9ae h1:W7Fzq/rW+rWvD+yrzymJcMzdZKwkdqzcPpEVzar6+9o=
+github.com/mdlayher/ndp v0.0.0-20210623142709-5d20bbb4b9ae/go.mod h1:32w/5dDZWVSEOxyniAgKK4d7dHTuO6TCxWmUznQe3f8=
 github.com/mdlayher/netlink v0.0.0-20190409211403-11939a169225/go.mod h1:eQB3mZE4aiYnlUsyGGCOpPETfdQq4Jhsgf1fk3cwQaA=
 github.com/mdlayher/netlink v1.0.0/go.mod h1:KxeJAFOFLG6AjpyDkQ/iIhxygIUKD+vcwqcnu43w/+M=
 github.com/mdlayher/netlink v1.1.0/go.mod h1:H4WCitaheIsdF9yOYu8CFmCgQthAPIWZmcKp9uZHgmY=
@@ -184,8 +184,9 @@ github.com/mdlayher/schedgroup v0.0.0-20200506182200-45678742bdc7 h1:WsbRp8nLEDf
 github.com/mdlayher/schedgroup v0.0.0-20200506182200-45678742bdc7/go.mod h1:5NGn8lFa8HhigBCL4QIkR5YuAgaeolDZxE57JP/UVys=
 github.com/mdlayher/sdnotify v0.0.0-20210228150836-ea3ec207d697 h1:PBb7ld5cQGfxHF2pKvb/ydtuPwdRaltGI4e0QSCuiNI=
 github.com/mdlayher/sdnotify v0.0.0-20210228150836-ea3ec207d697/go.mod h1:HtjVsQfsrBm1GDcDTUFn4ZXhftxTwO/hxrvEiRc61U4=
-github.com/mdlayher/socket v0.0.0-20210307095302-262dc9984e00 h1:qEtkL8n1DAHpi5/AOgAckwGQUlMe4+jhL/GMt+GKIks=
 github.com/mdlayher/socket v0.0.0-20210307095302-262dc9984e00/go.mod h1:GAFlyu4/XV68LkQKYzKhIo/WW7j3Zi0YRAz/BOoanUc=
+github.com/mdlayher/socket v0.0.0-20210624160740-9dbe287ded84 h1:L1jnQ6o+K3M574eez7eTxbsia6H1SfJaVpaXY33L37Q=
+github.com/mdlayher/socket v0.0.0-20210624160740-9dbe287ded84/go.mod h1:GAFlyu4/XV68LkQKYzKhIo/WW7j3Zi0YRAz/BOoanUc=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
