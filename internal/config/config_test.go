@@ -338,6 +338,8 @@ func TestParseDefaults(t *testing.T) {
 }
 
 func TestInterfaceRouterAdvertisement(t *testing.T) {
+	t.Parallel()
+
 	// More comprehensive tests exist in internal/corerad; just check the
 	// basics.
 

@@ -162,13 +162,6 @@ func Test_parsePrefix(t *testing.T) {
 		ok   bool
 	}{
 		{
-			name: "no prefix",
-			s: `
-			[[interfaces]]
-			  [[interfaces.prefix]]
-			`,
-		},
-		{
 			name: "bad prefix string",
 			s: `
 			[[interfaces]]
@@ -284,6 +277,15 @@ func Test_parsePrefix(t *testing.T) {
 			  [[interfaces.prefix]]
 			  prefix = "2001:db8::/96"
 			`,
+		},
+		{
+			name: "OK implied defaults",
+			s: `
+			[[interfaces]]
+			  [[interfaces.prefix]]
+			`,
+			p:  defaults,
+			ok: true,
 		},
 		{
 			name: "OK defaults",
@@ -562,14 +564,6 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 		},
 		{
-			name: "bad servers empty",
-			s: `
-			[[interfaces]]
-			  [[interfaces.rdnss]]
-			  servers = []
-			`,
-		},
-		{
 			name: "bad servers address",
 			s: `
 			[[interfaces]]
@@ -634,6 +628,18 @@ func Test_parseRDNSS(t *testing.T) {
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
 				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::1")},
+			},
+			ok: true,
+		},
+		{
+			name: "OK implied wildcard server",
+			s: `
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			`,
+			r: &plugin.RDNSS{
+				Lifetime: 20 * time.Minute,
+				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 			},
 			ok: true,
 		},

@@ -136,11 +136,21 @@ func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
 	}, nil
 }
 
+// autoPrefix is the sentinel prefix which is used to automatically infer the
+// appropriate prefixes to advertise for a given interface.
+var autoPrefix = netaddr.MustParseIPPrefix("::/64")
+
 // parsePrefix parses a Prefix plugin.
 func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
-	prefix, err := parseIPPrefix(p.Prefix)
+	prefix, err := parseIPPrefix(p.Prefix, allowEmpty)
 	if err != nil {
 		return nil, err
+	}
+
+	// Allow an empty prefix to be used in place of ::/64 as that is the default
+	// most users will want.
+	if prefix.IsZero() {
+		prefix = autoPrefix
 	}
 
 	// Don't permit /128 "prefixes". This input is valid as a route but not
@@ -208,7 +218,7 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 
 // parseRoute parses a Route plugin.
 func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
-	prefix, err := parseIPPrefix(r.Prefix)
+	prefix, err := parseIPPrefix(r.Prefix, disallowEmpty)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +251,7 @@ func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
 	}, nil
 }
 
-// parseDNSSL parses a DNSSL plugin.
+// parseRDNSS parses a RDNSS plugin.
 func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	// If auto, compute lifetime as recommended by radvd.
 	lifetime, err := parseDuration(d.Lifetime, 2*maxInterval)
@@ -250,9 +260,12 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	}
 
 	if len(d.Servers) == 0 {
-		// TODO(mdlayher): should this imply the :: wildcard support? If so
-		// consider also implying ::/64 for empty prefix option.
-		return nil, errors.New("must specify one or more DNS server IPv6 addresses")
+		// If the RDNSS stanza was specified but the servers list is empty,
+		// assume the user wants the :: wildcard.
+		return &plugin.RDNSS{
+			Lifetime: lifetime,
+			Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+		}, nil
 	}
 
 	// Parse all server addresses as IPv6 addresses.
@@ -275,9 +288,20 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	}, nil
 }
 
-// parseIPPrefix parses s an IPv6 prefix. It returns an error if the prefix is
-// invalid, refers to an address within a prefix, or is an IPv4 prefix.
-func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
+const (
+	allowEmpty    = true
+	disallowEmpty = false
+)
+
+// parseIPPrefix parses s an IPv6 prefix which may optionally be empty. It
+// returns an error if the prefix is invalid, refers to an address within a
+// prefix, or is an IPv4 prefix.
+func parseIPPrefix(s string, emptyOK bool) (netaddr.IPPrefix, error) {
+	if emptyOK && s == "" {
+		// When permitted, empty string produces a valid zero IPPrefix.
+		return netaddr.IPPrefix{}, nil
+	}
+
 	p1, err := netaddr.ParseIPPrefix(s)
 	if err != nil {
 		return netaddr.IPPrefix{}, err
