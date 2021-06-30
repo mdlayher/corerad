@@ -57,6 +57,30 @@ func TestParse(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad interface name and names",
+			s: `
+			[[interfaces]]
+			name = "foo"
+			names = ["foo"]
+			`,
+		},
+		{
+			name: "bad interface names repeated",
+			s: `
+			[[interfaces]]
+			names = ["foo", "foo"]
+			`,
+		},
+		{
+			name: "bad interface name repeated",
+			s: `
+			[[interfaces]]
+			name = "foo"
+			[[interfaces]]
+			name = "foo"
+			`,
+		},
+		{
 			name: "bad interface",
 			s: `
 			[[interfaces]]
@@ -159,7 +183,7 @@ func TestParse(t *testing.T) {
 			verbose = true
 
 			[[interfaces]]
-			name = "eth4"
+			names = ["eth4", "eth5"]
 			advertise = true
 			default_lifetime = ""
 
@@ -251,6 +275,14 @@ func TestParse(t *testing.T) {
 					},
 					{
 						Name:        "eth4",
+						Advertise:   true,
+						MinInterval: 3*time.Minute + 18*time.Second,
+						MaxInterval: 10 * time.Minute,
+						HopLimit:    64,
+						Plugins:     []plugin.Plugin{&plugin.LLA{}},
+					},
+					{
+						Name:        "eth5",
 						Advertise:   true,
 						MinInterval: 3*time.Minute + 18*time.Second,
 						MaxInterval: 10 * time.Minute,

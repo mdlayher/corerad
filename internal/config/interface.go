@@ -21,8 +21,44 @@ import (
 	"github.com/mdlayher/ndp"
 )
 
-// parseInterfaces parses a rawInterface into an Interface.
-func parseInterface(ifi rawInterface, epoch time.Time) (*Interface, error) {
+// parseInterfaces parses a rawInterface into a one or more Interfaces.
+func parseInterfaces(ifi rawInterface, epoch time.Time) ([]Interface, error) {
+	var (
+		hasName  = ifi.Name != ""
+		hasNames = len(ifi.Names) > 0
+	)
+
+	// Expect just one of name/names to be configured, and use that as the basis
+	// for configuring all interfaces in a given group using the same
+	// rawInterface.
+	var names []string
+	switch {
+	case hasName && hasNames:
+		return nil, errors.New("name and names identifiers are mutually exclusive")
+	case hasName && !hasNames:
+		names = []string{ifi.Name}
+	case !hasName && hasNames:
+		names = ifi.Names
+	default:
+		return nil, errors.New("must specify one of name or names identifiers")
+	}
+
+	ifis := make([]Interface, 0, len(names))
+	for _, name := range names {
+		iface, err := parseInterface(name, ifi, epoch)
+		if err != nil {
+			return nil, fmt.Errorf("%q: %v", name, err)
+		}
+
+		ifis = append(ifis, *iface)
+	}
+
+	return ifis, nil
+}
+
+// parseInterfaces parses a rawInterface into a single Interface with the
+// specified name.
+func parseInterface(name string, ifi rawInterface, epoch time.Time) (*Interface, error) {
 	// monitor and advertise are mutually exclusive.
 	if ifi.Monitor && ifi.Advertise {
 		return nil, errors.New("monitor and advertise mode are mutually exclusive")
@@ -31,7 +67,7 @@ func parseInterface(ifi rawInterface, epoch time.Time) (*Interface, error) {
 	// monitor short-circuits all advertising configuration.
 	if ifi.Monitor {
 		return &Interface{
-			Name:    ifi.Name,
+			Name:    name,
 			Monitor: ifi.Monitor,
 			Verbose: ifi.Verbose,
 		}, nil
@@ -114,7 +150,7 @@ func parseInterface(ifi rawInterface, epoch time.Time) (*Interface, error) {
 	}
 
 	return &Interface{
-		Name:            ifi.Name,
+		Name:            name,
 		Monitor:         ifi.Monitor,
 		Advertise:       ifi.Advertise,
 		Verbose:         ifi.Verbose,

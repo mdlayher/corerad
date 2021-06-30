@@ -5,7 +5,10 @@
 
 # Interfaces which will be used to serve IPv6 NDP router advertisements.
 [[interfaces]]
+# Interfaces can be configured individually via "name" or as a group via
+# "names". These keys are mutually exclusive.
 name = "eth0"
+# names = ["eth0", "eth1"]
 
 # Indicates whether or not this interface will be used exclusively for
 # monitoring incoming NDP traffic. monitor provides limited functionality in

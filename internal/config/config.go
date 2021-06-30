@@ -40,8 +40,12 @@ type file struct {
 
 // A rawInterface is the raw configuration file representation of an Interface.
 type rawInterface struct {
+	// Identifier for a single interface or multiple interfaces which should be
+	// configured as a unit: mutually exclusive.
+	Name  string   `toml:"name"`
+	Names []string `toml:"names"`
+
 	// Base interface configuration.
-	Name            string  `toml:"name"`
 	Monitor         bool    `toml:"monitor"`
 	Advertise       bool    `toml:"advertise"`
 	Verbose         bool    `toml:"verbose"`
@@ -184,20 +188,25 @@ func Parse(r io.Reader, epoch time.Time) (*Config, error) {
 		c.Debug = f.Debug
 	}
 
-	// Don't bother to check for valid interface names; that is more easily
-	// done when trying to create server listeners.
-	for i, ifi := range f.Interfaces {
-		if ifi.Name == "" {
-			return nil, fmt.Errorf("interface %d: empty interface name", i)
-		}
-
-		iface, err := parseInterface(ifi, epoch)
+	// Make sure each interface appears only once, but don't bother to check for
+	// valid interface names: that is more easily done when trying to create
+	// server listeners.
+	seen := make(map[string]struct{})
+	for i, ifaces := range f.Interfaces {
+		ifis, err := parseInterfaces(ifaces, epoch)
 		if err != nil {
 			// Narrow down the location of a configuration error.
-			return nil, fmt.Errorf("interface %d/%q: %v", i, ifi.Name, err)
+			return nil, fmt.Errorf("interface %d: %v", i, err)
 		}
 
-		c.Interfaces = append(c.Interfaces, *iface)
+		for _, ifi := range ifis {
+			if _, ok := seen[ifi.Name]; ok {
+				return nil, fmt.Errorf("interface %d: %q cannot appear multiple times in configuration", i, ifi.Name)
+			}
+			seen[ifi.Name] = struct{}{}
+		}
+
+		c.Interfaces = append(c.Interfaces, ifis...)
 	}
 
 	return c, nil
