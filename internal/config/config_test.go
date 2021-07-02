@@ -205,6 +205,7 @@ func TestParse(t *testing.T) {
 						UnicastOnly:     false,
 						Plugins: []plugin.Plugin{
 							&plugin.Prefix{
+								Auto:              true,
 								Prefix:            netaddr.MustParseIPPrefix("::/64"),
 								OnLink:            true,
 								Autonomous:        true,
@@ -250,6 +251,7 @@ func TestParse(t *testing.T) {
 						Preference:      ndp.Low,
 						Plugins: []plugin.Plugin{
 							&plugin.RDNSS{
+								Auto:     true,
 								Lifetime: 8 * time.Second,
 								Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 							},

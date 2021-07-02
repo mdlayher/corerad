@@ -148,6 +148,7 @@ func Test_parsePrefix(t *testing.T) {
 	t.Parallel()
 
 	defaults := &plugin.Prefix{
+		Auto:              true,
 		Prefix:            netaddr.MustParseIPPrefix("::/64"),
 		OnLink:            true,
 		Autonomous:        true,
@@ -319,6 +320,7 @@ func Test_parsePrefix(t *testing.T) {
 			  valid_lifetime = "infinite"
 			`,
 			p: &plugin.Prefix{
+				Auto:              true,
 				Prefix:            netaddr.MustParseIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
@@ -340,6 +342,7 @@ func Test_parsePrefix(t *testing.T) {
 			  valid_lifetime = "60s"
 			`,
 			p: &plugin.Prefix{
+				Auto:              true,
 				Prefix:            netaddr.MustParseIPPrefix("::/64"),
 				OnLink:            true,
 				PreferredLifetime: 30 * time.Second,
@@ -638,6 +641,7 @@ func Test_parseRDNSS(t *testing.T) {
 			  [[interfaces.rdnss]]
 			`,
 			r: &plugin.RDNSS{
+				Auto:     true,
 				Lifetime: 20 * time.Minute,
 				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 			},
@@ -651,6 +655,7 @@ func Test_parseRDNSS(t *testing.T) {
 			  servers = ["::"]
 			`,
 			r: &plugin.RDNSS{
+				Auto:     true,
 				Lifetime: 20 * time.Minute,
 				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 			},

@@ -98,6 +98,7 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "Prefix wildcard",
 			p: &Prefix{
+				Auto:              true,
 				Prefix:            netaddr.MustParseIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
@@ -132,6 +133,7 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "RDNSS wildcard",
 			p: &RDNSS{
+				Auto:     true,
 				Lifetime: 30 * time.Second,
 				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 				Addrs:    addrs,
@@ -235,6 +237,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "automatic prefixes /64",
 			plugin: &Prefix{
+				Auto:              true,
 				Prefix:            netaddr.MustParseIPPrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
@@ -279,6 +282,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "automatic prefixes /32",
 			plugin: &Prefix{
+				Auto:   true,
 				Prefix: netaddr.MustParseIPPrefix("::/32"),
 				Addrs: func() ([]net.Addr, error) {
 					return []net.Addr{
@@ -467,6 +471,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "automatic RDNSS no addresses",
 			plugin: &RDNSS{
+				Auto:     true,
 				Lifetime: 10 * time.Second,
 				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 				Addrs:    func() ([]net.Addr, error) { return nil, nil },
@@ -475,6 +480,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "automatic RDNSS one address",
 			plugin: &RDNSS{
+				Auto:     true,
 				Lifetime: 10 * time.Second,
 				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 				Addrs: func() ([]net.Addr, error) {
@@ -494,6 +500,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "automatic RDNSS many addresses",
 			plugin: &RDNSS{
+				Auto:     true,
 				Lifetime: 10 * time.Second,
 				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 				Addrs: func() ([]net.Addr, error) {

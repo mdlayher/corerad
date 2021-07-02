@@ -206,6 +206,9 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 	}
 
 	return &plugin.Prefix{
+		// Determine whether or not the prefix is using auto mode.
+		Auto: prefix == autoPrefix,
+
 		Prefix:            prefix,
 		OnLink:            onLink,
 		Autonomous:        auto,
@@ -263,6 +266,8 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 		// If the RDNSS stanza was specified but the servers list is empty,
 		// assume the user wants the :: wildcard.
 		return &plugin.RDNSS{
+			Auto: true,
+
 			Lifetime: lifetime,
 			Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 		}, nil
@@ -283,6 +288,9 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	}
 
 	return &plugin.RDNSS{
+		// TODO(mdlayher): check for Auto if :: is present anywhere.
+		Auto: len(servers) == 1 && servers[0] == netaddr.IPv6Unspecified(),
+
 		Lifetime: lifetime,
 		Servers:  servers,
 	}, nil

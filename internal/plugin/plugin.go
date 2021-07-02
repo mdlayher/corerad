@@ -145,6 +145,10 @@ func (m *MTU) Apply(ra *ndp.RouterAdvertisement) error {
 
 // A Prefix configures a NDP Prefix Information option.
 type Prefix struct {
+	// Whether or not this Prefix should automatically infer and apply the
+	// appropriate IPv6 prefixes to the configuration.
+	Auto bool
+
 	// Parameters from configuration.
 	Prefix            netaddr.IPPrefix
 	OnLink            bool
@@ -168,7 +172,7 @@ func (p *Prefix) Name() string { return "prefix" }
 // String implements Plugin.
 func (p *Prefix) String() string {
 	prefix := p.Prefix.String()
-	if p.wildcard() {
+	if p.Auto {
 		// Make a best-effort to note the current prefixes if the user is using
 		// the wildcard syntax. If this returns an error, we'll return "::/N"
 		// with no further information.
@@ -216,7 +220,7 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 
 // Apply implements Plugin.
 func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
-	if !p.wildcard() {
+	if !p.Auto {
 		// User specified an exact prefix so apply it directly.
 		p.applyPrefixes([]netaddr.IPPrefix{p.Prefix}, ra)
 		return nil
@@ -234,10 +238,6 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 	p.applyPrefixes(prefixes, ra)
 	return nil
 }
-
-// wildcard determines if the prefix is configured with the ::/N wildcard
-// syntax.
-func (p *Prefix) wildcard() bool { return p.Prefix.IP() == netaddr.IPv6Unspecified() }
 
 // currentPrefixes fetches the current prefix IPs from the interface.
 func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
@@ -418,6 +418,10 @@ func (r *Route) lifetime() time.Duration {
 
 // RDNSS configures a NDP Recursive DNS Servers option.
 type RDNSS struct {
+	// Whether or not this RDNSS should automatically infer and apply the
+	// appropriate IPv6 DNS server address to the configuration.
+	Auto bool
+
 	// Parameters from configuration.
 	Lifetime time.Duration
 	Servers  []netaddr.IP
@@ -437,7 +441,7 @@ func (r *RDNSS) String() string {
 	}
 
 	servers := fmt.Sprintf("[%s]", strings.Join(ips, ", "))
-	if r.wildcard() {
+	if r.Auto {
 		// Make a best-effort to note the current server if the user is using
 		// the wildcard syntax. If this returns an error, we'll return "::"
 		// with no further information.
@@ -458,7 +462,7 @@ func (r *RDNSS) Prepare(ifi *net.Interface) error {
 
 // Apply implements Plugin.
 func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
-	if !r.wildcard() {
+	if !r.Auto {
 		// User specified exact servers so apply them directly.
 		r.applyServers(r.Servers, ra)
 		return nil
@@ -487,13 +491,6 @@ func (r *RDNSS) applyServers(servers []netaddr.IP, ra *ndp.RouterAdvertisement) 
 		Lifetime: r.Lifetime,
 		Servers:  ips,
 	})
-}
-
-// wildcard determines if the RDNSS option is configured with the :: wildcard
-// syntax.
-func (r *RDNSS) wildcard() bool {
-	// TODO(mdlayher): allow both wildcard and non-wildcard servers?
-	return len(r.Servers) == 1 && r.Servers[0] == netaddr.IPv6Unspecified()
 }
 
 // currentServer fetches the current DNS server IP from the interface.
