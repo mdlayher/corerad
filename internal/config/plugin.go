@@ -269,12 +269,15 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 			Auto: true,
 
 			Lifetime: lifetime,
-			Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 		}, nil
 	}
 
 	// Parse all server addresses as IPv6 addresses.
-	servers := make([]netaddr.IP, 0, len(d.Servers))
+	var (
+		auto    bool
+		servers []netaddr.IP
+	)
+
 	for _, s := range d.Servers {
 		ip, err := netaddr.ParseIP(s)
 		if err != nil {
@@ -284,12 +287,19 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 			return nil, fmt.Errorf("string %q is not an IPv6 address", s)
 		}
 
+		// If :: is present, don't add it to the slice but do set Auto to true
+		// so a server address can be automatically chosen at runtime. The
+		// remaining server addresses will be set statically.
+		if ip == netaddr.IPv6Unspecified() {
+			auto = true
+			continue
+		}
+
 		servers = append(servers, ip)
 	}
 
 	return &plugin.RDNSS{
-		// TODO(mdlayher): check for Auto if :: is present anywhere.
-		Auto: len(servers) == 1 && servers[0] == netaddr.IPv6Unspecified(),
+		Auto: auto,
 
 		Lifetime: lifetime,
 		Servers:  servers,

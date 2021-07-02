@@ -469,14 +469,14 @@ func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
 	}
 
 	// User specified the :: wildcard syntax, automatically choose a DNS server
-	// address from this interface.
+	// address from this interface and prepend it to the list.
 	server, err := r.currentServer()
 	if err != nil {
 		return err
 	}
 
 	// Produce a RecursiveDNSServers option for this server.
-	r.applyServers([]netaddr.IP{server}, ra)
+	r.applyServers(append([]netaddr.IP{server}, r.Servers...), ra)
 	return nil
 }
 

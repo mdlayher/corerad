@@ -253,7 +253,6 @@ func TestParse(t *testing.T) {
 							&plugin.RDNSS{
 								Auto:     true,
 								Lifetime: 8 * time.Second,
-								Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 							},
 							&plugin.LLA{},
 						},

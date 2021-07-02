@@ -473,7 +473,6 @@ func TestBuild(t *testing.T) {
 			plugin: &RDNSS{
 				Auto:     true,
 				Lifetime: 10 * time.Second,
-				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 				Addrs:    func() ([]net.Addr, error) { return nil, nil },
 			},
 		},
@@ -482,7 +481,6 @@ func TestBuild(t *testing.T) {
 			plugin: &RDNSS{
 				Auto:     true,
 				Lifetime: 10 * time.Second,
-				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 				Addrs: func() ([]net.Addr, error) {
 					return []net.Addr{mustCIDR("2001:db8::1/64")}, nil
 				},
@@ -502,7 +500,6 @@ func TestBuild(t *testing.T) {
 			plugin: &RDNSS{
 				Auto:     true,
 				Lifetime: 10 * time.Second,
-				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 				Addrs: func() ([]net.Addr, error) {
 					return []net.Addr{
 						// Populate some addresses which should be ignored.
@@ -518,6 +515,26 @@ func TestBuild(t *testing.T) {
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,
 						Servers:  []net.IP{mustIP("fdff::1")},
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "automatic RDNSS with static address",
+			plugin: &RDNSS{
+				Auto:     true,
+				Lifetime: 10 * time.Second,
+				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::2")},
+				Addrs: func() ([]net.Addr, error) {
+					return []net.Addr{mustCIDR("2001:db8::1/64")}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RecursiveDNSServer{
+						Lifetime: 10 * time.Second,
+						Servers:  []net.IP{mustIP("2001:db8::1"), mustIP("2001:db8::2")},
 					},
 				},
 			},

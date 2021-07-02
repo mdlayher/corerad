@@ -643,7 +643,6 @@ func Test_parseRDNSS(t *testing.T) {
 			r: &plugin.RDNSS{
 				Auto:     true,
 				Lifetime: 20 * time.Minute,
-				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 			},
 			ok: true,
 		},
@@ -657,7 +656,20 @@ func Test_parseRDNSS(t *testing.T) {
 			r: &plugin.RDNSS{
 				Auto:     true,
 				Lifetime: 20 * time.Minute,
-				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+			},
+			ok: true,
+		},
+		{
+			name: "OK wildcard and static server",
+			s: `
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["::", "2001:db8::1"]
+			`,
+			r: &plugin.RDNSS{
+				Auto:     true,
+				Lifetime: 20 * time.Minute,
+				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::1")},
 			},
 			ok: true,
 		},
