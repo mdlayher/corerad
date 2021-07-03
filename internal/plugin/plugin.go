@@ -563,7 +563,7 @@ func betterRDNSS(best, current netaddr.IP) bool {
 	// ULA.
 	for _, fn := range []func(netaddr.IP) bool{
 		isULA, // TODO: (netaddr.IP).IsPrivate,
-		isGUA, // TODO: (netaddr.IP).IsGlobalUnicast,
+		(netaddr.IP).IsGlobalUnicast,
 		(netaddr.IP).IsLinkLocalUnicast,
 	} {
 		okC, okB := fn(current), fn(best)
@@ -597,8 +597,6 @@ func durString(d time.Duration) string {
 }
 
 // TODO(mdlayher): upstream into inet.af/netaddr.
-
-func isGUA(ip netaddr.IP) bool { return ip.IPAddr().IP.IsGlobalUnicast() }
 
 var ula = netaddr.MustParseIPPrefix("fc00::/7")
 
