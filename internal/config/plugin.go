@@ -161,7 +161,7 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 
 	// Only permit ::/64 as a special case. It isn't clear if other prefix
 	// lengths with :: would be useful, so throw an error for now.
-	if prefix.IP() == netaddr.IPv6Unspecified() && prefix.Bits() != 64 {
+	if prefix.IP().IsUnspecified() && prefix.Bits() != 64 {
 		return nil, errors.New("only ::/64 is permitted for inferring prefixes from interface addresses")
 	}
 
@@ -290,7 +290,7 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 		// If :: is present, don't add it to the slice but do set Auto to true
 		// so a server address can be automatically chosen at runtime. The
 		// remaining server addresses will be set statically.
-		if ip == netaddr.IPv6Unspecified() {
+		if ip.IsUnspecified() {
 			auto = true
 			continue
 		}

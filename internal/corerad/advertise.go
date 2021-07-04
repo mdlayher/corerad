@@ -241,7 +241,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 		// Issue a unicast RA for clients with valid addresses, or a multicast
 		// RA for any client contacting us via the IPv6 unspecified address,
 		// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
-		if host == netaddr.IPv6Unspecified() {
+		if host.IsUnspecified() {
 			host = netaddr.IPv6LinkLocalAllNodes()
 		}
 
