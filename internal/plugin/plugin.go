@@ -562,7 +562,7 @@ func betterRDNSS(best, current netaddr.IP) bool {
 	// TODO(mdlayher): infer permanence of an address from EUI-64 format. Prefer
 	// ULA.
 	for _, fn := range []func(netaddr.IP) bool{
-		isULA, // TODO: (netaddr.IP).IsPrivate,
+		(netaddr.IP).IsPrivate,
 		(netaddr.IP).IsGlobalUnicast,
 		(netaddr.IP).IsLinkLocalUnicast,
 	} {
@@ -595,12 +595,6 @@ func durString(d time.Duration) string {
 		return d.String()
 	}
 }
-
-// TODO(mdlayher): upstream into inet.af/netaddr.
-
-var ula = netaddr.MustParseIPPrefix("fc00::/7")
-
-func isULA(ip netaddr.IP) bool { return ula.Contains(ip) }
 
 func panicf(format string, a ...interface{}) {
 	panic(fmt.Sprintf(format, a...))
