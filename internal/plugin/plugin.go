@@ -581,7 +581,3 @@ func durString(d time.Duration) string {
 		return d.String()
 	}
 }
-
-func panicf(format string, a ...interface{}) {
-	panic(fmt.Sprintf(format, a...))
-}

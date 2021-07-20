@@ -552,7 +552,6 @@ func TestBuild(t *testing.T) {
 			if diff := cmp.Diff(tt.ra, ra); diff != "" {
 				t.Fatalf("unexpected RA (-want +got):\n%s", diff)
 			}
-
 		})
 	}
 }
