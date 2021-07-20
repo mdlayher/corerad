@@ -15,12 +15,6 @@
 
 package system
 
-import (
-	"net"
-
-	"inet.af/netaddr"
-)
-
 // NewAddresser creates an Addresser which uses package net functions for
 // operating systems which do not have explicit Addresser implementations.
 func NewAddresser() Addresser { return NewNetAddresser() }
