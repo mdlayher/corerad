@@ -665,11 +665,4 @@ func Test_betterRDNSS(t *testing.T) {
 	}
 }
 
-func mustIP(s string) net.IP {
-	ip := net.ParseIP(s)
-	if ip == nil {
-		panicf("failed to parse %q as IP address", s)
-	}
-
-	return ip
-}
+func mustIP(s string) net.IP { return netaddr.MustParseIP(s).IPAddr().IP }
