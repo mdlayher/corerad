@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
 )
@@ -27,32 +28,14 @@ func TestPluginString(t *testing.T) {
 	// A function which returns synthesized interface addresses. Address
 	// prefixes are duplicated and of different address types to exercise
 	// different test cases for wildcard options.
-	addrs := func() ([]net.Addr, error) {
-		return []net.Addr{
-			&net.IPNet{
-				IP:   net.ParseIP("2001:db8::"),
-				Mask: net.CIDRMask(64, 128),
-			},
-			&net.IPNet{
-				IP:   net.ParseIP("2001:db8::1"),
-				Mask: net.CIDRMask(64, 128),
-			},
-			&net.IPNet{
-				IP:   net.ParseIP("fdff::"),
-				Mask: net.CIDRMask(64, 128),
-			},
-			&net.IPNet{
-				IP:   net.ParseIP("fdff::1"),
-				Mask: net.CIDRMask(64, 128),
-			},
-			&net.IPNet{
-				IP:   net.ParseIP("fe80::"),
-				Mask: net.CIDRMask(64, 128),
-			},
-			&net.IPNet{
-				IP:   net.ParseIP("fe80::1"),
-				Mask: net.CIDRMask(64, 128),
-			},
+	addrs := func() ([]system.IP, error) {
+		return []system.IP{
+			{Address: netaddr.MustParseIPPrefix("2001:db8::/64")},
+			{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
+			{Address: netaddr.MustParseIPPrefix("fdff::/64")},
+			{Address: netaddr.MustParseIPPrefix("fdff::1/64")},
+			{Address: netaddr.MustParseIPPrefix("fe80::/64")},
+			{Address: netaddr.MustParseIPPrefix("fe80::1/64")},
 		}, nil
 	}
 
@@ -244,16 +227,15 @@ func TestBuild(t *testing.T) {
 				PreferredLifetime: 10 * time.Second,
 				ValidLifetime:     20 * time.Second,
 
-				Addrs: func() ([]net.Addr, error) {
-					return []net.Addr{
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
 						// Populate some addresses that should be ignored.
-						mustCIDR("192.0.2.1/24"),
-						&net.TCPAddr{},
-						mustCIDR("fe80::1/64"),
-						mustCIDR("fdff::1/32"),
-						mustCIDR("2001:db8::1/64"),
-						mustCIDR("2001:db8::2/64"),
-						mustCIDR("fd00::1/64"),
+						{Address: netaddr.MustParseIPPrefix("192.0.2.1/24")},
+						{Address: netaddr.MustParseIPPrefix("fe80::1/64")},
+						{Address: netaddr.MustParseIPPrefix("fdff::1/32")},
+						{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
+						{Address: netaddr.MustParseIPPrefix("2001:db8::2/64")},
+						{Address: netaddr.MustParseIPPrefix("fd00::1/64")},
 					}, nil
 				},
 			},
@@ -284,13 +266,13 @@ func TestBuild(t *testing.T) {
 			plugin: &Prefix{
 				Auto:   true,
 				Prefix: netaddr.MustParseIPPrefix("::/32"),
-				Addrs: func() ([]net.Addr, error) {
-					return []net.Addr{
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
 						// Specify an IPv4 address that could feasibly be
 						// matched, but must be skipped due to incorrect address
 						// family.
-						mustCIDR("192.0.2.1/32"),
-						mustCIDR("2001:db8::1/32"),
+						{Address: netaddr.MustParseIPPrefix("192.0.2.1/32")},
+						{Address: netaddr.MustParseIPPrefix("2001:db8::1/32")},
 					}, nil
 				},
 			},
@@ -473,7 +455,7 @@ func TestBuild(t *testing.T) {
 			plugin: &RDNSS{
 				Auto:     true,
 				Lifetime: 10 * time.Second,
-				Addrs:    func() ([]net.Addr, error) { return nil, nil },
+				Addrs:    func() ([]system.IP, error) { return nil, nil },
 			},
 		},
 		{
@@ -481,8 +463,10 @@ func TestBuild(t *testing.T) {
 			plugin: &RDNSS{
 				Auto:     true,
 				Lifetime: 10 * time.Second,
-				Addrs: func() ([]net.Addr, error) {
-					return []net.Addr{mustCIDR("2001:db8::1/64")}, nil
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{{
+						Address: netaddr.MustParseIPPrefix("2001:db8::1/64"),
+					}}, nil
 				},
 			},
 			ra: &ndp.RouterAdvertisement{
@@ -500,13 +484,12 @@ func TestBuild(t *testing.T) {
 			plugin: &RDNSS{
 				Auto:     true,
 				Lifetime: 10 * time.Second,
-				Addrs: func() ([]net.Addr, error) {
-					return []net.Addr{
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
 						// Populate some addresses which should be ignored.
-						&net.TCPAddr{},
-						mustCIDR("192.0.2.1/32"),
-						mustCIDR("fdff::1/64"),
-						mustCIDR("2001:db8::1/64"),
+						{Address: netaddr.MustParseIPPrefix("192.0.2.1/32")},
+						{Address: netaddr.MustParseIPPrefix("fdff::1/64")},
+						{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
 					}, nil
 				},
 			},
@@ -526,8 +509,10 @@ func TestBuild(t *testing.T) {
 				Auto:     true,
 				Lifetime: 10 * time.Second,
 				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::2")},
-				Addrs: func() ([]net.Addr, error) {
-					return []net.Addr{mustCIDR("2001:db8::1/64")}, nil
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{{
+						Address: netaddr.MustParseIPPrefix("2001:db8::1/64"),
+					}}, nil
 				},
 			},
 			ra: &ndp.RouterAdvertisement{
@@ -687,15 +672,4 @@ func mustIP(s string) net.IP {
 	}
 
 	return ip
-}
-
-func mustCIDR(s string) *net.IPNet {
-	ip, ipn, err := net.ParseCIDR(s)
-	if err != nil {
-		panicf("failed to parse CIDR: %v", err)
-	}
-
-	// Remove masking to simulate 2001:db8::1/64 and etc. properly.
-	ipn.IP = ip
-	return ipn
 }

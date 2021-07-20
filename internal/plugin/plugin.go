@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
 )
@@ -163,7 +164,7 @@ type Prefix struct {
 
 	// Functions which can be swapped for tests.
 	TimeNow func() time.Time
-	Addrs   func() ([]net.Addr, error)
+	Addrs   func() ([]system.IP, error)
 }
 
 // Name implements Plugin.
@@ -214,7 +215,9 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 	p.TimeNow = time.Now
 
 	// Fetch addresses from the specified interface whenever invoked.
-	p.Addrs = ifi.Addrs
+	a := system.NewAddresser()
+	p.Addrs = func() ([]system.IP, error) { return a.AddressesByIndex(ifi.Index) }
+
 	return nil
 }
 
@@ -251,26 +254,20 @@ func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
 	var prefixes []netaddr.IPPrefix
 	seen := make(map[netaddr.IPPrefix]struct{})
 	for _, a := range addrs {
-		ipn, ok := a.(*net.IPNet)
-		if !ok {
-			continue
-		}
-
-		ipp, ok := netaddr.FromStdIPNet(ipn)
-		if !ok {
-			panicf("corerad: invalid net.IPNet: %+v", a)
-		}
-
 		// Only advertise non-link-local IPv6 prefixes that also have a
 		// matching mask:
 		// https://tools.ietf.org/html/rfc4861#section-4.6.2.
-		if ipp.IP().Is4() || ipp.IP().IsLinkLocalUnicast() || ipp.Bits() != p.Prefix.Bits() {
+		ip := a.Address.IP()
+		if ip.Is4() || ip.IsLinkLocalUnicast() || a.Address.Bits() != p.Prefix.Bits() {
 			continue
 		}
 
+		// TODO(mdlayher): inspect other system.IP fields and use those to make
+		// decisions as well.
+
 		// Found a match, mask and keep the prefix bits of the address, and only
 		// add each prefix once.
-		pfx := ipp.Masked()
+		pfx := a.Address.Masked()
 		if _, ok := seen[pfx]; ok {
 			continue
 		}
@@ -427,7 +424,7 @@ type RDNSS struct {
 	Servers  []netaddr.IP
 
 	// Functions which can be swapped for tests.
-	Addrs func() ([]net.Addr, error)
+	Addrs func() ([]system.IP, error)
 }
 
 // Name implements Plugin.
@@ -456,7 +453,9 @@ func (r *RDNSS) String() string {
 // Prepare implements Plugin.
 func (r *RDNSS) Prepare(ifi *net.Interface) error {
 	// Fetch addresses from the specified interface whenever invoked.
-	r.Addrs = ifi.Addrs
+	a := system.NewAddresser()
+	r.Addrs = func() ([]system.IP, error) { return a.AddressesByIndex(ifi.Index) }
+
 	return nil
 }
 
@@ -505,25 +504,18 @@ func (r *RDNSS) currentServer() (netaddr.IP, error) {
 
 	var best netaddr.IP
 	for _, a := range addrs {
-		ipn, ok := a.(*net.IPNet)
-		if !ok {
-			continue
-		}
-
-		ipp, ok := netaddr.FromStdIPNet(ipn)
-		if !ok {
-			panicf("corerad: invalid net.IPNet: %+v", a)
-		}
-
 		// Only consider IPv6 addresses.
-		ip := ipp.IP()
+		ip := a.Address.IP()
 		if ip.Is4() {
 			continue
 		}
 
+		// TODO(mdlayher): inspect other system.IP fields and use those to make
+		// decisions as well.
+
 		// Is ip better than our current best?
-		if betterRDNSS(best, ip) {
-			best = ip
+		if betterRDNSS(best, a.Address.IP()) {
+			best = a.Address.IP()
 		}
 	}
 
@@ -555,12 +547,6 @@ func betterRDNSS(best, current netaddr.IP) bool {
 	//     may not be a problem.
 	//
 	// In the event of a tie, the lesser address by byte comparison wins.
-	//
-	// TODO(mdlayher): actually consider OS-specific data like
-	// temporary/deprecated address flags.
-	//
-	// TODO(mdlayher): infer permanence of an address from EUI-64 format. Prefer
-	// ULA.
 	for _, fn := range []func(netaddr.IP) bool{
 		(netaddr.IP).IsPrivate,
 		(netaddr.IP).IsGlobalUnicast,
