@@ -13,7 +13,11 @@
 
 package system
 
-import "inet.af/netaddr"
+import (
+	"net"
+
+	"inet.af/netaddr"
+)
 
 // An Addresser is a type that can fetch IP address information from the
 // operating system.
@@ -31,4 +35,44 @@ type IP struct {
 	// Interface flags fetched from the operating system which are used for
 	// address preference logic.
 	Deprecated, StablePrivacy, Temporary, Tentative bool
+}
+
+// A netAddresser is a generic Addresser which uses package net functions.
+type netAddresser struct{}
+
+// NewNetAddresser creates an Addresser which uses package net functions.
+func NewNetAddresser() Addresser { return &netAddresser{} }
+
+// AddressesByIndex implements Addresser.
+func (*netAddresser) AddressesByIndex(index int) ([]IP, error) {
+	ifi, err := net.InterfaceByIndex(index)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs, err := ifi.Addrs()
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter out any values which are not IPv6 *net.IPNets. Don't preallocate
+	// ips because filtering is required.
+	var ips []IP
+	for _, a := range addrs {
+		ipn, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+
+		ipp, ok := netaddr.FromStdIPNet(ipn)
+		if !ok || !ipp.IP().Is6() || ipp.IP().Is4in6() {
+			continue
+		}
+
+		// Unfortunately this generic Addresser cannot infer any address flags
+		// so just return the IP.
+		ips = append(ips, IP{Address: ipp})
+	}
+
+	return ips, nil
 }

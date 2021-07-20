@@ -18,6 +18,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/system"
 	"inet.af/netaddr"
 )
@@ -33,17 +34,22 @@ func TestIntegrationAddresser(t *testing.T) {
 		t.Skipf("skipping, found no network interfaces")
 	}
 
-	a := system.NewAddresser()
+	// Compare the OS-specific implementation against the generic net one.
+	var (
+		sysA = system.NewAddresser()
+		netA = system.NewNetAddresser()
+	)
+
 	for _, ifi := range ifis {
-		ips, err := a.AddressesByIndex(ifi.Index)
+		gotIPs, err := sysA.AddressesByIndex(ifi.Index)
 		if err != nil {
-			t.Fatalf("failed to get netaddr addresses for %q: %v", ifi.Name, err)
+			t.Fatalf("failed to get system addresses for %q: %v", ifi.Name, err)
 		}
 
 		// For each interface, track all of the known IPv6 addresses to compare
 		// against the stdlib's output.
 		seen := make(map[netaddr.IPPrefix]bool)
-		for _, ip := range ips {
+		for _, ip := range gotIPs {
 			seen[ip.Address] = false
 
 			// We can't verify Address flags using stdlib so just log the ones
@@ -65,29 +71,24 @@ func TestIntegrationAddresser(t *testing.T) {
 			t.Logf("%s: %s, flags: [%s]", ifi.Name, ip.Address, strings.Join(flags, ", "))
 		}
 
-		addrs, err := ifi.Addrs()
+		wantIPs, err := netA.AddressesByIndex(ifi.Index)
 		if err != nil {
 			t.Fatalf("failed to get stdlib addresses for %q: %v", ifi.Name, err)
 		}
 
-		// Filter out any values which are not IPv6 *net.IPNets and also verify
-		// that all addresses were found by the addresser.
-		for _, a := range addrs {
-			ipn, ok := a.(*net.IPNet)
-			if !ok {
-				continue
+		// Verify that all addresses were found by the addresser.
+		for _, ip := range wantIPs {
+			// The netAddresser should always set all flags to false, so just
+			// compare against zero values with the Address set.
+			if diff := cmp.Diff(system.IP{Address: ip.Address}, ip, cmp.Comparer(ipPrefixEqual)); diff != "" {
+				t.Fatalf("unexpected system IP from netAddresser (-want +got):\n%s", diff)
 			}
 
-			ipp, ok := netaddr.FromStdIPNet(ipn)
-			if !ok || !ipp.IP().Is6() {
-				continue
+			if _, ok := seen[ip.Address]; !ok {
+				t.Fatalf("stdlib found interface %q address %q, not found by addresser", ifi.Name, ip.Address)
 			}
 
-			if _, ok := seen[ipp]; !ok {
-				t.Fatalf("stdlib found interface %q address %q, not found by addresser", ifi.Name, ipp)
-			}
-
-			seen[ipp] = true
+			seen[ip.Address] = true
 		}
 
 		// Finally verify that every prefix was found in both outputs.
@@ -98,3 +99,5 @@ func TestIntegrationAddresser(t *testing.T) {
 		}
 	}
 }
+
+func ipPrefixEqual(x, y netaddr.IPPrefix) bool { return x == y }
