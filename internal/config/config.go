@@ -20,17 +20,32 @@ import (
 	"net"
 	"time"
 
-	// Embed the default configuration file.
-	_ "embed"
-
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 	"github.com/pelletier/go-toml"
 )
 
-// Default is the toml representation of the default configuration.
-//go:embed default.toml
-var Default string
+// Minimal is the minimal configuration file for CoreRAD.
+const Minimal = `# %s configuration file
+
+# Advertise an IPv6 default route and SLAAC-capable prefixes on LAN-facing eth0.
+[[interfaces]]
+name = "eth0"
+advertise = true
+
+  # Advertise an on-link, autonomous prefix for all /64 addresses on eth0.
+  [[interfaces.prefix]]
+
+# Monitor upstream router advertisements on WAN-facing eth1.
+[[interfaces]]
+name = "eth1"
+monitor = true
+
+# Optional: enable Prometheus metrics.
+[debug]
+address = "localhost:9430"
+prometheus = true
+`
 
 // A file is the raw top-level configuration file representation.
 type file struct {

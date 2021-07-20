@@ -316,7 +316,7 @@ func TestParse(t *testing.T) {
 			}
 
 			opts := []cmp.Option{
-				cmp.Comparer(compareNetaddrIP), cmp.Comparer(compareNetaddrIPPrefix),
+				cmp.Comparer(ipEqual), cmp.Comparer(ipPrefixEqual),
 			}
 
 			if diff := cmp.Diff(tt.c, c, opts...); diff != "" {
@@ -326,47 +326,11 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestParseDefaults(t *testing.T) {
+func TestParseMinimal(t *testing.T) {
 	t.Parallel()
 
-	const minimal = `
-		[[interfaces]]
-		name = "eth0"
-
-		  [[interfaces.prefix]]
-		  prefix = "::/64"
-
-		  [[interfaces.prefix]]
-		  prefix = "2001:db8::/64"
-
-		  [[interfaces.route]]
-		  prefix = "2001:db8:ffff::/64"
-
-		  [[interfaces.rdnss]]
-		  servers = ["::"]
-
-		  [[interfaces.dnssl]]
-		  domain_names = ["foo.example.com"]
-
-		[debug]
-		address = "localhost:9430"
-	`
-
-	min, err := config.Parse(strings.NewReader(minimal), time.Time{})
-	if err != nil {
+	if _, err := config.Parse(strings.NewReader(config.Minimal), time.Time{}); err != nil {
 		t.Fatalf("failed to parse minimal config: %v", err)
-	}
-	defaults, err := config.Parse(strings.NewReader(config.Default), time.Time{})
-	if err != nil {
-		t.Fatalf("failed to parse default config: %v", err)
-	}
-
-	opts := []cmp.Option{
-		cmp.Comparer(compareNetaddrIP), cmp.Comparer(compareNetaddrIPPrefix),
-	}
-
-	if diff := cmp.Diff(defaults, min, opts...); diff != "" {
-		t.Fatalf("unexpected default Config (-want +got):\n%s", diff)
 	}
 }
 
@@ -425,5 +389,5 @@ func TestInterfaceRouterAdvertisement(t *testing.T) {
 	}
 }
 
-func compareNetaddrIP(x, y netaddr.IP) bool             { return x == y }
-func compareNetaddrIPPrefix(x, y netaddr.IPPrefix) bool { return x == y }
+func ipEqual(x, y netaddr.IP) bool             { return x == y }
+func ipPrefixEqual(x, y netaddr.IPPrefix) bool { return x == y }

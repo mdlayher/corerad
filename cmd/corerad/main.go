@@ -19,10 +19,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/build"
@@ -43,7 +43,7 @@ func main() {
 	var (
 		cfgFlag  = flag.String("c", cfgFile, "path to configuration file")
 		initFlag = flag.Bool("init", false,
-			fmt.Sprintf("write out a default configuration file to %q and exit", cfgFile))
+			fmt.Sprintf("write out a minimal configuration file to %q and exit", cfgFile))
 	)
 
 	flag.Usage = func() {
@@ -59,15 +59,22 @@ func main() {
 	ll := log.New(os.Stderr, "", 0)
 
 	if *initFlag {
-		err := ioutil.WriteFile(
+		err := os.WriteFile(
 			cfgFile,
-			[]byte(fmt.Sprintf(config.Default, build.Banner())),
+			[]byte(fmt.Sprintf(config.Minimal, build.Banner())),
 			0o644,
 		)
 		if err != nil {
-			ll.Fatalf("failed to write default configuration: %v", err)
+			ll.Fatalf("failed to write minimal configuration: %v", err)
 		}
 
+		dir, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("failed to get working directory: %v", err)
+		}
+
+		ll.Printf("wrote minimal configuration file for %s to %q",
+			build.Banner(), filepath.Join(dir, cfgFile))
 		return
 	}
 

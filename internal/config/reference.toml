@@ -1,4 +1,4 @@
-# %s configuration file
+# CoreRAD reference configuration file
 
 # All duration values are specified in Go time.ParseDuration format:
 # https://golang.org/pkg/time/#ParseDuration.
@@ -100,6 +100,8 @@ preference = "medium"
   [[interfaces.prefix]]
   # Serve Prefix Information options for each IPv6 prefix on this interface
   # configured with a /64 CIDR mask. Only /64 is allowed for this special case.
+  #
+  # If prefix is an empty string or omitted, "::/64" is assumed.
   prefix = "::/64"
 
   # Specifies on-link and autonomous address autoconfiguration (SLAAC) flags
@@ -151,10 +153,13 @@ preference = "medium"
   # RDNSS: attaches a NDP Recursive DNS Servers option to the router advertisement.
   [[interfaces.rdnss]]
   # The DNS servers which should be advertised. Explicit IPv6 addresses may be
-  # specified, but the special :: wildcard will choose a suitable IPv6 address
-  # (preferring Unique Local Addresses, then Global Unicast Addresses, then
-  # Link-Local Addresses) from this interface to serve in the event that the DNS
-  # server resides on the same interface as CoreRAD.
+  # specified, but the special :: wildcard may also be set (with or without
+  # other explicit addresses) to choose a suitable IPv6 address (preferring
+  # Unique Local Addresses, then Global Unicast Addresses, then Link-Local
+  # Addresses) from this interface to serve in the event that the DNS server
+  # resides on the same interface as CoreRAD.
+  #
+  # If servers is an empty array or omitted, ["::"] is assumed.
   servers = ["::"]
 
   # The maximum time these RDNSS addresses may be used for name resolution.
