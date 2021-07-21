@@ -527,8 +527,8 @@ func (r *RDNSS) currentServer() (netaddr.IP, error) {
 
 	ip := best.Address.IP()
 	if ip.IsZero() {
-		// No IPv6 addresses, cannot use wildcard syntax.
-		return netaddr.IP{}, errors.New("interface has no IPv6 addresses")
+		// No usable IPv6 addresses, cannot use wildcard syntax.
+		return netaddr.IP{}, errors.New("interface has no usable IPv6 addresses")
 	}
 
 	return ip, nil
