@@ -591,6 +591,22 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad servers duplicate",
+			s: `
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["2001:db8::1", "2001:db8::1"]
+			`,
+		},
+		{
+			name: "bad servers wildcard duplicate",
+			s: `
+			[[interfaces]]
+			  [[interfaces.rdnss]]
+			  servers = ["::", "::"]
+			`,
+		},
+		{
 			name: "OK explicit",
 			s: `
 			[[interfaces]]

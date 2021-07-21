@@ -16,6 +16,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/plugin"
@@ -272,10 +273,10 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 		}, nil
 	}
 
-	// Parse all server addresses as IPv6 addresses.
+	// Parse all server addresses as unique IPv6 addresses.
 	var (
 		auto    bool
-		servers []netaddr.IP
+		servers = make(map[netaddr.IP]struct{})
 	)
 
 	for _, s := range d.Servers {
@@ -291,18 +292,40 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 		// so a server address can be automatically chosen at runtime. The
 		// remaining server addresses will be set statically.
 		if ip.IsUnspecified() {
+			// Don't allow :: twice. This check is separate because we don't
+			// actually add it to the servers set.
+			if auto {
+				return nil, errors.New("server wildcard :: cannot be specified multiple times")
+			}
+
 			auto = true
 			continue
 		}
 
-		servers = append(servers, ip)
+		// Don't allow repeated servers.
+		if _, ok := servers[ip]; ok {
+			return nil, fmt.Errorf("server %q cannot be specified multiple times", ip)
+		}
+		servers[ip] = struct{}{}
+	}
+
+	// If any servers are present, flatten the set into a slice and sort for
+	// deterministic output.
+	var ips []netaddr.IP
+	if len(servers) > 0 {
+		ips = make([]netaddr.IP, 0, len(servers))
+		for ip := range servers {
+			ips = append(ips, ip)
+		}
+
+		sort.SliceStable(ips, func(i, j int) bool { return ips[i].Less(ips[j]) })
 	}
 
 	return &plugin.RDNSS{
 		Auto: auto,
 
 		Lifetime: lifetime,
-		Servers:  servers,
+		Servers:  ips,
 	}, nil
 }
 
