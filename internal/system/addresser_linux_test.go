@@ -108,6 +108,7 @@ func TestLinux_addresserAddressesByIndex(t *testing.T) {
 						// This flag combination is nonsense but we can use it
 						// to test for each bit we check.
 						Flags: unix.IFA_F_DEPRECATED |
+							unix.IFA_F_MANAGETEMPADDR |
 							unix.IFA_F_STABLE_PRIVACY |
 							unix.IFA_F_TEMPORARY |
 							unix.IFA_F_TENTATIVE,
@@ -117,11 +118,12 @@ func TestLinux_addresserAddressesByIndex(t *testing.T) {
 			ips: []IP{
 				{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
 				{
-					Address:       netaddr.MustParseIPPrefix("fe80::1/128"),
-					Deprecated:    true,
-					StablePrivacy: true,
-					Temporary:     true,
-					Tentative:     true,
+					Address:                  netaddr.MustParseIPPrefix("fe80::1/128"),
+					Deprecated:               true,
+					ManageTemporaryAddresses: true,
+					StablePrivacy:            true,
+					Temporary:                true,
+					Tentative:                true,
 				},
 			},
 		},

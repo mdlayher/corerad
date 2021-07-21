@@ -34,7 +34,7 @@ type IP struct {
 
 	// Interface flags fetched from the operating system which are used for
 	// address preference logic.
-	Deprecated, StablePrivacy, Temporary, Tentative bool
+	Deprecated, ManageTemporaryAddresses, StablePrivacy, Temporary, Tentative bool
 }
 
 // A netAddresser is a generic Addresser which uses package net functions.

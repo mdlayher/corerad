@@ -81,10 +81,11 @@ func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
 		addrs = append(addrs, IP{
 			Address: netaddr.IPPrefixFrom(ip, am.PrefixLength),
 
-			Deprecated:    f&unix.IFA_F_DEPRECATED != 0,
-			StablePrivacy: f&unix.IFA_F_STABLE_PRIVACY != 0,
-			Temporary:     f&unix.IFA_F_TEMPORARY != 0,
-			Tentative:     f&unix.IFA_F_TENTATIVE != 0,
+			Deprecated:               f&unix.IFA_F_DEPRECATED != 0,
+			ManageTemporaryAddresses: f&unix.IFA_F_MANAGETEMPADDR != 0,
+			StablePrivacy:            f&unix.IFA_F_STABLE_PRIVACY != 0,
+			Temporary:                f&unix.IFA_F_TEMPORARY != 0,
+			Tentative:                f&unix.IFA_F_TENTATIVE != 0,
 		})
 	}
 

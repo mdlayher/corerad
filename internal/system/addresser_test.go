@@ -58,6 +58,9 @@ func TestIntegrationAddresser(t *testing.T) {
 			if ip.Deprecated {
 				flags = append(flags, "deprecated")
 			}
+			if ip.ManageTemporaryAddresses {
+				flags = append(flags, "manage-temporary-addresses")
+			}
 			if ip.StablePrivacy {
 				flags = append(flags, "stable-privacy")
 			}
