@@ -131,6 +131,15 @@ func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
 		return nil, errors.New("must specify one or more DNS search domain names")
 	}
 
+	// Make sure all domain names are unique.
+	seen := make(map[string]struct{})
+	for _, d := range d.DomainNames {
+		if _, ok := seen[d]; ok {
+			return nil, fmt.Errorf("domain name %q cannot be specified multiple times", d)
+		}
+		seen[d] = struct{}{}
+	}
+
 	return &plugin.DNSSL{
 		Lifetime:    lifetime,
 		DomainNames: d.DomainNames,

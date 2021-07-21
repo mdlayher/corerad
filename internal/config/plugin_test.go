@@ -46,11 +46,19 @@ func Test_parseDNSSL(t *testing.T) {
 			`,
 		},
 		{
-			name: "bad domain names",
+			name: "bad domain names empty",
 			s: `
 			[[interfaces]]
 			  [[interfaces.dnssl]]
 			  domain_names = []
+			`,
+		},
+		{
+			name: "bad domain names duplicate",
+			s: `
+			[[interfaces]]
+			  [[interfaces.dnssl]]
+			  domain_names = ["lan", "lan"]
 			`,
 		},
 		{
