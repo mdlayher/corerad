@@ -233,6 +233,15 @@ func TestBuild(t *testing.T) {
 						{Address: netaddr.MustParseIPPrefix("192.0.2.1/24")},
 						{Address: netaddr.MustParseIPPrefix("fe80::1/64")},
 						{Address: netaddr.MustParseIPPrefix("fdff::1/32")},
+						{
+							Address:   netaddr.MustParseIPPrefix("2001:db8::fff0/64"),
+							Temporary: true,
+						},
+						{
+							Address:   netaddr.MustParseIPPrefix("2001:db8::fff1/64"),
+							Tentative: true,
+						},
+						// Addresses which are not ignored.
 						{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
 						{Address: netaddr.MustParseIPPrefix("2001:db8::2/64")},
 						{Address: netaddr.MustParseIPPrefix("fd00::1/64")},

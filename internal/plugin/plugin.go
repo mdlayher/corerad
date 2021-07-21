@@ -262,8 +262,14 @@ func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
 			continue
 		}
 
-		// TODO(mdlayher): inspect other system.IP fields and use those to make
-		// decisions as well.
+		// Don't advertise prefixes derived from addresses which are:
+		//  - temporary: short-lived, used for outbound connections
+		//  - tentative: may be awaiting duplicate address detection results
+		if a.Temporary || a.Tentative {
+			continue
+		}
+
+		// TODO(mdlayher): handle a.Deprecated by also flagging p.Deprecated?
 
 		// Found a match, mask and keep the prefix bits of the address, and only
 		// add each prefix once.
