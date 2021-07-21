@@ -508,57 +508,78 @@ func (r *RDNSS) currentServer() (netaddr.IP, error) {
 		return netaddr.IP{}, fmt.Errorf("failed to fetch IP addresses: %v", err)
 	}
 
-	var best netaddr.IP
+	var best system.IP
 	for _, a := range addrs {
-		// Only consider IPv6 addresses.
+		// Only consider IPv6 addresses which are not:
+		//  - deprecated: should not be used when possible
+		//  - temporary: short-lived, used for outbound connections
+		//  - tentative: may be awaiting duplicate address detection results
 		ip := a.Address.IP()
-		if ip.Is4() {
+		if ip.Is4() || a.Deprecated || a.Temporary || a.Tentative {
 			continue
 		}
 
-		// TODO(mdlayher): inspect other system.IP fields and use those to make
-		// decisions as well.
-
-		// Is ip better than our current best?
-		if betterRDNSS(best, a.Address.IP()) {
-			best = a.Address.IP()
+		// Is this address better than our current best?
+		if betterRDNSS(best, a) {
+			best = a
 		}
 	}
 
-	if best.IsZero() {
+	ip := best.Address.IP()
+	if ip.IsZero() {
 		// No IPv6 addresses, cannot use wildcard syntax.
 		return netaddr.IP{}, errors.New("interface has no IPv6 addresses")
 	}
 
-	return best, nil
+	return ip, nil
 }
 
-// betterRDNSS compares two IPv6 addresses and returns whether the current
-// input address is considered a better choice than the existing best address.
-func betterRDNSS(best, current netaddr.IP) bool {
-	if best.IsZero() {
+// betterRDNSS compares two IPv6 addresses and their metadata and returns
+// whether the current input address is considered a better choice than the
+// existing best address.
+func betterRDNSS(best, current system.IP) bool {
+	if best.Address.IsZero() {
 		// When best is zero, current always wins.
 		return true
 	}
 
 	// The best IPv6 address selection algorithm for RDNSS is as follows:
 	//
-	// 1) Unique Local Address (ULA)
+	// 1) IP stability flags
+	//   - flags which indicate an address is meant for stable, long-term use
+	//     are more likely to serve traffic.
+	// 2) Unique Local Address (ULA)
 	//   - if assigned, high probability of use for internal-only services.
-	// 2) Global Unicast Address (GUA)
+	// 3) Global Unicast Address (GUA)
 	//   - de-facto choice when ULA is not available.
-	// 3) Link-Local Address (LLA)
+	// 4) Link-Local Address (LLA)
 	//   - last resort, doesn't work across subnets but since this machine is
 	//     also running CoreRAD (and sending router advertisements on-link) that
 	//     may not be a problem.
 	//
 	// In the event of a tie, the lesser address by byte comparison wins.
+	okC, okB := isStable(current), isStable(best)
+	switch {
+	case okC && !okB:
+		// current wins.
+		return true
+	case !okC && okB:
+		// best wins.
+		return false
+	}
+
+	// Tie on flags, so now we have to compare IP address properties.
+	var (
+		cIP = current.Address.IP()
+		bIP = best.Address.IP()
+	)
+
 	for _, fn := range []func(netaddr.IP) bool{
 		(netaddr.IP).IsPrivate,
 		(netaddr.IP).IsGlobalUnicast,
 		(netaddr.IP).IsLinkLocalUnicast,
 	} {
-		okC, okB := fn(current), fn(best)
+		okC, okB := fn(cIP), fn(bIP)
 		switch {
 		case okC && !okB:
 			// current wins.
@@ -568,13 +589,23 @@ func betterRDNSS(best, current netaddr.IP) bool {
 			return false
 		case okC && okB:
 			// Tie, break using byte comparison.
-			return current.Less(best)
+			return cIP.Less(bIP)
 		}
 	}
 
 	// None of the comparison functions were matched (perhaps due to an input
 	// like localhost ::1), so do a final byte comparison.
-	return current.Less(best)
+	return cIP.Less(bIP)
+}
+
+// isStable indicates if ip is considered stable by its flag values.
+func isStable(ip system.IP) bool {
+	// Indicates the Linux kernel should allocate temporary addresses based on
+	// this one: a good indicator of stability.
+	return ip.ManageTemporaryAddresses ||
+		// Indicates an address which is stable per-network, and presumably a
+		// machine serving router advertisements will remain on that network.
+		ip.StablePrivacy
 }
 
 // durString converts a time.Duration into a string while also recognizing

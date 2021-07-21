@@ -496,9 +496,29 @@ func TestBuild(t *testing.T) {
 				Addrs: func() ([]system.IP, error) {
 					return []system.IP{
 						// Populate some addresses which should be ignored.
+						// Normally ULAs win the tie-breaker so use those
+						// explicitly for bad IPv6 addresses.
 						{Address: netaddr.MustParseIPPrefix("192.0.2.1/32")},
+						{
+							Address:    netaddr.MustParseIPPrefix("fd00::fff0/64"),
+							Deprecated: true,
+						},
+						{
+							Address:   netaddr.MustParseIPPrefix("fd00::fff1/64"),
+							Temporary: true,
+						},
+						{
+							Address:   netaddr.MustParseIPPrefix("fd00::fff2/64"),
+							Tentative: true,
+						},
+						// Addresses which are not ignored.
 						{Address: netaddr.MustParseIPPrefix("fdff::1/64")},
 						{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
+						// Winner.
+						{
+							Address:                  netaddr.MustParseIPPrefix("fdff::10/64"),
+							ManageTemporaryAddresses: true,
+						},
 					}, nil
 				},
 			},
@@ -506,7 +526,7 @@ func TestBuild(t *testing.T) {
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,
-						Servers:  []net.IP{mustIP("fdff::1")},
+						Servers:  []net.IP{mustIP("fdff::10")},
 					},
 				},
 			},
@@ -567,27 +587,35 @@ func TestBuild(t *testing.T) {
 
 func Test_betterRDNSS(t *testing.T) {
 	var (
-		lo = netaddr.MustParseIP("::1")
+		lo = system.IP{Address: netaddr.MustParseIPPrefix("::1/128")}
 
-		ula1 = netaddr.MustParseIP("fdff::1")
-		ula2 = netaddr.MustParseIP("fdff::2")
+		ula1   = system.IP{Address: netaddr.MustParseIPPrefix("fdff::1/64")}
+		ula2   = system.IP{Address: netaddr.MustParseIPPrefix("fdff::2/64")}
+		ulaMTA = system.IP{
+			Address:                  netaddr.MustParseIPPrefix("fdff::3/64"),
+			ManageTemporaryAddresses: true,
+		}
 
-		gua1 = netaddr.MustParseIP("2001:db8::1")
-		gua2 = netaddr.MustParseIP("2001:db8::2")
+		gua1      = system.IP{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")}
+		gua2      = system.IP{Address: netaddr.MustParseIPPrefix("2001:db8::2/64")}
+		guaStable = system.IP{
+			Address:       netaddr.MustParseIPPrefix("2001:db8::3/64"),
+			StablePrivacy: true,
+		}
 
-		lla1 = netaddr.MustParseIP("fe80::1")
-		lla2 = netaddr.MustParseIP("fe80::2")
+		lla1 = system.IP{Address: netaddr.MustParseIPPrefix("fe80::1/64")}
+		lla2 = system.IP{Address: netaddr.MustParseIPPrefix("fe80::2/64")}
 	)
 
 	tests := []struct {
 		name          string
-		best, current netaddr.IP
+		best, current system.IP
 		ok            bool
 	}{
 		{
 			name:    "zero best",
 			current: ula1,
-			best:    netaddr.IP{},
+			best:    system.IP{},
 			ok:      true,
 		},
 		{
@@ -598,8 +626,8 @@ func Test_betterRDNSS(t *testing.T) {
 		},
 		{
 			name:    "zero vs zero",
-			current: netaddr.IP{},
-			best:    netaddr.IP{},
+			current: system.IP{},
+			best:    system.IP{},
 			ok:      true,
 		},
 		{
@@ -615,6 +643,12 @@ func Test_betterRDNSS(t *testing.T) {
 			ok:      true,
 		},
 		{
+			name:    "ULA vs ULA MTA",
+			current: ula1,
+			best:    ulaMTA,
+			ok:      false,
+		},
+		{
 			name:    "ULA vs GUA",
 			current: ula1,
 			best:    gua1,
@@ -627,6 +661,18 @@ func Test_betterRDNSS(t *testing.T) {
 			ok:      true,
 		},
 		{
+			name:    "ULA MTA vs ULA MTA",
+			current: ulaMTA,
+			best:    ulaMTA,
+			ok:      false,
+		},
+		{
+			name:    "ULA MTA vs GUA stable",
+			current: ulaMTA,
+			best:    guaStable,
+			ok:      true,
+		},
+		{
 			name:    "GUA vs ULA",
 			current: gua1,
 			best:    ula1,
@@ -636,6 +682,12 @@ func Test_betterRDNSS(t *testing.T) {
 			name:    "GUA vs GUA",
 			current: gua1,
 			best:    gua2,
+			ok:      true,
+		},
+		{
+			name:    "GUA stable vs GUA",
+			current: guaStable,
+			best:    gua1,
 			ok:      true,
 		},
 		{
@@ -667,7 +719,7 @@ func Test_betterRDNSS(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if diff := cmp.Diff(tt.ok, betterRDNSS(tt.best, tt.current)); diff != "" {
-				t.Fatalf("unexpected better result for %s vs %s (-want +got):\n%s", tt.best, tt.current, diff)
+				t.Fatalf("unexpected better result for %+v vs %+v (-want +got):\n%s", tt.best, tt.current, diff)
 			}
 		})
 	}
