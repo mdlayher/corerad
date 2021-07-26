@@ -42,7 +42,6 @@ advertise = true
 
   # Advertise an on-link, autonomous prefix for all /64 addresses on eth0.
   [[interfaces.prefix]]
-  prefix = "::/64"
 
 # Monitor upstream router advertisements on eth1.
 [[interfaces]]
@@ -61,7 +60,7 @@ is resolved before retry attempts run out:
 
 ```text
 $ corerad -c ./corerad.toml 
-CoreRAD v0.3.1 (2021-05-28) starting with configuration file "corerad.toml"
+CoreRAD v0.3.3 (2021-07-20) starting with configuration file "corerad.toml"
 starting HTTP debug listener on "localhost:9430": prometheus: true, pprof: false
 eth0: interface not ready, reinitializing
 eth0: retrying initialization in 250ms, 49 attempt(s) remaining: interface "eth0" is not up: link not ready
@@ -98,7 +97,7 @@ Date: Tue, 22 Jun 2021 11:25:29 GMT
 Content-Length: 28
 Content-Type: text/plain; charset=utf-8
 
-CoreRAD v0.3.1 (2021-05-28)
+CoreRAD v0.3.3 (2021-07-20)
 ```
 
 If enabled, you can also check the Prometheus metrics output:
