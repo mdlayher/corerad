@@ -111,9 +111,9 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		plugins = append(plugins, &plugin.LLA{})
 	}
 
-	// Only set when key is present and not empty.
-	if cp := ifi.CaptivePortal; cp != nil && *cp != "" {
-		plugins = append(plugins, plugin.NewCaptivePortal(*cp))
+	// Only set when key is not empty.
+	if cp := ifi.CaptivePortal; cp != "" {
+		plugins = append(plugins, plugin.NewCaptivePortal(cp))
 	}
 
 	return plugins, nil
