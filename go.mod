@@ -14,11 +14,11 @@ require (
 	github.com/mdlayher/socket v0.0.0-20210624160740-9dbe287ded84 // indirect
 	github.com/pelletier/go-toml v1.9.3
 	github.com/prometheus/client_golang v1.11.0
-	github.com/prometheus/common v0.29.0 // indirect
-	github.com/prometheus/procfs v0.7.0 // indirect
-	golang.org/x/net v0.0.0-20210716203947-853a461950ff
+	github.com/prometheus/common v0.30.0 // indirect
+	github.com/prometheus/procfs v0.7.1 // indirect
+	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 	google.golang.org/protobuf v1.27.1 // indirect
-	inet.af/netaddr v0.0.0-20210707202901-70468d781e6c
+	inet.af/netaddr v0.0.0-20210721214506-ce7a8ad02cc1
 )
