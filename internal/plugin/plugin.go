@@ -605,7 +605,16 @@ func isStable(ip system.IP) bool {
 	return ip.ManageTemporaryAddresses ||
 		// Indicates an address which is stable per-network, and presumably a
 		// machine serving router advertisements will remain on that network.
-		ip.StablePrivacy
+		ip.StablePrivacy ||
+		// Last effort: does this address look like an EUI-64 format address?
+		isEUI64(ip.Address.IP())
+}
+
+// isEUI64 checks if ip resembles an IPv6 EUI-64 format address.
+func isEUI64(ip netaddr.IP) bool {
+	// Look for the "ff:fe" pattern in the address.
+	b := ip.As16()
+	return b[11] == 0xff && b[12] == 0xfe
 }
 
 // durString converts a time.Duration into a string while also recognizing

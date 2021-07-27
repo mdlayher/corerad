@@ -603,8 +603,11 @@ func Test_betterRDNSS(t *testing.T) {
 			StablePrivacy: true,
 		}
 
-		lla1 = system.IP{Address: netaddr.MustParseIPPrefix("fe80::1/64")}
-		lla2 = system.IP{Address: netaddr.MustParseIPPrefix("fe80::2/64")}
+		lla1     = system.IP{Address: netaddr.MustParseIPPrefix("fe80::1/64")}
+		lla2     = system.IP{Address: netaddr.MustParseIPPrefix("fe80::2/64")}
+		llaEUI64 = system.IP{
+			Address: netaddr.MustParseIPPrefix("fe80::f:ff:fe00:ffff/64"),
+		}
 	)
 
 	tests := []struct {
@@ -713,6 +716,12 @@ func Test_betterRDNSS(t *testing.T) {
 			current: lla1,
 			best:    lla2,
 			ok:      true,
+		},
+		{
+			name:    "LLA vs LLA EUI-64",
+			current: lla1,
+			best:    llaEUI64,
+			ok:      false,
 		},
 	}
 
