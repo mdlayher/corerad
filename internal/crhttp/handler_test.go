@@ -127,7 +127,6 @@ func TestHandlerRoutes(t *testing.T) {
 					DefaultLifetime: 30 * time.Minute,
 					ReachableTime:   12345 * time.Millisecond,
 					Plugins: []plugin.Plugin{
-
 						&plugin.LLA{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 						plugin.NewMTU(1500),
 						&plugin.Prefix{
@@ -159,6 +158,7 @@ func TestHandlerRoutes(t *testing.T) {
 							Preference: ndp.High,
 							Lifetime:   10 * time.Minute,
 						},
+						plugin.NewCaptivePortal("capport:unrestricted"),
 					},
 				},
 				{
@@ -210,6 +210,7 @@ func TestHandlerRoutes(t *testing.T) {
 										RouteLifetimeSeconds: 60 * 10,
 									}},
 									SourceLinkLayerAddress: "de:ad:be:ef:de:ad",
+									CaptivePortal:          "capport:unrestricted",
 								},
 							},
 						},

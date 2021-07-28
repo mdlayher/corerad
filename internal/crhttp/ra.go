@@ -87,6 +87,7 @@ type options struct {
 	RDNSS                  []rdnss  `json:"rdnss"`
 	Routes                 []route  `json:"routes"`
 	SourceLinkLayerAddress string   `json:"source_link_layer_address"`
+	CaptivePortal          string   `json:"captive_portal"`
 }
 
 // A dnssl represents an NDP DNS Search List option.
@@ -122,6 +123,8 @@ func packOptions(opts []ndp.Option) options {
 	var out options
 	for _, o := range opts {
 		switch o := o.(type) {
+		case *ndp.CaptivePortal:
+			out.CaptivePortal = string(*o)
 		case *ndp.DNSSearchList:
 			out.DNSSL = append(out.DNSSL, dnssl{
 				LifetimeSeconds: int(o.Lifetime.Seconds()),
