@@ -613,121 +613,121 @@ func Test_betterRDNSS(t *testing.T) {
 	tests := []struct {
 		name          string
 		best, current system.IP
-		ok            bool
+		better        bool
 	}{
 		{
 			name:    "zero best",
 			current: ula1,
 			best:    system.IP{},
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "self best",
 			current: ula1,
 			best:    ula1,
-			ok:      false,
+			better:  false,
 		},
 		{
 			name:    "zero vs zero",
 			current: system.IP{},
 			best:    system.IP{},
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "lo vs lo",
 			current: lo,
 			best:    lo,
-			ok:      false,
+			better:  false,
 		},
 		{
 			name:    "ULA vs ULA",
 			current: ula1,
 			best:    ula2,
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "ULA vs ULA MTA",
 			current: ula1,
 			best:    ulaMTA,
-			ok:      false,
+			better:  false,
 		},
 		{
 			name:    "ULA vs GUA",
 			current: ula1,
 			best:    gua1,
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "ULA vs LLA",
 			current: ula1,
 			best:    lla1,
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "ULA MTA vs ULA MTA",
 			current: ulaMTA,
 			best:    ulaMTA,
-			ok:      false,
+			better:  false,
 		},
 		{
 			name:    "ULA MTA vs GUA stable",
 			current: ulaMTA,
 			best:    guaStable,
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "GUA vs ULA",
 			current: gua1,
 			best:    ula1,
-			ok:      false,
+			better:  false,
 		},
 		{
 			name:    "GUA vs GUA",
 			current: gua1,
 			best:    gua2,
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "GUA stable vs GUA",
 			current: guaStable,
 			best:    gua1,
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "GUA vs LLA",
 			current: gua1,
 			best:    lla1,
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "LLA vs ULA",
 			current: lla1,
 			best:    ula1,
-			ok:      false,
+			better:  false,
 		},
 		{
 			name:    "LLA vs GUA",
 			current: lla1,
 			best:    gua1,
-			ok:      false,
+			better:  false,
 		},
 		{
 			name:    "LLA vs LLA",
 			current: lla1,
 			best:    lla2,
-			ok:      true,
+			better:  true,
 		},
 		{
 			name:    "LLA vs LLA EUI-64",
 			current: lla1,
 			best:    llaEUI64,
-			ok:      false,
+			better:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if diff := cmp.Diff(tt.ok, betterRDNSS(tt.best, tt.current)); diff != "" {
+			if diff := cmp.Diff(tt.better, betterRDNSS(tt.best, tt.current)); diff != "" {
 				t.Fatalf("unexpected better result for %+v vs %+v (-want +got):\n%s", tt.best, tt.current, diff)
 			}
 		})
