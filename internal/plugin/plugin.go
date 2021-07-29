@@ -438,22 +438,30 @@ func (r *RDNSS) Name() string { return "rdnss" }
 
 // String implements Plugin.
 func (r *RDNSS) String() string {
-	ips := make([]string, 0, len(r.Servers))
-	for _, s := range r.Servers {
-		ips = append(ips, s.String())
-	}
-
-	servers := fmt.Sprintf("[%s]", strings.Join(ips, ", "))
+	var servers []string
 	if r.Auto {
 		// Make a best-effort to note the current server if the user is using
 		// the wildcard syntax. If this returns an error, we'll return "::"
 		// with no further information.
 		if s, err := r.currentServer(); err == nil {
-			servers = fmt.Sprintf(":: [%s]", s.String())
+			servers = append(servers, fmt.Sprintf(":: [%s]", s.String()))
+
+		} else {
+			servers = append(servers, "::")
 		}
 	}
 
-	return fmt.Sprintf("servers: %s, lifetime: %s", servers, durString(r.Lifetime))
+	for _, s := range r.Servers {
+		if s.IsUnspecified() {
+			// Remove unspecified addresses as they are stringified in the
+			// r.Auto check.
+			continue
+		}
+
+		servers = append(servers, s.String())
+	}
+
+	return fmt.Sprintf("servers: [%s], lifetime: %s", strings.Join(servers, ", "), durString(r.Lifetime))
 }
 
 // Prepare implements Plugin.

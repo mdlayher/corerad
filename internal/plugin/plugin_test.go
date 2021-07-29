@@ -121,7 +121,20 @@ func TestPluginString(t *testing.T) {
 				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
 				Addrs:    addrs,
 			},
-			s: "servers: :: [fdff::], lifetime: 30s",
+			s: "servers: [:: [fdff::]], lifetime: 30s",
+		},
+		{
+			name: "RDNSS wildcard and static",
+			p: &RDNSS{
+				Auto:     true,
+				Lifetime: 30 * time.Second,
+				Servers: []netaddr.IP{
+					netaddr.IPv6Unspecified(),
+					netaddr.MustParseIP("2001:db8::1"),
+				},
+				Addrs: addrs,
+			},
+			s: "servers: [:: [fdff::], 2001:db8::1], lifetime: 30s",
 		},
 	}
 
