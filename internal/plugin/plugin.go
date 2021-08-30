@@ -94,19 +94,23 @@ func (d *DNSSL) Apply(ra *ndp.RouterAdvertisement) error {
 }
 
 // LLA configures a NDP Source Link Layer Address option.
-type LLA net.HardwareAddr
+type LLA struct {
+	Address net.HardwareAddr
+}
 
 // Name implements Plugin.
 func (l *LLA) Name() string { return "lla" }
 
 // String implements Plugin.
 func (l *LLA) String() string {
-	return fmt.Sprintf("source link-layer address: %s", net.HardwareAddr(*l))
+	return fmt.Sprintf("source link-layer address: %s", l.Address)
 }
 
 // Prepare implements Plugin.
 func (l *LLA) Prepare(ifi *net.Interface) error {
-	*l = LLA(ifi.HardwareAddr)
+	if l.Address == nil {
+		l.Address = ifi.HardwareAddr
+	}
 	return nil
 }
 
@@ -114,7 +118,7 @@ func (l *LLA) Prepare(ifi *net.Interface) error {
 func (l *LLA) Apply(ra *ndp.RouterAdvertisement) error {
 	ra.Options = append(ra.Options, &ndp.LinkLayerAddress{
 		Direction: ndp.Source,
-		Addr:      net.HardwareAddr(*l),
+		Addr:      l.Address,
 	})
 
 	return nil

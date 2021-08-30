@@ -14,6 +14,7 @@
 package config_test
 
 import (
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -129,6 +130,7 @@ func TestParse(t *testing.T) {
 			min_interval = "6m"
 			hop_limit = 64
 			default_lifetime = "auto"
+			source_lla = "auto"
 			mtu = 1500
 			preference = "medium"
 
@@ -161,7 +163,7 @@ func TestParse(t *testing.T) {
 			other_config = true
 			reachable_time = "30s"
 			retransmit_timer = "5s"
-			source_lla = true
+			source_lla = "de:ad:be:ef:de:ad"
 			captive_portal = ""
 			preference = "low"
 
@@ -173,7 +175,7 @@ func TestParse(t *testing.T) {
 			verbose = true
 			hop_limit = 0
 			unicast_only = true
-			source_lla = false
+			source_lla = "none"
 			captive_portal = "http://router/portal"
 			preference = "high"
 
@@ -234,7 +236,9 @@ func TestParse(t *testing.T) {
 								DomainNames: []string{"lan.example.com"},
 							},
 							plugin.NewMTU(1500),
-							&plugin.LLA{},
+							&plugin.LLA{
+								Address: nil,
+							},
 						},
 					},
 					{
@@ -254,7 +258,9 @@ func TestParse(t *testing.T) {
 								Auto:     true,
 								Lifetime: 8 * time.Second,
 							},
-							&plugin.LLA{},
+							&plugin.LLA{
+								Address: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+							},
 						},
 					},
 					{

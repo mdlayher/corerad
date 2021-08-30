@@ -59,7 +59,7 @@ func TestPluginString(t *testing.T) {
 		},
 		{
 			name: "LLA",
-			p:    &LLA{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+			p:    &LLA{Address: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad}},
 			s:    "source link-layer address: de:ad:be:ef:de:ad",
 		},
 		{

@@ -720,7 +720,7 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 
 	// For test purposes, only attach source LLA if explicitly true.
 	if f.Interfaces[0].SourceLLA == nil {
-		v := false
+		v := "none"
 		f.Interfaces[0].SourceLLA = &v
 	}
 
