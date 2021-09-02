@@ -417,9 +417,21 @@ func (a *Advertiser) buildRA(ifi config.Interface) (*ndp.RouterAdvertisement, er
 		return nil, fmt.Errorf("failed to get IPv6 forwarding state: %w", err)
 	}
 
-	ra, err := ifi.RouterAdvertisement(forwarding)
+	ra, ms, err := ifi.RouterAdvertisement(forwarding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate router advertisement: %v", err)
+	}
+
+	// Report any RA misconfigurations which may result in unexpected behavior,
+	// so the user can more readily remedy any issues.
+	for _, m := range ms {
+		switch m {
+		case config.InterfaceNotForwarding:
+			a.logf("interface is not configured for IPv6 forwarding, refusing to advertise a default route (default lifetime: %s)",
+				ifi.DefaultLifetime)
+		default:
+			panicf("corerad: unhandled config.Misconfiguration: %d", m)
+		}
 	}
 
 	return ra, nil

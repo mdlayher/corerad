@@ -111,7 +111,8 @@ func (h *Handler) interfaces(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ra, err := iface.RouterAdvertisement(forwarding)
+		// TODO(mdlayher): plumb in misconfigurations.
+		ra, _, err := iface.RouterAdvertisement(forwarding)
 		if err != nil {
 			h.errorf(w, "failed to generate router advertisements: %v", err)
 			return

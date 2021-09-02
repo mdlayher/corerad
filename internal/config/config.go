@@ -138,10 +138,22 @@ type Interface struct {
 	Plugins                        []plugin.Plugin
 }
 
+// A Misconfiguration indicates that the user configuration conflicts with the
+// generated router advertisement in some way, and thus should be reported to
+// the user.
+type Misconfiguration int
+
+// Possible Misconfiguration values.
+const (
+	_ Misconfiguration = iota
+	InterfaceNotForwarding
+)
+
 // RouterAdvertisement generates an IPv6 NDP router advertisement for this
-// interface. Input parameters are used to tune parts of the RA, per the
-// NDP RFCs.
-func (ifi Interface) RouterAdvertisement(forwarding bool) (*ndp.RouterAdvertisement, error) {
+// interface. Input parameters are used to tune parts of the RA, per the NDP
+// RFCs. Any conflicting configurations will be reported as Misconfiguration
+// values.
+func (ifi Interface) RouterAdvertisement(forwarding bool) (*ndp.RouterAdvertisement, []Misconfiguration, error) {
 	ra := &ndp.RouterAdvertisement{
 		CurrentHopLimit:           ifi.HopLimit,
 		ManagedConfiguration:      ifi.Managed,
@@ -154,20 +166,24 @@ func (ifi Interface) RouterAdvertisement(forwarding bool) (*ndp.RouterAdvertisem
 
 	for _, p := range ifi.Plugins {
 		if err := p.Apply(ra); err != nil {
-			return nil, fmt.Errorf("failed to apply plugin %q: %v", p.Name(), err)
+			return nil, nil, fmt.Errorf("failed to apply plugin %q: %v", p.Name(), err)
 		}
 	}
 
-	// Apply any necessary changes due to modification in system state.
+	// Apply any necessary changes due to modification in system state. If these
+	// changes cause the router advertisement to be modified in a way that
+	// ignores the user configuration, Misconfiguration values are reported.
+	var ms []Misconfiguration
 
 	// If the interface is not forwarding packets, we must set the router
 	// lifetime field to zero, per:
 	// https://tools.ietf.org/html/rfc4861#section-6.2.5.
-	if !forwarding {
+	if ra.RouterLifetime > 0 && !forwarding {
 		ra.RouterLifetime = 0
+		ms = append(ms, InterfaceNotForwarding)
 	}
 
-	return ra, nil
+	return ra, ms, nil
 }
 
 // Debug provides configuration for debugging and observability.

@@ -345,21 +345,30 @@ func TestInterfaceRouterAdvertisement(t *testing.T) {
 		ifi        config.Interface
 		forwarding bool
 		ra         *ndp.RouterAdvertisement
+		ms         []config.Misconfiguration
 	}{
 		{
 			name: "no forwarding",
 			ifi: config.Interface{
-				HopLimit:        64,
-				Preference:      ndp.High,
-				DefaultLifetime: 30 * time.Minute,
-				Plugins:         []plugin.Plugin{plugin.NewMTU(1500)},
+				HopLimit:   64,
+				Preference: ndp.High,
+				Plugins:    []plugin.Plugin{plugin.NewMTU(1500)},
 			},
 			ra: &ndp.RouterAdvertisement{
 				CurrentHopLimit:           64,
 				RouterSelectionPreference: ndp.High,
-				RouterLifetime:            0,
 				Options:                   []ndp.Option{ndp.NewMTU(1500)},
 			},
+		},
+		{
+			name: "no forwarding, misconfigured",
+			ifi: config.Interface{
+				DefaultLifetime: 30 * time.Minute,
+			},
+			ra: &ndp.RouterAdvertisement{
+				RouterLifetime: 0,
+			},
+			ms: []config.Misconfiguration{config.InterfaceNotForwarding},
 		},
 		{
 			name: "forwarding",
@@ -377,14 +386,19 @@ func TestInterfaceRouterAdvertisement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ra, err := tt.ifi.RouterAdvertisement(tt.forwarding)
+			ra, ms, err := tt.ifi.RouterAdvertisement(tt.forwarding)
 			if err != nil {
 				t.Fatalf("failed to generate router advertisement: %v", err)
 			}
 
 			if diff := cmp.Diff(tt.ra, ra); diff != "" {
-				t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
+				t.Errorf("unexpected router advertisement (-want +got):\n%s", diff)
 			}
+
+			if diff := cmp.Diff(tt.ms, ms); diff != "" {
+				t.Fatalf("unexpected misconfigurations (-want +got):\n%s", diff)
+			}
+
 		})
 	}
 }
