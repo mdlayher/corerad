@@ -19,6 +19,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -127,7 +128,7 @@ func TestHandlerRoutes(t *testing.T) {
 					DefaultLifetime: 30 * time.Minute,
 					ReachableTime:   12345 * time.Millisecond,
 					Plugins: []plugin.Plugin{
-						&plugin.LLA{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+						&plugin.LLA{Addr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad}},
 						plugin.NewMTU(1500),
 						&plugin.Prefix{
 							Autonomous:        true,

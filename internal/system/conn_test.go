@@ -77,12 +77,6 @@ func Test_checkInterface(t *testing.T) {
 		ok, tempErr bool
 	}{
 		{
-			name: "no MAC",
-			ifi: &net.Interface{
-				Name: "test0",
-			},
-		},
-		{
 			name: "link down",
 			ifi: &net.Interface{
 				Name:         "test0",
@@ -118,11 +112,24 @@ func Test_checkInterface(t *testing.T) {
 			tempErr: true,
 		},
 		{
-			name: "OK",
+			name: "OK ethernet",
 			ifi: &net.Interface{
 				Name:         "test0",
 				HardwareAddr: mac,
 				Flags:        net.FlagUp,
+			},
+			addrFunc: func() ([]net.Addr, error) {
+				return []net.Addr{&net.IPNet{
+					IP: net.ParseIP("fe80::1"),
+				}}, nil
+			},
+			ok: true,
+		},
+		{
+			name: "OK point-to-point",
+			ifi: &net.Interface{
+				Name:  "ppp0",
+				Flags: net.FlagUp | net.FlagPointToPoint,
 			},
 			addrFunc: func() ([]net.Addr, error) {
 				return []net.Addr{&net.IPNet{

@@ -58,8 +58,13 @@ func TestPluginString(t *testing.T) {
 			s: "domain names: [foo.example.com, bar.example.com], lifetime: 30s",
 		},
 		{
+			name: "LLA nil",
+			p:    &LLA{},
+			s:    "source link-layer address: n/a",
+		},
+		{
 			name: "LLA",
-			p:    &LLA{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+			p:    &LLA{Addr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad}},
 			s:    "source link-layer address: de:ad:be:ef:de:ad",
 		},
 		{
