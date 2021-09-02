@@ -29,7 +29,7 @@ $ ip -6 addr show dev eth0
     inet6 fe80::20d:b9ff:fe53:eacd/64 scope link
        valid_lft forever preferred_lft forever
 ```
-```
+```text
 $ cat /proc/sys/net/ipv6/conf/eth0/forwarding
 0
 $ echo 1 | sudo tee /proc/sys/net/ipv6/conf/eth0/forwarding
