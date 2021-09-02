@@ -24,6 +24,7 @@ import (
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/netlink"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sys/unix"
 )
 
 // deadlineNow is a sentinel value which will cause an immediate timeout to
@@ -32,9 +33,7 @@ var deadlineNow = time.Unix(0, 1)
 
 // osWatch is the OS-specific portion of a Watcher's Watch method.
 func osWatch(ctx context.Context, notify func(changeSet)) error {
-	c, err := rtnetlink.Dial(&netlink.Config{
-		Groups: 0x1, // RTMGRP_LINK (TODO: move to x/sys).
-	})
+	c, err := rtnetlink.Dial(&netlink.Config{Groups: unix.RTMGRP_LINK})
 	if err != nil {
 		return fmt.Errorf("netstate: watcher failed to dial route netlink: %w", err)
 	}
