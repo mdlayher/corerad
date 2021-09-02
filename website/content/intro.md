@@ -12,9 +12,12 @@ provide IPv6-enabled hosts with a default route and IPv6 addresses via
 [Stateless Address Autoconfiguration
 (SLAAC)](https://en.wikipedia.org/wiki/IPv6#Stateless_address_autoconfiguration_(SLAAC)).
 
-To start, we assume you have a Linux-based router which has IPv6 addresses from
-one or more `/64` subnets already configured on a LAN-facing interface `eth0`,
-via static assignment, DHCPv6 prefix delegation, or another mechanism:
+This guide will assumes a Linux-based router with the following configuration:
+
+- a LAN-facing network interface named `eth0`
+- IPv6 addresses from one or more `/64` subnets configured on `eth0`, via static
+  assignment, DHCPv6 prefix delegation, or another mechanism
+- IPv6 forwarding enabled for `eth0`
 
 ```text
 $ ip -6 addr show dev eth0
@@ -25,6 +28,12 @@ $ ip -6 addr show dev eth0
        valid_lft 537884sec preferred_lft 537884sec
     inet6 fe80::20d:b9ff:fe53:eacd/64 scope link
        valid_lft forever preferred_lft forever
+```
+```
+$ cat /proc/sys/net/ipv6/conf/eth0/forwarding
+0
+$ echo 1 | sudo tee /proc/sys/net/ipv6/conf/eth0/forwarding
+1
 ```
 
 Create a minimal `corerad.toml` configuration file with the following text:
@@ -51,7 +60,7 @@ As of July 2021, CoreRAD packages are available for:
 
 For other Linux distributions or operating systems, download and build [the
 latest CoreRAD release from
-source](https://github.com/mdlayher/corerad/releases). A Go 1.16+ compiler is
+source](https://github.com/mdlayher/corerad/releases). A Go 1.17+ compiler is
 required.
 
 ```text
