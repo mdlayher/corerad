@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## v0.3.4
+September 3, 2021
+
+Special thanks to [@markpash](https://github.com/markpash) for his help testing
+various features in this release.
+
+- CoreRAD will now operate on interfaces which do not have a MAC address, such
+  as PPPoE interfaces. Monitor mode works on these interfaces, but advertise
+  mode may still have subtle bugs. Feedback is welcome.
+- CoreRAD will now log errors when an interface is configured to advertise an
+  IPv6 default route (`interfaces.default_lifetime` is non-zero) but is
+  incapable of doing so due to IPv6 forwarding being disabled on the interface.
+  This will notify the user that their configuration is invalid and they should
+  either enable IPv6 forwarding or remove the `interfaces.default_lifetime`
+  configuration to resolve the problem.
+- IPv6 addresses which are flagged as stable (manage temporary addresses, stable
+  privacy, or EUI-64 address format) on Linux are now preferred for automatic
+  prefix and RDNSS advertising.
+- IPv6 addresses which are flagged as non-stable (deprecated, temporary, or
+  tentative) on Linux will no longer be considered candidates for automatic
+  prefix and RDNSS advertising.
+- The `interfaces.rdnss.servers` and `interfaces.dnssl.domain_names` options now
+  verify that all string array arguments are unique.
+
 ## v0.3.3
 July 20, 2021
 
