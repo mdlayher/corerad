@@ -83,6 +83,10 @@ mtu = 0
 # address of current interface. Defaults to auto when omitted.
 source_lla = "auto"
 
+# AdvSourceLLAddress: override the interface's link-layer address with specified MAC
+# Useful when sending out router advertisements on behalf of another router.
+lla_address = ""
+
 # Attaches a NDP captive portal option to the router advertisement. Only set
 # when a URI value is present and not an empty string.
 captive_portal = ""

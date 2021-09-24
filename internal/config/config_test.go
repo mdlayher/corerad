@@ -90,6 +90,14 @@ func TestParse(t *testing.T) {
 			`,
 		},
 		{
+			name: "bad LLA address",
+			s: `
+			[[interfaces]]
+			name = "eth0"
+			lla_address = "yes"
+			`,
+		},
+		{
 			name: "bad debug address",
 			s: `
 			[[interfaces]]
@@ -130,7 +138,6 @@ func TestParse(t *testing.T) {
 			min_interval = "6m"
 			hop_limit = 64
 			default_lifetime = "auto"
-			source_lla = "auto"
 			mtu = 1500
 			preference = "medium"
 
@@ -163,7 +170,8 @@ func TestParse(t *testing.T) {
 			other_config = true
 			reachable_time = "30s"
 			retransmit_timer = "5s"
-			source_lla = "de:ad:be:ef:de:ad"
+			source_lla = true
+			lla_address = "de:ad:be:ef:de:ad"
 			captive_portal = ""
 			preference = "low"
 
@@ -175,7 +183,7 @@ func TestParse(t *testing.T) {
 			verbose = true
 			hop_limit = 0
 			unicast_only = true
-			source_lla = "none"
+			source_lla = false
 			captive_portal = "http://router/portal"
 			preference = "high"
 
@@ -236,9 +244,7 @@ func TestParse(t *testing.T) {
 								DomainNames: []string{"lan.example.com"},
 							},
 							plugin.NewMTU(1500),
-							&plugin.LLA{
-								Addr: nil,
-							},
+							&plugin.LLA{},
 						},
 					},
 					{

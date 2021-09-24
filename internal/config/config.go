@@ -83,7 +83,8 @@ type rawInterface struct {
 	RDNSS         []rawRDNSS  `toml:"rdnss"`
 	DNSSL         []rawDNSSL  `toml:"dnssl"`
 	MTU           int         `toml:"mtu"`
-	SourceLLA     *string     `toml:"source_lla"`
+	SourceLLA     *bool       `toml:"source_lla"`
+	LLA_Address   string      `toml:"lla_address"`
 	CaptivePortal string      `toml:"captive_portal"`
 }
 
