@@ -54,13 +54,7 @@ func lookupInterface(iface string) (*net.Interface, error) {
 
 // checkInterface verifies the readiness of an interface.
 func checkInterface(ifi *net.Interface, addrFunc func() ([]net.Addr, error)) error {
-	// Link must have a MAC address (e.g. WireGuard links do not).
-	if ifi.HardwareAddr == nil {
-		return fmt.Errorf("interface %q has no MAC address", ifi.Name)
-	}
-
 	// Link must be up.
-	// TODO: check point-to-point and multicast flags and configure accordingly.
 	if ifi.Flags&net.FlagUp == 0 {
 		return fmt.Errorf("interface %q is not up: %w", ifi.Name, ErrLinkNotReady)
 	}

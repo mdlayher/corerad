@@ -267,7 +267,9 @@ func (m *Metrics) constScrape(metrics map[string]func(float64, ...string)) error
 		var ra *ndp.RouterAdvertisement
 		if ifi.Advertise {
 			// Generate a current RA advertising interfaces and report on it.
-			ra, err = ifi.RouterAdvertisement(fwd)
+			//
+			// TODO(mdlayher): plumb in misconfigurations.
+			ra, _, err = ifi.RouterAdvertisement(fwd)
 			if err != nil {
 				return errorf("failed to generate router advertisement for metrics for %q: %v", ifi.Name, err)
 			}

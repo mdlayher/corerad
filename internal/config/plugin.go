@@ -114,7 +114,7 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 	case *ifi.SourceLLA == "none":
 	default:
 		if addr, err := net.ParseMAC(*ifi.SourceLLA); err == nil {
-			plugins = append(plugins, &plugin.LLA{Address: addr})
+			plugins = append(plugins, &plugin.LLA{Addr: addr})
 		} else {
 			return nil, fmt.Errorf("failed to parse SourceLLA: %v", err)
 		}
