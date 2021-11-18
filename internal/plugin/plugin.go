@@ -460,7 +460,6 @@ func (r *RDNSS) String() string {
 		// with no further information.
 		if s, err := r.currentServer(); err == nil {
 			servers = append(servers, fmt.Sprintf(":: [%s]", s.String()))
-
 		} else {
 			servers = append(servers, "::")
 		}

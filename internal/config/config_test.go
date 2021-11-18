@@ -398,7 +398,6 @@ func TestInterfaceRouterAdvertisement(t *testing.T) {
 			if diff := cmp.Diff(tt.ms, ms); diff != "" {
 				t.Fatalf("unexpected misconfigurations (-want +got):\n%s", diff)
 			}
-
 		})
 	}
 }
