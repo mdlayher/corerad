@@ -79,8 +79,13 @@ default_lifetime = "auto"
 mtu = 0
 
 # AdvSourceLLAddress: attaches a NDP source link-layer address option to the
-# router advertisement. Defaults to true when omitted.
-source_lla = true
+# router advertisement. Specify router MAC address or set to auto to use MAC
+# address of current interface. Defaults to auto when omitted.
+source_lla = "auto"
+
+# AdvSourceLLAddress: override the interface's link-layer address with specified MAC
+# Useful when sending out router advertisements on behalf of another router.
+lla_address = ""
 
 # Attaches a NDP captive portal option to the router advertisement. Only set
 # when a URI value is present and not an empty string.

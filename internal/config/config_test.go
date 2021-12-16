@@ -14,6 +14,7 @@
 package config_test
 
 import (
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -86,6 +87,14 @@ func TestParse(t *testing.T) {
 			[[interfaces]]
 			name = "eth0"
 			default_lifetime = "yes"
+			`,
+		},
+		{
+			name: "bad LLA address",
+			s: `
+			[[interfaces]]
+			name = "eth0"
+			lla_address = "yes"
 			`,
 		},
 		{
@@ -162,6 +171,7 @@ func TestParse(t *testing.T) {
 			reachable_time = "30s"
 			retransmit_timer = "5s"
 			source_lla = true
+			lla_address = "de:ad:be:ef:de:ad"
 			captive_portal = ""
 			preference = "low"
 
@@ -254,7 +264,9 @@ func TestParse(t *testing.T) {
 								Auto:     true,
 								Lifetime: 8 * time.Second,
 							},
-							&plugin.LLA{},
+							&plugin.LLA{
+								Addr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+							},
 						},
 					},
 					{

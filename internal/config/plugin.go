@@ -16,6 +16,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"sort"
 	"time"
 
@@ -108,7 +109,18 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 
 	// Always set unless explicitly false.
 	if ifi.SourceLLA == nil || *ifi.SourceLLA {
-		plugins = append(plugins, &plugin.LLA{})
+		p := &plugin.LLA{}
+		// if LLA_Address is set, explicitly use that address instead of the
+		// interface's actual address.
+		if ifi.LLA_Address != "" {
+			var err error
+			p.Addr, err = net.ParseMAC(ifi.LLA_Address)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse LLA_Address: %v", err)
+			}
+		}
+
+		plugins = append(plugins, p)
 	}
 
 	// Only set when key is not empty.
