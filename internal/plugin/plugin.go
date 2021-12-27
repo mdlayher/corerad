@@ -542,9 +542,7 @@ func (r *RDNSS) currentServer() (netaddr.IP, error) {
 		}
 
 		// Is this address better than our current best?
-		if betterRDNSS(best, a) {
-			best = a
-		}
+		best = betterRDNSS(best, a)
 	}
 
 	ip := best.Address.IP()
@@ -556,13 +554,13 @@ func (r *RDNSS) currentServer() (netaddr.IP, error) {
 	return ip, nil
 }
 
-// betterRDNSS compares two IPv6 addresses and their metadata and returns
-// whether the current input address is considered a better choice than the
-// existing best address.
-func betterRDNSS(best, current system.IP) bool {
+// betterRDNSS compares two IPv6 addresses and their metadata and returns the
+// address which is more favorable of the two for use as an automatic RDNSS
+// server.
+func betterRDNSS(best, current system.IP) system.IP {
 	if best.Address.IsZero() {
 		// When best is zero, current always wins.
-		return true
+		return current
 	}
 
 	// The best IPv6 address selection algorithm for RDNSS is as follows:
@@ -584,10 +582,10 @@ func betterRDNSS(best, current system.IP) bool {
 	switch {
 	case okC && !okB:
 		// current wins.
-		return true
+		return current
 	case !okC && okB:
 		// best wins.
-		return false
+		return best
 	}
 
 	// Tie on flags, so now we have to compare IP address properties.
@@ -605,19 +603,27 @@ func betterRDNSS(best, current system.IP) bool {
 		switch {
 		case okC && !okB:
 			// current wins.
-			return true
+			return current
 		case !okC && okB:
 			// best wins.
-			return false
+			return best
 		case okC && okB:
 			// Tie, break using byte comparison.
-			return cIP.Less(bIP)
+			if cIP.Less(bIP) {
+				return current
+			}
+
+			return best
 		}
 	}
 
 	// None of the comparison functions were matched (perhaps due to an input
 	// like localhost ::1), so do a final byte comparison.
-	return cIP.Less(bIP)
+	if cIP.Less(bIP) {
+		return current
+	}
+
+	return best
 }
 
 // isStable indicates if ip is considered stable by its flag values.
