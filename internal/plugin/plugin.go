@@ -628,9 +628,14 @@ func betterRDNSS(best, current system.IP) system.IP {
 
 // isStable indicates if ip is considered stable by its flag values.
 func isStable(ip system.IP) bool {
-	// Indicates the Linux kernel should allocate temporary addresses based on
-	// this one: a good indicator of stability.
-	return ip.ManageTemporaryAddresses ||
+	// No-op; used to align future checks and comments.
+	return false ||
+		// Indicates an address was statically assigned and we never expect it
+		// to disappear while serving traffic.
+		ip.ValidForever ||
+		// Indicates the Linux kernel should allocate temporary addresses based
+		// on this one: a good indicator of stability.
+		ip.ManageTemporaryAddresses ||
 		// Indicates an address which is stable per-network, and presumably a
 		// machine serving router advertisements will remain on that network.
 		ip.StablePrivacy ||

@@ -35,6 +35,10 @@ type IP struct {
 	// Interface flags fetched from the operating system which are used for
 	// address preference logic.
 	Deprecated, ManageTemporaryAddresses, StablePrivacy, Temporary, Tentative bool
+
+	// Reports whether the operating system treats this address as valid
+	// forever, as is the case for static addresses.
+	ValidForever bool
 }
 
 // A netAddresser is a generic Addresser which uses package net functions.

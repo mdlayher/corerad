@@ -17,6 +17,8 @@
 package system
 
 import (
+	"math"
+
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/netlink"
 	"golang.org/x/sys/unix"
@@ -76,6 +78,13 @@ func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
 			panicf("corerad: invalid IPv6 net.IP: %+v", ip)
 		}
 
+		// Note whether the kernel treats this address as valid forever since
+		// that means it is static.
+		var forever bool
+		if am.Attributes.CacheInfo.Valid == math.MaxUint32 {
+			forever = true
+		}
+
 		// Finally inspect the extended flags in attributes and parse all the
 		// address flags for use elsewhere.
 		f := am.Attributes.Flags
@@ -87,6 +96,8 @@ func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
 			StablePrivacy:            f&unix.IFA_F_STABLE_PRIVACY != 0,
 			Temporary:                f&unix.IFA_F_TEMPORARY != 0,
 			Tentative:                f&unix.IFA_F_TENTATIVE != 0,
+
+			ValidForever: forever,
 		})
 	}
 

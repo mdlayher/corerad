@@ -71,7 +71,8 @@ func TestIntegrationAddresser(t *testing.T) {
 				flags = append(flags, "tentative")
 			}
 
-			t.Logf("%s: %s, flags: [%s]", ifi.Name, ip.Address, strings.Join(flags, ", "))
+			t.Logf("%s: %s, flags: [%s], forever: %v",
+				ifi.Name, ip.Address, strings.Join(flags, ", "), ip.ValidForever)
 		}
 
 		wantIPs, err := netA.AddressesByIndex(ifi.Index)

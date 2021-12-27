@@ -613,6 +613,10 @@ func Test_betterRDNSS(t *testing.T) {
 			Address:                  netaddr.MustParseIPPrefix("fdff::3/64"),
 			ManageTemporaryAddresses: true,
 		}
+		ulaForever = system.IP{
+			Address:      netaddr.MustParseIPPrefix("fdff::4/64"),
+			ValidForever: true,
+		}
 
 		gua1      = system.IP{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")}
 		gua2      = system.IP{Address: netaddr.MustParseIPPrefix("2001:db8::2/64")}
@@ -739,6 +743,12 @@ func Test_betterRDNSS(t *testing.T) {
 			current: lla1,
 			best:    llaEUI64,
 			better:  llaEUI64,
+		},
+		{
+			name:    "ULA vs LLA EUI-64",
+			current: ulaForever,
+			best:    llaEUI64,
+			better:  ulaForever,
 		},
 	}
 
