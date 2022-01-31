@@ -56,8 +56,12 @@ func NewHandler(
 		h:      mux,
 	}
 
+	// TODO(mdlayher): the interfaces API exists but is undocumented as of
+	// v1.0.0. Prefix it with /_/ to further discourage its current use. I don't
+	// expect major changes to occur, but response bodies are subject to change.
+
 	// Plumb in debugging API handlers.
-	mux.HandleFunc("/api/interfaces", h.interfaces)
+	mux.HandleFunc("/_/api/interfaces", h.interfaces)
 
 	// Optionally enable Prometheus and pprof support.
 	if cfg.Debug.Prometheus {

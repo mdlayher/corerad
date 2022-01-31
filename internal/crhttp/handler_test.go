@@ -104,7 +104,7 @@ func TestHandlerRoutes(t *testing.T) {
 			state: system.TestState{
 				Forwarding: true,
 			},
-			path:   "/api/interfaces",
+			path:   "/_/api/interfaces",
 			status: http.StatusOK,
 			check: func(t *testing.T, h http.Header, b []byte) {
 				body := parseJSONBody(b)
@@ -167,7 +167,7 @@ func TestHandlerRoutes(t *testing.T) {
 					Advertise: false,
 				},
 			},
-			path:   "/api/interfaces",
+			path:   "/_/api/interfaces",
 			status: http.StatusOK,
 			check: func(t *testing.T, h http.Header, b []byte) {
 				want := interfacesBody{
@@ -240,7 +240,7 @@ func TestHandlerRoutes(t *testing.T) {
 			ifaces: []config.Interface{
 				{Name: "eth0", Advertise: true},
 			},
-			path:   "/api/interfaces",
+			path:   "/_/api/interfaces",
 			status: http.StatusInternalServerError,
 			check: func(t *testing.T, _ http.Header, b []byte) {
 				if !bytes.HasPrefix(b, []byte(`failed to check interface "eth0" forwarding`)) {
