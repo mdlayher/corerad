@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v1.0.0
+January 31, 2022
+
+CoreRAD is now considered **stable** and ready for production use on Linux
+routers!
+
+This project has been deployed and running on Matt Layher's Linux home router
+for more than 2 years with no problems. CoreRAD should work with reduced
+functionality on *BSD as well, but this has not been tested.
+
+- The configuration file format is now considered stable! Only additive changes
+  will be made for the remainder of v1.x.x.
+- The valid lifetime of an IPv6 address is now taken into account when selecting
+  a stable address for automatic prefix and RDNSS advertising.
+- All Go dependencies have been upgraded to their latest stable versions.
+
 ## v0.3.4
 September 3, 2021
 
