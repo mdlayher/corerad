@@ -53,7 +53,7 @@ address = "localhost:9430"
 prometheus = true
 ```
 
-As of July 2021, CoreRAD packages are available for:
+As of January 2022, CoreRAD packages are available for:
 
 - [Alpine Linux](https://pkgs.alpinelinux.org/packages?name=corerad&branch=edge)
 - [NixOS](https://search.nixos.org/packages?query=corerad)
@@ -66,7 +66,7 @@ required.
 ```text
 $ go build ./cmd/corerad/
 $ ./corerad -h
-CoreRAD v0.3.3 (2021-07-20)
+CoreRAD v1.0.0 (2022-01-31)
 flags:
   -c string
         path to configuration file (default "corerad.toml")
@@ -87,7 +87,7 @@ Finally, start CoreRAD with the configuration file:
 
 ```text
 $ ./corerad -c ./corerad.toml
-CoreRAD v0.3.3 (2021-07-20) starting with configuration file "corerad.toml"
+CoreRAD v1.0.0 (2022-01-31) starting with configuration file "corerad.toml"
 starting HTTP debug listener on "localhost:9430": prometheus: true, pprof: false
 eth0: "prefix": ::/64 [2600:6c4a:787f:d100::/64, fd9e:1a04:f01d::/64] [on-link, autonomous], preferred: 4h0m0s, valid: 24h0m0s
 eth0: "lla": source link-layer address: 00:0d:b9:53:ea:cd
@@ -128,3 +128,7 @@ $ curl -s localhost:9430/metrics | grep corerad_advertiser_prefix_autonomous
 corerad_advertiser_prefix_autonomous{interface="eth0",prefix="2600:6c4a:787f:d100::/64"} 1
 corerad_advertiser_prefix_autonomous{interface="eth0",prefix="fd9e:1a04:f01d::/64"} 1
 ```
+
+From here, [you may wish to read through the Operation guide](/operation) to
+learn how to run CoreRAD under systemd supervision, and how to monitor upstream
+network traffic.

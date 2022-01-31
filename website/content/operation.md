@@ -60,7 +60,7 @@ is resolved before retry attempts run out:
 
 ```text
 $ corerad -c ./corerad.toml 
-CoreRAD v0.3.3 (2021-07-20) starting with configuration file "corerad.toml"
+CoreRAD v1.0.0 (2022-01-31) starting with configuration file "corerad.toml"
 starting HTTP debug listener on "localhost:9430": prometheus: true, pprof: false
 eth0: interface not ready, reinitializing
 eth0: retrying initialization in 250ms, 49 attempt(s) remaining: interface "eth0" is not up: link not ready
@@ -97,7 +97,7 @@ Date: Tue, 22 Jun 2021 11:25:29 GMT
 Content-Length: 28
 Content-Type: text/plain; charset=utf-8
 
-CoreRAD v0.3.3 (2021-07-20)
+CoreRAD v1.0.0 (2022-01-31)
 ```
 
 If enabled, you can also check the Prometheus metrics output:
@@ -165,23 +165,28 @@ NixOS router. Note the `Status` line, indicating that [systemd readiness
 notifications](https://www.freedesktop.org/software/systemd/man/sd_notify.html) are in use.
 
 ```text
-$ systemctl status corerad
+$ sudo systemctl status corerad
 ● corerad.service - CoreRAD IPv6 NDP RA daemon
-     Loaded: loaded (/nix/store/8zkfcmn39l2i04jd0j44vyqqj75561jl-unit-corerad.service/corerad.service; enabled; vendor preset: enabled)
-     Active: active (running) since Tue 2021-06-22 07:20:00 EDT; 6min ago
-   Main PID: 4004482 (corerad)
+     Loaded: loaded (/etc/systemd/system/corerad.service; enabled; vendor preset: enabled)
+     Active: active (running) since Mon 2022-01-31 15:44:45 EST; 5s ago
+   Main PID: 355483 (corerad)
      Status: "server started, all tasks running"
-         IP: 31.6K in, 108.9K out
-         IO: 44.0K read, 0B written
-      Tasks: 10 (limit: 4690)
-     Memory: 11.0M
-        CPU: 1.422s
+         IP: 1.0K in, 1.6K out
+         IO: 172.0K read, 0B written
+      Tasks: 10 (limit: 4672)
+     Memory: 5.1M
+        CPU: 187ms
      CGroup: /system.slice/corerad.service
-             └─4004482 /nix/store/hyfx8za34rjx2061hrkiv3jvqdx6wxs7-corerad-0.3.1/bin/corerad -c=/nix/store/738wciz9f4lxzjz1bx4dwlyafarw95gc-corerad.toml
+             └─355483 /nix/store/91qndsh96jnb7cbzyzkj4amk1fmz4jfd-corerad-1.0.0/bin/corerad -c=/nix/store/nh2vzmp84s7c5i4rk201kvawzqg7pla1-corerad.toml
 
-Jun 22 07:20:00 routnerr-2 corerad[4004482]: lan0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
-Jun 22 07:20:00 routnerr-2 corerad[4004482]: tengb0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
-Jun 22 07:20:00 routnerr-2 corerad[4004482]: iot0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
-Jun 22 07:20:00 routnerr-2 corerad[4004482]: lab0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
-Jun 22 07:20:00 routnerr-2 systemd[1]: Started CoreRAD IPv6 NDP RA daemon.
+Jan 31 15:44:45 router corerad[355483]: lan0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+Jan 31 15:44:45 router corerad[355483]: guest0: "rdnss": servers: [:: [fe80::20d:b9ff:fe53:eacd]], lifetime: 20m0s
+Jan 31 15:44:45 router corerad[355483]: guest0: "lla": source link-layer address: 00:0d:b9:53:ea:cd
+Jan 31 15:44:45 router corerad[355483]: iot0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+Jan 31 15:44:45 router corerad[355483]: guest0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+Jan 31 15:44:45 router corerad[355483]: lab0: "prefix": ::/64 [2600:6c4a:787f:5902::/64, fd9e:1a04:f01d:2::/64] [on-link, autonomous], preferred: 4h0m0s, valid: 24h0m0s
+Jan 31 15:44:45 router corerad[355483]: lab0: "rdnss": servers: [:: [fe80::20d:b9ff:fe53:eacd]], lifetime: 20m0s
+Jan 31 15:44:45 router corerad[355483]: lab0: "lla": source link-layer address: 00:0d:b9:53:ea:cd
+Jan 31 15:44:45 router corerad[355483]: lab0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+Jan 31 15:44:45 router systemd[1]: Started CoreRAD IPv6 NDP RA daemon.
 ```

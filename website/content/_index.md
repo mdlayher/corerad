@@ -6,6 +6,9 @@ layout: default
 Protocol](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol) router
 advertisement daemon, released under the Apache 2.0 License.
 
+CoreRAD has reached v1.0.0 and is considered stable and ready for production
+use on Linux routers.
+
 [You can find the source code at `github.com/mdlayher/corerad`.](https://github.com/mdlayher/corerad)
 
 [![CoreRAD Grafana + Prometheus dashboard](/img/grafana.png)](/img/grafana.png)
@@ -22,21 +25,20 @@ Some of the project's key features include:
   when an IPv6 default route will expire
 - monitoring of downstream (LAN-facing) router advertisements to ensure they do
   not conflict with CoreRAD's own configuration
-- an HTTP API for troubleshooting and debugging
 - flexible configuration which can be tailored for each advertising network
   interface
 
 Future goals include:
 
 - dynamic router advertisement configuration via HTTP and/or gRPC APIs
-- expanded HTTP API capabilities
+- an HTTP API to export network configuration information
 - better support for *BSD and other platforms (these mostly work today, with
   some caveats)
 
 ## Resources
 
-CoreRAD is currently deployed and running on several home LAN networks. Early
-adopters are welcome to join us on:
+CoreRAD is deployed and running in production environments. Users are welcome to
+join us on:
 
 - [`#corerad` on Gophers Slack](https://invite.slack.golangbridge.org/)
 - [`#corerad` on Libera.Chat](https://web.libera.chat/)
