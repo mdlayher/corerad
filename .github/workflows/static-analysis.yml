@@ -46,5 +46,8 @@ jobs:
     - name: Generate default TOML configuration
       run: ./corerad -init
 
+    - name: Install tomlv
+      run: go install github.com/BurntSushi/toml/cmd/tomlv@latest
+
     - name: Verify default TOML configuration
-      run: go run github.com/BurntSushi/toml/cmd/tomlv -- ./corerad.toml
+      run: tomlv ./corerad.toml
