@@ -14,6 +14,7 @@
 package config_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -331,6 +332,20 @@ func TestParseMinimal(t *testing.T) {
 
 	if _, err := config.Parse(strings.NewReader(config.Minimal), time.Time{}); err != nil {
 		t.Fatalf("failed to parse minimal config: %v", err)
+	}
+}
+
+func TestParseReference(t *testing.T) {
+	t.Parallel()
+
+	f, err := os.Open("reference.toml")
+	if err != nil {
+		t.Fatalf("failed to open reference config: %v", err)
+	}
+	defer f.Close()
+
+	if _, err := config.Parse(f, time.Time{}); err != nil {
+		t.Fatalf("failed to parse reference config: %v", err)
 	}
 }
 
