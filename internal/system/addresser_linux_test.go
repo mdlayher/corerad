@@ -37,7 +37,6 @@ func TestLinux_addresserAddressesByIndex(t *testing.T) {
 		panicked bool
 		ips      []IP
 	}{
-
 		{
 			name:     "bad message type",
 			msgs:     []rtnetlink.Message{&rtnetlink.LinkMessage{}},
