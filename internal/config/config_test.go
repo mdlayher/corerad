@@ -142,6 +142,8 @@ func TestParse(t *testing.T) {
 			  deprecated = true
 
 			  [[interfaces.route]]
+
+			  [[interfaces.route]]
 			  prefix = "2001:db8:ffff::/64"
 
 			  [[interfaces.rdnss]]
@@ -220,6 +222,12 @@ func TestParse(t *testing.T) {
 								ValidLifetime:     24 * time.Hour,
 								PreferredLifetime: 4 * time.Hour,
 								Deprecated:        true,
+							},
+							&plugin.Route{
+								Auto:       true,
+								Prefix:     netaddr.MustParseIPPrefix("::/0"),
+								Preference: ndp.Medium,
+								Lifetime:   24 * time.Hour,
 							},
 							&plugin.Route{
 								Prefix:     netaddr.MustParseIPPrefix("2001:db8:ffff::/64"),

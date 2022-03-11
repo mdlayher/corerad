@@ -145,7 +145,21 @@ preference = "medium"
   [[interfaces.prefix]]
   prefix = "2001:db8::/64"
 
-  # Route: attaches a NDP Route Information option to the router advertisement.
+  # Route: attaches an NDP Route Information option to the router advertisement.
+  [[interfaces.route]]
+  # Serve Route Information options for each IPv6 destination route configured
+  # on system loopback interfaces, meaning this router owns that route and can
+  # be the authority on how traffic is routed to that prefix. This is a typical
+  # configuration for DHCPv6 Prefix Delegation; for example, an ISP router
+  # delegates a /48 prefix on a WAN interface. The router will configure a /48
+  # unreachable route on loopback (as it owns the entire delegated prefix), but
+  # it can advertise more specific /64 prefixes on each LAN.
+  #
+  # Only ::/0 is allowed for this special case. If prefix is an empty string or
+  # omitted, "::/0" is assumed.
+  prefix = "::/0"
+
+  # Alternatively, serve an explicit IPv6 route.
   [[interfaces.route]]
   prefix = "2001:db8:ffff::/64"
 

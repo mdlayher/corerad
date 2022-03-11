@@ -192,7 +192,7 @@ func (p *Prefix) String() string {
 		// Make a best-effort to note the current prefixes if the user is using
 		// the wildcard syntax. If this returns an error, we'll return "::/N"
 		// with no further information.
-		if ps, err := p.currentPrefixes(); err == nil {
+		if ps, err := p.current(); err == nil {
 			ss := make([]string, 0, len(ps))
 			for _, p := range ps {
 				ss = append(ss, p.String())
@@ -240,25 +240,25 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 	if !p.Auto {
 		// User specified an exact prefix so apply it directly.
-		p.applyPrefixes([]netaddr.IPPrefix{p.Prefix}, ra)
+		p.apply([]netaddr.IPPrefix{p.Prefix}, ra)
 		return nil
 	}
 
 	// User specified the ::/N wildcard syntax, fetch all of the current
 	// prefixes on the interface.
-	prefixes, err := p.currentPrefixes()
+	prefixes, err := p.current()
 	if err != nil {
 		return err
 	}
 
 	// Produce a PrefixInformation option for each configured prefix.
 	// All prefixes expanded from ::/N have the same configuration.
-	p.applyPrefixes(prefixes, ra)
+	p.apply(prefixes, ra)
 	return nil
 }
 
-// currentPrefixes fetches the current prefix IPs from the interface.
-func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
+// current fetches the current prefix IPs from the interface.
+func (p *Prefix) current() ([]netaddr.IPPrefix, error) {
 	// Expand ::/N to all unique, non-link local prefixes with matching length
 	// on this interface.
 	addrs, err := p.Addrs()
@@ -305,13 +305,17 @@ func (p *Prefix) currentPrefixes() ([]netaddr.IPPrefix, error) {
 	return prefixes, nil
 }
 
-// applyPrefixes unpacks prefixes into ndp.PrefixInformation options within ra.
-func (p *Prefix) applyPrefixes(prefixes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement) {
-	// Pre-allocate space for prefixes since we know how many are needed.
-	opts := make([]ndp.Option, 0, len(prefixes))
-	for _, pfx := range prefixes {
-		valid, pref := p.lifetimes()
+// apply unpacks prefixes into ndp.PrefixInformation options within ra.
+func (p *Prefix) apply(prefixes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement) {
+	var (
+		// Lifetime is the same for each prefix..
+		valid, pref = p.lifetimes()
 
+		// Pre-allocate space for prefixes since we know how many are needed.
+		opts = make([]ndp.Option, 0, len(prefixes))
+	)
+
+	for _, pfx := range prefixes {
 		opts = append(opts, &ndp.PrefixInformation{
 			PrefixLength:                   pfx.Bits(),
 			OnLink:                         p.OnLink,
@@ -360,6 +364,10 @@ func (p *Prefix) lifetimes() (valid, pref time.Duration) {
 
 // A Route configures a NDP Route Information option.
 type Route struct {
+	// Whether or not this Route should automatically infer and apply the
+	// appropriate IPv6 loopback interface routes to the configuration.
+	Auto bool
+
 	// Parameters from configuration.
 	Prefix     netaddr.IPPrefix
 	Preference ndp.Preference
@@ -372,6 +380,7 @@ type Route struct {
 
 	// Functions which can be swapped for tests.
 	TimeNow func() time.Time
+	Routes  func() ([]system.Route, error)
 }
 
 // Name implements Plugin.
@@ -379,6 +388,21 @@ func (*Route) Name() string { return "route" }
 
 // String implements Plugin.
 func (r *Route) String() string {
+	prefix := r.Prefix.String()
+	if r.Auto {
+		// Make a best-effort to note the current routes if the user is using
+		// the wildcard syntax. If this returns an error, we'll return "::/N"
+		// with no further information.
+		if rs, err := r.current(); err == nil {
+			ss := make([]string, 0, len(rs))
+			for _, r := range rs {
+				ss = append(ss, r.String())
+			}
+
+			prefix = fmt.Sprintf("%s [%s]", prefix, strings.Join(ss, ", "))
+		}
+	}
+
 	// Note deprecation similar to Prefix if applicable.
 	var deprecated string
 	if r.Deprecated {
@@ -386,7 +410,7 @@ func (r *Route) String() string {
 	}
 
 	return fmt.Sprintf("%s%s, preference: %s, lifetime: %s",
-		r.Prefix,
+		prefix,
 		deprecated,
 		r.Preference.String(),
 		durString(r.Lifetime),
@@ -398,19 +422,92 @@ func (r *Route) Prepare(_ *net.Interface) error {
 	// Use the real system time.
 	r.TimeNow = time.Now
 
+	// Fetch automatic routes from loopback interfaces when available.
+	r.Routes = system.NewAddresser().LoopbackRoutes
+
 	return nil
 }
 
 // Apply implements Plugin.
 func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
-	ra.Options = append(ra.Options, &ndp.RouteInformation{
-		PrefixLength:  r.Prefix.Bits(),
-		Preference:    r.Preference,
-		RouteLifetime: r.lifetime(),
-		Prefix:        r.Prefix.IP().IPAddr().IP,
+	if !r.Auto {
+		// User specified an exact route so apply it directly.
+		r.apply([]netaddr.IPPrefix{r.Prefix}, ra)
+		return nil
+	}
+
+	// User specified the ::/N wildcard syntax, fetch all of the current routes
+	// on the loopback interface.
+	//
+	// TODO(mdlayher): propagate preference from rtnetlink.
+	routes, err := r.current()
+	if err != nil {
+		return err
+	}
+
+	// Produce a RouteInformation option for each configured loopback route. All
+	// routes expanded from ::/N have the same configuration.
+	r.apply(routes, ra)
+	return nil
+}
+
+// current fetches the current IPv6 loopback routes from the system.
+func (r *Route) current() ([]netaddr.IPPrefix, error) {
+	// Expand ::/N to all loopback routes.
+	//
+	// TODO(mdlayher): if we choose to accept syntax other than ::/0, we'll have
+	// to update this logic.
+	routes, err := r.Routes()
+	if err != nil {
+		return nil, err
+	}
+
+	var prefixes []netaddr.IPPrefix
+outer:
+	for _, rt := range routes {
+		// Skip IPv4 or /128s on loopbacks.
+		if rt.Prefix.IP().Is4() || rt.Prefix.IsSingleIP() {
+			continue
+		}
+
+		// Prefix covered by larger prefix which is not equal to itself.
+		for _, rt2 := range routes {
+			if rt.Prefix != rt2.Prefix && rt2.Prefix.Contains(rt.Prefix.IP()) {
+				continue outer
+			}
+		}
+
+		prefixes = append(prefixes, rt.Prefix)
+	}
+
+	// For output consistency.
+	sort.SliceStable(prefixes, func(i, j int) bool {
+		return prefixes[i].IP().Less(prefixes[j].IP())
 	})
 
-	return nil
+	return prefixes, nil
+}
+
+// apply unpacks routes into ndp.PrefixInformation options within ra.
+func (r *Route) apply(routes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement) {
+	var (
+		// Lifetime is the same for each route.
+		lt = r.lifetime()
+
+		// Pre-allocate space for routes since we know how many are needed.
+		opts = make([]ndp.Option, 0, len(routes))
+	)
+
+	for _, rt := range routes {
+		ra.Options = append(ra.Options, &ndp.RouteInformation{
+			PrefixLength:  rt.Bits(),
+			Preference:    r.Preference,
+			RouteLifetime: lt,
+			Prefix:        rt.IP().IPAddr().IP,
+		})
+	}
+
+	ra.Options = append(ra.Options, opts...)
 }
 
 // lifetimes calculates a Route's lifetime as either a fixed or dynamic value
@@ -458,7 +555,7 @@ func (r *RDNSS) String() string {
 		// Make a best-effort to note the current server if the user is using
 		// the wildcard syntax. If this returns an error, we'll return "::"
 		// with no further information.
-		if s, err := r.currentServer(); err == nil {
+		if s, err := r.current(); err == nil {
 			servers = append(servers, fmt.Sprintf(":: [%s]", s.String()))
 		} else {
 			servers = append(servers, "::")
@@ -491,24 +588,24 @@ func (r *RDNSS) Prepare(ifi *net.Interface) error {
 func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
 	if !r.Auto {
 		// User specified exact servers so apply them directly.
-		r.applyServers(r.Servers, ra)
+		r.apply(r.Servers, ra)
 		return nil
 	}
 
 	// User specified the :: wildcard syntax, automatically choose a DNS server
 	// address from this interface and prepend it to the list.
-	server, err := r.currentServer()
+	server, err := r.current()
 	if err != nil {
 		return err
 	}
 
 	// Produce a RecursiveDNSServers option for this server.
-	r.applyServers(append([]netaddr.IP{server}, r.Servers...), ra)
+	r.apply(append([]netaddr.IP{server}, r.Servers...), ra)
 	return nil
 }
 
-// applyServers unpacks servers into an ndp.RecursiveDNSServer option within ra.
-func (r *RDNSS) applyServers(servers []netaddr.IP, ra *ndp.RouterAdvertisement) {
+// apply unpacks servers into an ndp.RecursiveDNSServer option within ra.
+func (r *RDNSS) apply(servers []netaddr.IP, ra *ndp.RouterAdvertisement) {
 	ips := make([]net.IP, 0, len(servers))
 	for _, s := range servers {
 		ips = append(ips, s.IPAddr().IP)
@@ -520,8 +617,8 @@ func (r *RDNSS) applyServers(servers []netaddr.IP, ra *ndp.RouterAdvertisement) 
 	})
 }
 
-// currentServer fetches the current DNS server IP from the interface.
-func (r *RDNSS) currentServer() (netaddr.IP, error) {
+// current fetches the current DNS server IP from the interface.
+func (r *RDNSS) current() (netaddr.IP, error) {
 	// Expand :: to one of the IPv6 addresses on this interface. The "best"
 	// address will be chosen by comparing all addresses on the interface for
 	// desired properties.

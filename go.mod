@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/google/go-cmp v0.5.7
-	github.com/jsimonetti/rtnetlink v1.1.0
+	github.com/jsimonetti/rtnetlink v1.1.1
 	github.com/mdlayher/metricslite v0.0.0-20200705182329-f8b577e97896
 	github.com/mdlayher/ndp v0.0.0-20220304194648-de594d7bc183
 	github.com/mdlayher/netlink v1.6.0
