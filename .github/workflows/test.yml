@@ -13,7 +13,8 @@ jobs:
     strategy:
       matrix:
         go-version: [1.17]
-        os: [ubuntu-latest, macos-latest]
+        # TODO(mdlayher): figure out macOS test hangs.
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
