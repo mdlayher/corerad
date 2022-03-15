@@ -18,8 +18,10 @@ package system
 
 import (
 	"math"
+	"net"
 
 	"github.com/jsimonetti/rtnetlink"
+	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netlink"
 	"golang.org/x/sys/unix"
 	"inet.af/netaddr"
@@ -38,9 +40,8 @@ func NewAddresser() Addresser { return &addresser{execute: rtnlExecute} }
 
 // AddressesByIndex implements Addresser.
 func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
-	// Passing this request enables newer kernels to filter the addresses for us
-	// to IPv6 only and the specified interface. Older kernels will ignore this
-	// and our own filtering code will kick in.
+	// The kernel can filter the addresses for us to return IPv6 addresses only
+	// for the given interface.
 	msgs, err := a.execute(
 		&rtnetlink.AddressMessage{
 			Family: unix.AF_INET6,
@@ -49,33 +50,20 @@ func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
 		unix.RTM_GETADDR,
 		netlink.Request|netlink.Dump,
 	)
-	if err != nil {
+	if err != nil || len(msgs) == 0 {
 		return nil, err
 	}
 
-	// Unfortunately we can't preallocate as it's possible for older kernels to
-	// ignore our filter request and just return all the IP addresses anyway.
-	var addrs []IP
+	addrs := make([]IP, 0, len(msgs))
 	for _, m := range msgs {
 		// rtnetlink package invariant checks.
 		am, ok := m.(*rtnetlink.AddressMessage)
-		if !ok {
+		if !ok || am.Family != unix.AF_INET6 || am.Attributes == nil {
 			panicf("corerad: invalid rtnetlink message type: %+v", m)
 		}
-		if am.Family != unix.AF_INET6 || am.Index != uint32(index) {
-			// Only want IPv6 addresses for the specified interface.
-			continue
-		}
-
-		if am.Attributes == nil {
-			panicf("corerad: rtnetlink address message missing attributes: %+v", m)
-		}
-
-		// Only want IPv6 addresses, and anything with AF_INET6 must be an IPv6
-		// address.
 		ip, ok := netaddr.FromStdIP(am.Attributes.Address)
 		if !ok || !ip.Is6() || ip.Is4in6() {
-			panicf("corerad: invalid IPv6 net.IP: %+v", ip)
+			panicf("corerad: invalid IPv6 address from rtnetlink: %q", am.Attributes.Address)
 		}
 
 		// Note whether the kernel treats this address as valid forever since
@@ -85,8 +73,6 @@ func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
 			forever = true
 		}
 
-		// Finally inspect the extended flags in attributes and parse all the
-		// address flags for use elsewhere.
 		f := am.Attributes.Flags
 		addrs = append(addrs, IP{
 			Address: netaddr.IPPrefixFrom(ip, am.PrefixLength),
@@ -104,25 +90,103 @@ func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
 	return addrs, nil
 }
 
+// AddressesByIndex implements Addresser.
+func (a *addresser) LoopbackRoutes() ([]Route, error) {
+	// TODO(mdlayher): it appears there is no way to have rtnetlink filter only
+	// loopback interfaces on request. For now we filter in userspace.
+	ifis, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	// Gather routes for each matching interface.
+	//
+	// TODO(mdlayher): experiment with multiple loopback interfaces if possible.
+	var routes []Route
+	for _, ifi := range ifis {
+		if ifi.Flags&net.FlagLoopback == 0 || ifi.Flags&net.FlagUp == 0 {
+			continue
+		}
+
+		rs, err := a.routesByIndex(ifi.Index)
+		if err != nil {
+			return nil, err
+		}
+
+		routes = append(routes, rs...)
+	}
+
+	return routes, nil
+}
+
+// routesByIndex calls rtnetlink to fetch IPv6 routes for an interface by index.
+func (a *addresser) routesByIndex(index int) ([]Route, error) {
+	// The kernel can filter the routes for us to return IPv6 routes only for
+	// the given out interface.
+	msgs, err := a.execute(
+		&rtnetlink.RouteMessage{
+			Family: unix.AF_INET6,
+			Attributes: rtnetlink.RouteAttributes{
+				OutIface: uint32(index),
+				// Only dump the "main" table for automatic routes. Note that we
+				// specify table in the attributes and not the body to enable
+				// strict check filtering.
+				//
+				// TODO(mdlayher): how would we deal with multiple routing
+				// tables?
+				Table: unix.RT_TABLE_MAIN,
+			},
+		},
+		unix.RTM_GETROUTE,
+		netlink.Request|netlink.Dump,
+	)
+	if err != nil || len(msgs) == 0 {
+		return nil, err
+	}
+
+	routes := make([]Route, 0, len(msgs))
+	for _, m := range msgs {
+		// rtnetlink package invariant checks.
+		rm, ok := m.(*rtnetlink.RouteMessage)
+		if !ok || rm.Family != unix.AF_INET6 {
+			panicf("corerad: invalid rtnetlink message type: %+v", m)
+		}
+
+		ip, ok := netaddr.FromStdIP(rm.Attributes.Dst)
+		if !ok || !ip.Is6() || ip.Is4in6() {
+			panicf("corerad: invalid IPv6 route from rtnetlink: %q", rm.Attributes.Dst)
+		}
+
+		// Pass along NDP preference if set.
+		pref := ndp.Medium
+		if p := rm.Attributes.Pref; p != nil {
+			pref = ndp.Preference(*p)
+		}
+
+		routes = append(routes, Route{
+			Prefix:     netaddr.IPPrefixFrom(ip, rm.DstLength),
+			Index:      int(rm.Attributes.OutIface),
+			Preference: pref,
+		})
+	}
+
+	return routes, nil
+}
+
 // rtnlExecute executes an rtnetlink request using the operating system's
 // netlink sockets.
 func rtnlExecute(m rtnetlink.Message, family uint16, flags netlink.HeaderFlags) ([]rtnetlink.Message, error) {
-	c, err := rtnetlink.Dial(nil)
+	// Unconditionally set strict mode. In practice we don't expect users on
+	// older kernels to be running new software like CoreRAD. This simplifies
+	// the rest of the rtnetlink calling code by allowing in-kernel filtering of
+	// addresses and routes.
+	//
+	// If this ends up being an issue in practice, the issue can be revisited.
+	c, err := rtnetlink.Dial(&netlink.Config{Strict: true})
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
-
-	// Socket options are applied on a best-effort basis because they may not be
-	// supported on older Linux kernel versions.
-	for _, o := range []netlink.ConnOption{
-		// Enables better request validation and in-kernel filtering.
-		netlink.GetStrictCheck,
-		// Enables better error reporting.
-		netlink.ExtendedAcknowledge,
-	} {
-		_ = c.SetOption(o, true)
-	}
 
 	return c.Execute(m, family, flags)
 }

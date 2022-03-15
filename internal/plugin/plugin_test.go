@@ -108,6 +108,21 @@ func TestPluginString(t *testing.T) {
 			s: "2001:db8::/64 [DEPRECATED], preference: High, lifetime: 15m0s",
 		},
 		{
+			name: "Route wildcard",
+			p: &Route{
+				Auto:     true,
+				Prefix:   netaddr.MustParseIPPrefix("::/0"),
+				Lifetime: 10 * time.Minute,
+				Routes: func() ([]system.Route, error) {
+					return []system.Route{
+						{Prefix: netaddr.MustParseIPPrefix("fd00::/48")},
+						{Prefix: netaddr.MustParseIPPrefix("2001:db8::/32")},
+					}, nil
+				},
+			},
+			s: "::/0 [2001:db8::/32, fd00::/48], preference: Medium, lifetime: 10m0s",
+		},
+		{
 			name: "RDNSS",
 			p: &RDNSS{
 				Lifetime: 30 * time.Second,
@@ -406,6 +421,35 @@ func TestBuild(t *testing.T) {
 					&ndp.RouteInformation{
 						PrefixLength:  32,
 						Preference:    ndp.High,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        mustIP("2001:db8::"),
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "automatic routes",
+			plugin: &Route{
+				Auto:     true,
+				Lifetime: 10 * time.Second,
+				Routes: func() ([]system.Route, error) {
+					return []system.Route{
+						// IPv4 or /128s should be skipped.
+						{Prefix: netaddr.MustParseIPPrefix("192.0.2.1/32")},
+						{Prefix: netaddr.MustParseIPPrefix("::1/128")},
+						// The /48 is contained within the /32 and should be
+						// skipped.
+						{Prefix: netaddr.MustParseIPPrefix("2001:db8:ffff::/48")},
+						{Prefix: netaddr.MustParseIPPrefix("2001:db8::/32")},
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  32,
+						Preference:    ndp.Medium,
 						RouteLifetime: 10 * time.Second,
 						Prefix:        mustIP("2001:db8::"),
 					},

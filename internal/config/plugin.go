@@ -64,12 +64,17 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		routes = append(routes, rt)
 	}
 
-	// For sanity, configured routes on a given interface must not overlap.
+	// Configured routes on a given interface must not overlap. This would
+	// produce confusing and ineffective output to clients.
 	for _, rt1 := range routes {
 		for _, rt2 := range routes {
-			// Skip when rt1 and rt2 are identical, but make sure they don't
-			// overlap otherwise.
-			if rt1 != rt2 && rt1.Prefix.Overlaps(rt2.Prefix) {
+			// Skip when rt1 and rt2 are identical or one of them is the auto
+			// route.
+			if rt1 == rt2 || rt1.Prefix == autoRoute || rt2.Prefix == autoRoute {
+				continue
+			}
+
+			if rt1.Prefix.Overlaps(rt2.Prefix) {
 				return nil, fmt.Errorf("routes overlap: %s and %s",
 					rt1.Prefix, rt2.Prefix)
 			}
@@ -152,7 +157,7 @@ var autoPrefix = netaddr.MustParseIPPrefix("::/64")
 
 // parsePrefix parses a Prefix plugin.
 func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
-	prefix, err := parseIPPrefix(p.Prefix, allowEmpty)
+	prefix, err := parseIPPrefix(p.Prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -229,11 +234,29 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 	}, nil
 }
 
+// autoRoute is the sentinel prefix which is used to automatically infer the
+// appropriate routes to advertise for a given interface.
+var autoRoute = netaddr.MustParseIPPrefix("::/0")
+
 // parseRoute parses a Route plugin.
 func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
-	prefix, err := parseIPPrefix(r.Prefix, disallowEmpty)
+	prefix, err := parseIPPrefix(r.Prefix)
 	if err != nil {
 		return nil, err
+	}
+
+	// Allow an empty prefix to be used in place of ::/0 as that is the default
+	// most users will want.
+	if prefix.IsZero() {
+		prefix = autoRoute
+	}
+
+	// Only permit ::/0 as a special case for now. It might make sense to allow
+	// for example ::/48 or ::/56 in the future to match any route of that
+	// length or longer, but this would be a natural extension of ::/0 ("any
+	// length").
+	if prefix.IP().IsUnspecified() && prefix.Bits() != 0 {
+		return nil, errors.New("only ::/0 is permitted for inferring routes from loopback interfaces")
 	}
 
 	pref, err := parsePreference(r.Preference)
@@ -256,6 +279,9 @@ func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
 	}
 
 	return &plugin.Route{
+		// Determine whether or not the route is using auto mode.
+		Auto: prefix == autoRoute,
+
 		Prefix:     prefix,
 		Preference: pref,
 		Lifetime:   lt,
@@ -338,17 +364,12 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	}, nil
 }
 
-const (
-	allowEmpty    = true
-	disallowEmpty = false
-)
-
 // parseIPPrefix parses s an IPv6 prefix which may optionally be empty. It
 // returns an error if the prefix is invalid, refers to an address within a
 // prefix, or is an IPv4 prefix.
-func parseIPPrefix(s string, emptyOK bool) (netaddr.IPPrefix, error) {
-	if emptyOK && s == "" {
-		// When permitted, empty string produces a valid zero IPPrefix.
+func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
+	if s == "" {
+		// Empty string produces a valid zero IPPrefix.
 		return netaddr.IPPrefix{}, nil
 	}
 

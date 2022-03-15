@@ -20,10 +20,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/system"
+	"golang.org/x/net/nettest"
 	"inet.af/netaddr"
 )
 
-func TestIntegrationAddresser(t *testing.T) {
+func TestIntegrationAddresserAddresses(t *testing.T) {
 	ifis, err := net.Interfaces()
 	if err != nil {
 		t.Fatalf("failed to get interfaces: %v", err)
@@ -101,6 +102,23 @@ func TestIntegrationAddresser(t *testing.T) {
 				t.Fatalf("interface %q address %q was not found", ifi.Name, addr)
 			}
 		}
+	}
+}
+
+func TestIntegrationAddresserLoopbackRoutes(t *testing.T) {
+	lo, err := nettest.LoopbackInterface()
+	if err != nil {
+		t.Skipf("skipping, found no loopback network interface: %v", err)
+	}
+
+	routes, err := system.NewAddresser().LoopbackRoutes()
+	if err != nil {
+		t.Fatalf("failed to get loopback routes: %v", err)
+	}
+
+	t.Logf("loopback: %s, index: %d, flags: %s", lo.Name, lo.Index, lo.Flags)
+	for _, r := range routes {
+		t.Logf("  - %s: index %d, preference: %s", r.Prefix, r.Index, r.Preference)
 	}
 }
 

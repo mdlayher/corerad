@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/jsimonetti/rtnetlink"
+	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netlink"
 	"golang.org/x/sys/unix"
 	"inet.af/netaddr"
@@ -75,18 +76,6 @@ func TestLinux_addresserAddressesByIndex(t *testing.T) {
 		},
 		{
 			name: "empty response",
-		},
-		{
-			name: "filter messages",
-			msgs: []rtnetlink.Message{
-				// Bad family.
-				&rtnetlink.AddressMessage{Family: unix.AF_INET},
-				&rtnetlink.AddressMessage{
-					Family: unix.AF_INET,
-					// Bad index.
-					Index: index + 1,
-				},
-			},
 		},
 		{
 			name: "ok",
@@ -155,7 +144,7 @@ func TestLinux_addresserAddressesByIndex(t *testing.T) {
 			}
 
 			var ips []IP
-			panicked := panics(func() {
+			panicked := panics(t, func() {
 				out, err := a.AddressesByIndex(index)
 				if err != nil {
 					t.Fatalf("failed to get addresses: %v", err)
@@ -174,12 +163,159 @@ func TestLinux_addresserAddressesByIndex(t *testing.T) {
 	}
 }
 
+func TestLinux_addresserLoopbackRoutes(t *testing.T) {
+	// Use a fixed interface index for correct messages.
+	const index = 1
+	pref := uint8(ndp.High)
+
+	tests := []struct {
+		name     string
+		msgs     []rtnetlink.Message
+		panicked bool
+		routes   []Route
+	}{
+		{
+			name:     "bad message type",
+			msgs:     []rtnetlink.Message{&rtnetlink.LinkMessage{}},
+			panicked: true,
+		},
+
+		{
+			name: "bad family",
+			msgs: []rtnetlink.Message{&rtnetlink.RouteMessage{
+				Family: unix.AF_INET,
+			}},
+			panicked: true,
+		},
+		{
+			name: "invalid IP",
+			msgs: []rtnetlink.Message{&rtnetlink.RouteMessage{
+				Family:     unix.AF_INET6,
+				Attributes: rtnetlink.RouteAttributes{Dst: nil},
+			}},
+			panicked: true,
+		},
+		{
+			name: "invalid IPv4",
+			msgs: []rtnetlink.Message{&rtnetlink.RouteMessage{
+				Family: unix.AF_INET6,
+				Attributes: rtnetlink.RouteAttributes{
+					Dst: net.IPv4(192, 0, 2, 1),
+				},
+			}},
+			panicked: true,
+		},
+		{
+			name: "empty response",
+		},
+		{
+			name: "ok",
+			msgs: []rtnetlink.Message{
+				&rtnetlink.RouteMessage{
+					Family:    unix.AF_INET6,
+					DstLength: 32,
+					Attributes: rtnetlink.RouteAttributes{
+						Dst:      net.ParseIP("2001:db8::"),
+						OutIface: index,
+					},
+				},
+				// Filtered later by internal/plugin package.
+				&rtnetlink.RouteMessage{
+					Family:    unix.AF_INET6,
+					DstLength: 128,
+					Attributes: rtnetlink.RouteAttributes{
+						Dst:      net.IPv6loopback,
+						OutIface: index,
+					},
+				},
+				// A hypothetical second loopback interface route. This is a bit
+				// strange because it's technically part of the first
+				// interface's route dump but the effect is the same.
+				&rtnetlink.RouteMessage{
+					Family:    unix.AF_INET6,
+					DstLength: 48,
+					Attributes: rtnetlink.RouteAttributes{
+						Dst:      net.ParseIP("fd00::"),
+						OutIface: index + 1,
+						Pref:     &pref,
+					},
+				},
+			},
+			routes: []Route{
+				{
+					Prefix: netaddr.MustParseIPPrefix("2001:db8::/32"),
+					Index:  index,
+				},
+				{
+					Prefix: netaddr.MustParseIPPrefix("::1/128"),
+					Index:  index,
+				},
+				{
+					Prefix:     netaddr.MustParseIPPrefix("fd00::/48"),
+					Index:      index + 1,
+					Preference: ndp.High,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &addresser{
+				execute: func(m rtnetlink.Message, family uint16, flags netlink.HeaderFlags) ([]rtnetlink.Message, error) {
+					wantMessage := &rtnetlink.RouteMessage{
+						Family: unix.AF_INET6,
+						Attributes: rtnetlink.RouteAttributes{
+							OutIface: index,
+							Table:    unix.RT_TABLE_MAIN,
+						},
+					}
+
+					if diff := cmp.Diff(wantMessage, m); diff != "" {
+						t.Fatalf("unexpected request message (-want +got):\n%s", diff)
+					}
+
+					if diff := cmp.Diff(unix.RTM_GETROUTE, int(family)); diff != "" {
+						t.Fatalf("unexpected netlink header family (-want +got):\n%s", diff)
+					}
+
+					if diff := cmp.Diff(netlink.Request|netlink.Dump, flags); diff != "" {
+						t.Fatalf("unexpected netlink header flags (-want +got):\n%s", diff)
+					}
+
+					return tt.msgs, nil
+				},
+			}
+
+			var routes []Route
+			panicked := panics(t, func() {
+				out, err := a.LoopbackRoutes()
+				if err != nil {
+					t.Fatalf("failed to get routes: %v", err)
+				}
+
+				routes = out
+			})
+			if diff := cmp.Diff(tt.panicked, panicked); diff != "" {
+				t.Fatalf("unexpected function panic (-want +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff(tt.routes, routes, cmp.Comparer(ipPrefixEqual), cmp.Comparer(ipEqual)); diff != "" {
+				t.Fatalf("unexpected routes (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func ipEqual(x, y netaddr.IP) bool             { return x == y }
 func ipPrefixEqual(x, y netaddr.IPPrefix) bool { return x == y }
 
-func panics(fn func()) (panicked bool) {
+func panics(t *testing.T, fn func()) (panicked bool) {
+	t.Helper()
+
 	defer func() {
 		if r := recover(); r != nil {
+			t.Logf("panic: %v", r)
 			panicked = true
 		}
 	}()

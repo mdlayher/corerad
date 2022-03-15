@@ -16,13 +16,18 @@ package system
 import (
 	"net"
 
+	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
 )
 
-// An Addresser is a type that can fetch IP address information from the
-// operating system.
+// An Addresser is a type that can fetch IP address and route information from
+// the operating system.
+//
+// TODO(mdlayher): this name is a bit awkward with the inclusion of Routes.
+// Reconsider.
 type Addresser interface {
 	AddressesByIndex(index int) ([]IP, error)
+	LoopbackRoutes() ([]Route, error)
 }
 
 // An IP is an IP address and its associated operating system-specific metadata.
@@ -39,6 +44,19 @@ type IP struct {
 	// Reports whether the operating system treats this address as valid
 	// forever, as is the case for static addresses.
 	ValidForever bool
+}
+
+// A Route is an destination route and its associated operating system-specific
+// metadata.
+type Route struct {
+	// A destination route for an interface.
+	Prefix netaddr.IPPrefix
+
+	// The index of the network interface which contains this route.
+	Index int
+
+	// The NDP preference value for a particular route.
+	Preference ndp.Preference
 }
 
 // A netAddresser is a generic Addresser which uses package net functions.
@@ -79,4 +97,10 @@ func (*netAddresser) AddressesByIndex(index int) ([]IP, error) {
 	}
 
 	return ips, nil
+}
+
+// LoopbackRoutes implements Addresser.
+func (*netAddresser) LoopbackRoutes() ([]Route, error) {
+	// No cross-platform implementation for fetching routes. Do nothing.
+	return nil, nil
 }

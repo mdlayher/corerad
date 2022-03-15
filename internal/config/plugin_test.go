@@ -371,11 +371,20 @@ func Test_parsePrefix(t *testing.T) {
 func Test_parseRoute(t *testing.T) {
 	t.Parallel()
 
-	defaults := &plugin.Route{
-		Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
-		Preference: ndp.Medium,
-		Lifetime:   24 * time.Hour,
-	}
+	var (
+		defaults = &plugin.Route{
+			Auto:       true,
+			Prefix:     netaddr.MustParseIPPrefix("::/0"),
+			Preference: ndp.Medium,
+			Lifetime:   24 * time.Hour,
+		}
+
+		explicit = &plugin.Route{
+			Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
+			Preference: ndp.Medium,
+			Lifetime:   24 * time.Hour,
+		}
+	)
 
 	tests := []struct {
 		name string
@@ -383,13 +392,6 @@ func Test_parseRoute(t *testing.T) {
 		r    *plugin.Route
 		ok   bool
 	}{
-		{
-			name: "no prefix",
-			s: `
-			[[interfaces]]
-			  [[interfaces.route]]
-			`,
-		},
 		{
 			name: "bad prefix string",
 			s: `
@@ -478,14 +480,42 @@ func Test_parseRoute(t *testing.T) {
 			  prefix = "2001:db8::/96"
 			`,
 		},
+		// TODO(mdlayher): we may eventually permit this case.
+		{
+			name: "bad auto prefix",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "::/48"
+			`,
+		},
+		{
+			name: "OK implied defaults",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			`,
+			r:  defaults,
+			ok: true,
+		},
 		{
 			name: "OK defaults",
 			s: `
 			[[interfaces]]
 			  [[interfaces.route]]
-			  prefix = "2001:db8::/64"
+			  prefix = "::/0"
 			`,
 			r:  defaults,
+			ok: true,
+		},
+		{
+			name: "OK explicit",
+			s: `
+			[[interfaces]]
+			  [[interfaces.route]]
+			  prefix = "2001:db8::/64"
+			`,
+			r:  explicit,
 			ok: true,
 		},
 		{
@@ -496,7 +526,7 @@ func Test_parseRoute(t *testing.T) {
 			  prefix = "2001:db8::/64"
 			  lifetime = "auto"
 			`,
-			r:  defaults,
+			r:  explicit,
 			ok: true,
 		},
 		{
@@ -515,7 +545,7 @@ func Test_parseRoute(t *testing.T) {
 			ok: true,
 		},
 		{
-			name: "OK explicit",
+			name: "OK full",
 			s: `
 			[[interfaces]]
 			  [[interfaces.route]]
