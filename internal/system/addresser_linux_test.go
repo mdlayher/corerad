@@ -179,7 +179,6 @@ func TestLinux_addresserLoopbackRoutes(t *testing.T) {
 			msgs:     []rtnetlink.Message{&rtnetlink.LinkMessage{}},
 			panicked: true,
 		},
-
 		{
 			name: "bad family",
 			msgs: []rtnetlink.Message{&rtnetlink.RouteMessage{

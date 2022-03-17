@@ -15,7 +15,7 @@ package crhttp
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
 	"github.com/mdlayher/ndp"
 )
@@ -168,11 +168,8 @@ func packOptions(opts []ndp.Option) options {
 }
 
 // prefixString combines prefix and length into a CIDR notation string.
-func prefixString(prefix net.IP, length uint8) string {
-	return (&net.IPNet{
-		IP:   prefix,
-		Mask: net.CIDRMask(int(length), 128),
-	}).String()
+func prefixString(ip netip.Addr, length uint8) string {
+	return netip.PrefixFrom(ip, int(length)).String()
 }
 
 func panicf(format string, a ...interface{}) {

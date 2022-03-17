@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/mdlayher/ndp"
@@ -25,9 +26,9 @@ import (
 
 // A Conn abstracts IPv6 NDP socket operations for purposes of testing.
 type Conn interface {
-	ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
+	ReadFrom() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error)
 	SetReadDeadline(t time.Time) error
-	WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error
+	WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst netip.Addr) error
 }
 
 var _ Conn = &ndp.Conn{}
@@ -69,7 +70,12 @@ func checkInterface(ifi *net.Interface, addrFunc func() ([]net.Addr, error)) err
 	for _, a := range addrs {
 		// Skip non IP and link-local addresses.
 		a, ok := a.(*net.IPNet)
-		if ok && isIPv6(a.IP) && a.IP.IsLinkLocalUnicast() {
+		if !ok {
+			continue
+		}
+
+		ip, ok := netip.AddrFromSlice(a.IP)
+		if ok && ip.Is6() && ip.IsLinkLocalUnicast() {
 			foundLL = true
 			break
 		}
@@ -93,9 +99,4 @@ func isNoSuchInterface(err error) bool {
 	return oerr.Op == "route" &&
 		oerr.Net == "ip+net" &&
 		oerr.Err.Error() == "no such network interface"
-}
-
-// isIPv6 determines if ip is an IPv6 address.
-func isIPv6(ip net.IP) bool {
-	return ip.To16() != nil && ip.To4() == nil
 }

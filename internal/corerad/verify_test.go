@@ -14,7 +14,7 @@
 package corerad
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -26,7 +26,7 @@ func Test_verifyRAs(t *testing.T) {
 	var (
 		prefix = []ndp.Option{
 			&ndp.PrefixInformation{
-				Prefix:            mustNetIP("2001:db8::"),
+				Prefix:            netip.MustParseAddr("2001:db8::"),
 				PrefixLength:      64,
 				PreferredLifetime: 1 * time.Second,
 				ValidLifetime:     2 * time.Second,
@@ -35,7 +35,7 @@ func Test_verifyRAs(t *testing.T) {
 
 		route = []ndp.Option{
 			&ndp.RouteInformation{
-				Prefix:        mustNetIP("2001:db8:ffff::"),
+				Prefix:        netip.MustParseAddr("2001:db8:ffff::"),
 				PrefixLength:  64,
 				RouteLifetime: 1 * time.Second,
 				Preference:    ndp.High,
@@ -44,9 +44,9 @@ func Test_verifyRAs(t *testing.T) {
 
 		rdnss = []ndp.Option{
 			&ndp.RecursiveDNSServer{
-				Servers: []net.IP{
-					mustNetIP("2001:db8::1"),
-					mustNetIP("2001:db8::2"),
+				Servers: []netip.Addr{
+					netip.MustParseAddr("2001:db8::1"),
+					netip.MustParseAddr("2001:db8::2"),
 				},
 			},
 		}
@@ -72,13 +72,13 @@ func Test_verifyRAs(t *testing.T) {
 					OnLink:            true,
 					PreferredLifetime: 10 * time.Second,
 					ValidLifetime:     20 * time.Second,
-					Prefix:            mustNetIP("fdff:dead:beef::"),
+					Prefix:            netip.MustParseAddr("fdff:dead:beef::"),
 				},
 				route[0],
 				&ndp.RouteInformation{
 					PrefixLength:  96,
 					RouteLifetime: 10 * time.Second,
-					Prefix:        mustNetIP("fdff:dead:beef::"),
+					Prefix:        netip.MustParseAddr("fdff:dead:beef::"),
 				},
 				rdnss[0],
 				dnssl[0],
@@ -140,7 +140,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.PrefixInformation{
-						Prefix:            mustNetIP("2001:db8::"),
+						Prefix:            netip.MustParseAddr("2001:db8::"),
 						PrefixLength:      64,
 						PreferredLifetime: 3 * time.Second,
 						ValidLifetime:     4 * time.Second,
@@ -160,7 +160,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.RouteInformation{
-						Prefix:        mustNetIP("2001:db8:ffff::"),
+						Prefix:        netip.MustParseAddr("2001:db8:ffff::"),
 						PrefixLength:  64,
 						RouteLifetime: 3 * time.Second,
 						Preference:    ndp.High,
@@ -192,7 +192,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
-						Servers:  []net.IP{mustNetIP("2001:db8::1"), mustNetIP("2001:db8::2")},
+						Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1"), netip.MustParseAddr("2001:db8::2")},
 						Lifetime: 2 * time.Second,
 					},
 				},
@@ -219,7 +219,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
-						Servers: []net.IP{mustNetIP("2001:db8::2"), mustNetIP("2001:db8::3")},
+						Servers: []netip.Addr{netip.MustParseAddr("2001:db8::2"), netip.MustParseAddr("2001:db8::3")},
 					},
 				},
 			},
@@ -317,7 +317,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.PrefixInformation{
-						Prefix:            mustNetIP("fdff:dead:beef::"),
+						Prefix:            netip.MustParseAddr("fdff:dead:beef::"),
 						PrefixLength:      64,
 						PreferredLifetime: 3 * time.Second,
 						ValidLifetime:     4 * time.Second,
@@ -340,7 +340,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.RouteInformation{
-						Prefix:        mustNetIP("fdff:dead:beef::"),
+						Prefix:        netip.MustParseAddr("fdff:dead:beef::"),
 						PrefixLength:  64,
 						RouteLifetime: 3 * time.Second,
 					},
@@ -355,7 +355,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
 					&ndp.RouteInformation{
-						Prefix:        mustNetIP("2001:db8:ffff::"),
+						Prefix:        netip.MustParseAddr("2001:db8:ffff::"),
 						PrefixLength:  64,
 						RouteLifetime: 1 * time.Second,
 						Preference:    ndp.Low,

@@ -15,6 +15,7 @@ package plugin
 
 import (
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -244,7 +245,7 @@ func TestBuild(t *testing.T) {
 						OnLink:            true,
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
-						Prefix:            mustIP("2001:db8::"),
+						Prefix:            netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -289,7 +290,7 @@ func TestBuild(t *testing.T) {
 						AutonomousAddressConfiguration: true,
 						PreferredLifetime:              10 * time.Second,
 						ValidLifetime:                  20 * time.Second,
-						Prefix:                         mustIP("2001:db8::"),
+						Prefix:                         netip.MustParseAddr("2001:db8::"),
 					},
 					&ndp.PrefixInformation{
 						PrefixLength:                   64,
@@ -297,7 +298,7 @@ func TestBuild(t *testing.T) {
 						AutonomousAddressConfiguration: true,
 						PreferredLifetime:              10 * time.Second,
 						ValidLifetime:                  20 * time.Second,
-						Prefix:                         mustIP("fd00::"),
+						Prefix:                         netip.MustParseAddr("fd00::"),
 					},
 				},
 			},
@@ -322,7 +323,7 @@ func TestBuild(t *testing.T) {
 				Options: []ndp.Option{
 					&ndp.PrefixInformation{
 						PrefixLength: 32,
-						Prefix:       mustIP("2001:db8::"),
+						Prefix:       netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -349,7 +350,7 @@ func TestBuild(t *testing.T) {
 						OnLink:                         true,
 						PreferredLifetime:              6 * time.Second,
 						ValidLifetime:                  16 * time.Second,
-						Prefix:                         mustIP("2001:db8::"),
+						Prefix:                         netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -376,7 +377,7 @@ func TestBuild(t *testing.T) {
 						OnLink:                         true,
 						PreferredLifetime:              0 * time.Second,
 						ValidLifetime:                  10 * time.Second,
-						Prefix:                         mustIP("2001:db8::"),
+						Prefix:                         netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -403,7 +404,7 @@ func TestBuild(t *testing.T) {
 						OnLink:                         true,
 						PreferredLifetime:              0 * time.Second,
 						ValidLifetime:                  0 * time.Second,
-						Prefix:                         mustIP("2001:db8::"),
+						Prefix:                         netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -422,7 +423,7 @@ func TestBuild(t *testing.T) {
 						PrefixLength:  32,
 						Preference:    ndp.High,
 						RouteLifetime: 10 * time.Second,
-						Prefix:        mustIP("2001:db8::"),
+						Prefix:        netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -451,7 +452,7 @@ func TestBuild(t *testing.T) {
 						PrefixLength:  32,
 						Preference:    ndp.Medium,
 						RouteLifetime: 10 * time.Second,
-						Prefix:        mustIP("2001:db8::"),
+						Prefix:        netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -472,7 +473,7 @@ func TestBuild(t *testing.T) {
 					&ndp.RouteInformation{
 						PrefixLength:  32,
 						RouteLifetime: 6 * time.Second,
-						Prefix:        mustIP("2001:db8::"),
+						Prefix:        netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -493,7 +494,7 @@ func TestBuild(t *testing.T) {
 					&ndp.RouteInformation{
 						PrefixLength:  32,
 						RouteLifetime: 0 * time.Second,
-						Prefix:        mustIP("2001:db8::"),
+						Prefix:        netip.MustParseAddr("2001:db8::"),
 					},
 				},
 			},
@@ -512,9 +513,9 @@ func TestBuild(t *testing.T) {
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,
-						Servers: []net.IP{
-							mustIP("2001:db8::1"),
-							mustIP("2001:db8::2"),
+						Servers: []netip.Addr{
+							netip.MustParseAddr("2001:db8::1"),
+							netip.MustParseAddr("2001:db8::2"),
 						},
 					},
 				},
@@ -544,7 +545,7 @@ func TestBuild(t *testing.T) {
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,
-						Servers:  []net.IP{mustIP("2001:db8::1")},
+						Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 					},
 				},
 			},
@@ -588,7 +589,7 @@ func TestBuild(t *testing.T) {
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,
-						Servers:  []net.IP{mustIP("fdff::10")},
+						Servers:  []netip.Addr{netip.MustParseAddr("fdff::10")},
 					},
 				},
 			},
@@ -610,7 +611,7 @@ func TestBuild(t *testing.T) {
 				Options: []ndp.Option{
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,
-						Servers:  []net.IP{mustIP("2001:db8::1"), mustIP("2001:db8::2")},
+						Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1"), netip.MustParseAddr("2001:db8::2")},
 					},
 				},
 			},
@@ -640,7 +641,7 @@ func TestBuild(t *testing.T) {
 				return
 			}
 
-			if diff := cmp.Diff(tt.ra, ra); diff != "" {
+			if diff := cmp.Diff(tt.ra, ra, cmp.Comparer(addrEqual)); diff != "" {
 				t.Fatalf("unexpected RA (-want +got):\n%s", diff)
 			}
 		})
@@ -805,5 +806,5 @@ func Test_betterRDNSS(t *testing.T) {
 	}
 }
 
-func mustIP(s string) net.IP      { return netaddr.MustParseIP(s).IPAddr().IP }
-func ipEqual(x, y system.IP) bool { return x == y }
+func addrEqual(x, y netip.Addr) bool { return x == y }
+func ipEqual(x, y system.IP) bool    { return x == y }

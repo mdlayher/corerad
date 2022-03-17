@@ -24,6 +24,7 @@ import (
 	"github.com/mdlayher/ndp"
 	"golang.org/x/sync/errgroup"
 	"inet.af/netaddr"
+	"tailscale.com/util/netconv"
 )
 
 var (
@@ -137,10 +138,7 @@ func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netaddr.IP, e
 		}
 
 		// Convert to netaddr.IP for use elsewhere.
-		host, ok := netaddr.FromStdIP(from)
-		if !ok {
-			panicf("netaddr: invalid IP address: %q", from)
-		}
+		host := netconv.AsIP(from)
 
 		// Ensure this message has a valid hop limit.
 		if cm.HopLimit != ndp.HopLimit {

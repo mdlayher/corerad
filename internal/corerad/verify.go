@@ -15,7 +15,7 @@ package corerad
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"reflect"
 	"strings"
 	"time"
@@ -27,7 +27,7 @@ import (
 type problems []problem
 
 // push adds a problem with the input data.
-func (ps *problems) push(field, details string, want, got interface{}) {
+func (ps *problems) push(field, details string, want, got any) {
 	*ps = append(*ps, *newProblem(field, details, want, got))
 }
 
@@ -42,7 +42,7 @@ type problem struct {
 }
 
 // newProblem constructs a problem with the input fields.
-func newProblem(field, details string, want, got interface{}) *problem {
+func newProblem(field, details string, want, got any) *problem {
 	// Sanity check: any code using this API must pass identical types for
 	// any sort of sane output.
 	if reflect.TypeOf(want) != reflect.TypeOf(got) {
@@ -164,7 +164,7 @@ func checkPrefixes(want, got []ndp.Option) problems {
 	var ps problems
 	for _, a := range pfxA {
 		for _, b := range pfxB {
-			if !a.Prefix.Equal(b.Prefix) || a.PrefixLength != b.PrefixLength {
+			if a.Prefix != b.Prefix || a.PrefixLength != b.PrefixLength {
 				// a and b don't match, don't compare them.
 				continue
 			}
@@ -199,7 +199,7 @@ func checkRoutes(want, got []ndp.Option) problems {
 	var ps problems
 	for _, a := range pfxA {
 		for _, b := range pfxB {
-			if !a.Prefix.Equal(b.Prefix) || a.PrefixLength != b.PrefixLength {
+			if a.Prefix != b.Prefix || a.PrefixLength != b.PrefixLength {
 				// a and b don't match, don't compare them.
 				continue
 			}
@@ -254,10 +254,9 @@ func checkRDNSS(want, got []ndp.Option) problems {
 
 		equal := true
 		for j := range a[i].Servers {
-			if a, b := a[i].Servers[j], b[i].Servers[j]; !a.Equal(b) {
+			if a, b := a[i].Servers[j], b[i].Servers[j]; a != b {
 				equal = false
 				break
-
 			}
 		}
 		if !equal {
@@ -389,7 +388,7 @@ func sourceLLA(options []ndp.Option) string {
 	return "unknown"
 }
 
-func ipsStr(ips []net.IP) string {
+func ipsStr(ips []netip.Addr) string {
 	ss := make([]string, 0, len(ips))
 	for _, ip := range ips {
 		ss = append(ss, ip.String())

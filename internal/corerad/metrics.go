@@ -15,7 +15,7 @@ package corerad
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/build"
@@ -24,9 +24,6 @@ import (
 	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/ndp"
 )
-
-// TODO: rename/collapse advertiser and monitor metrics where applicable?
-// Particularly metrics related to RA data.
 
 // Names of metrics which are referenced here and in tests.
 const (
@@ -356,11 +353,8 @@ func (m *Metrics) Series() (map[string]metricslite.Series, bool) {
 func prefixStr(p *ndp.PrefixInformation) string { return cidrStr(p.Prefix, p.PrefixLength) }
 func routeStr(r *ndp.RouteInformation) string   { return cidrStr(r.Prefix, r.PrefixLength) }
 
-func cidrStr(prefix net.IP, length uint8) string {
-	return (&net.IPNet{
-		IP:   prefix,
-		Mask: net.CIDRMask(int(length), 128),
-	}).String()
+func cidrStr(prefix netip.Addr, length uint8) string {
+	return netip.PrefixFrom(prefix, int(length)).String()
 }
 
 func boolFloat(b bool) float64 {
