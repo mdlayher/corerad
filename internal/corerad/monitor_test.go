@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -47,7 +48,7 @@ func TestMonitorMetrics(t *testing.T) {
 			Options: []ndp.Option{
 				sll,
 				&ndp.PrefixInformation{
-					Prefix:            net.ParseIP("2001:db8::"),
+					Prefix:            netip.MustParseAddr("2001:db8::"),
 					PrefixLength:      32,
 					OnLink:            true,
 					ValidLifetime:     2 * time.Minute,
@@ -66,7 +67,7 @@ func TestMonitorMetrics(t *testing.T) {
 			m = rs
 		}
 
-		if err := cctx.c.WriteTo(m, nil, net.IPv6linklocalallrouters); err != nil {
+		if err := cctx.c.WriteTo(m, nil, system.IPv6LinkLocalAllRouters); err != nil {
 			t.Fatalf("failed to send NDP message: %v", err)
 		}
 
@@ -139,7 +140,7 @@ func makeReady() (<-chan struct{}, func(ndp.Message)) {
 
 func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *clientContext {
 	// Swap out the underlying connections for a UDP socket pair.
-	sc, cc, cDone := testConnPair(t)
+	sc, cc := testConnPair(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
@@ -162,7 +163,7 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 						Name:         iface,
 						HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 					},
-					IP: net.IPv6loopback,
+					IP: system.IPv6Loopback,
 				}, nil
 			},
 		},
@@ -195,8 +196,6 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 		if err := eg.Wait(); err != nil {
 			t.Fatalf("failed to stop monitor: %v", err)
 		}
-
-		cDone()
 	})
 
 	return &clientContext{

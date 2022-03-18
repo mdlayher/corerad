@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"sort"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"inet.af/netaddr"
+	"tailscale.com/util/netconv"
 )
 
 // A Plugin specifies a CoreRAD plugin's configuration.
@@ -322,7 +324,7 @@ func (p *Prefix) apply(prefixes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement)
 			AutonomousAddressConfiguration: p.Autonomous,
 			ValidLifetime:                  valid,
 			PreferredLifetime:              pref,
-			Prefix:                         pfx.IP().IPAddr().IP,
+			Prefix:                         netconv.AsAddr(pfx.IP()),
 		})
 	}
 
@@ -503,7 +505,7 @@ func (r *Route) apply(routes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement) {
 			PrefixLength:  rt.Bits(),
 			Preference:    r.Preference,
 			RouteLifetime: lt,
-			Prefix:        rt.IP().IPAddr().IP,
+			Prefix:        netconv.AsAddr(rt.IP()),
 		})
 	}
 
@@ -606,9 +608,9 @@ func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
 
 // apply unpacks servers into an ndp.RecursiveDNSServer option within ra.
 func (r *RDNSS) apply(servers []netaddr.IP, ra *ndp.RouterAdvertisement) {
-	ips := make([]net.IP, 0, len(servers))
+	ips := make([]netip.Addr, 0, len(servers))
 	for _, s := range servers {
-		ips = append(ips, s.IPAddr().IP)
+		ips = append(ips, netconv.AsAddr(s))
 	}
 
 	ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{

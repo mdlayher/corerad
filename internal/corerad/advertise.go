@@ -28,6 +28,7 @@ import (
 	"github.com/mdlayher/schedgroup"
 	"golang.org/x/sync/errgroup"
 	"inet.af/netaddr"
+	"tailscale.com/util/netconv"
 )
 
 // An Advertiser sends NDP router advertisements.
@@ -401,7 +402,7 @@ func (a *Advertiser) send(conn system.Conn, dst netaddr.IP, cfg config.Interface
 		return fmt.Errorf("failed to build router advertisement: %w", err)
 	}
 
-	if err := conn.WriteTo(ra, nil, dst.IPAddr().IP); err != nil {
+	if err := conn.WriteTo(ra, nil, netconv.AsAddr(dst)); err != nil {
 		return fmt.Errorf("failed to send router advertisement to %s: %w", dst, err)
 	}
 

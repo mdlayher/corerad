@@ -20,11 +20,27 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/netip"
 	"os"
 	"time"
 
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
+)
+
+var (
+	// IPv6LinkLocalRouters is the IPv6 link-local all routers multicast
+	// address.
+	//
+	// TODO(mdlayher): land in net/netip:
+	// https://github.com/golang/go/issues/51766.
+	IPv6LinkLocalAllRouters = netip.MustParseAddr("ff02::2")
+
+	// IPv6Loopback is the IPv6 loopback address.
+	//
+	// TODO(mdlayher): land in net/netip:
+	// https://github.com/golang/go/issues/51766.
+	IPv6Loopback = netip.MustParseAddr("::1")
 )
 
 // A Dialer can create Conns which can be reinitialized on certain errors.
@@ -77,7 +93,7 @@ func NewDialer(iface string, state State, mode DialerMode, ll *log.Logger) *Dial
 type DialContext struct {
 	Conn      Conn
 	Interface *net.Interface
-	IP        net.IP
+	IP        netip.Addr
 
 	done func() error
 }
@@ -224,7 +240,7 @@ func (d *Dialer) dial() (*DialContext, error) {
 		// In general, many of these actions are best-effort and should not halt
 		// shutdown on failure.
 
-		if err := conn.LeaveGroup(net.IPv6linklocalallrouters); err != nil {
+		if err := conn.LeaveGroup(IPv6LinkLocalAllRouters); err != nil {
 			d.logf("failed to leave IPv6 link-local all routers multicast group: %v", err)
 		}
 
@@ -296,10 +312,10 @@ func (d *Dialer) logf(format string, v ...interface{}) {
 }
 
 // dialNDP creates an ndp.Conn which is ready to serve router advertisements.
-func dialNDP(ifi *net.Interface) (*ndp.Conn, net.IP, error) {
+func dialNDP(ifi *net.Interface) (*ndp.Conn, netip.Addr, error) {
 	c, ip, err := ndp.Listen(ifi, ndp.LinkLocal)
 	if err != nil {
-		return nil, nil, err
+		return nil, netip.Addr{}, err
 	}
 
 	// Accept router solicitations to generate advertisements and other routers'
@@ -310,17 +326,17 @@ func dialNDP(ifi *net.Interface) (*ndp.Conn, net.IP, error) {
 	f.Accept(ipv6.ICMPTypeRouterAdvertisement)
 
 	if err := c.SetICMPFilter(&f); err != nil {
-		return nil, nil, fmt.Errorf("failed to apply ICMPv6 filter: %v", err)
+		return nil, netip.Addr{}, fmt.Errorf("failed to apply ICMPv6 filter: %v", err)
 	}
 
 	// Enable inspection of IPv6 control messages.
 	if err := c.SetControlMessage(ipv6.FlagHopLimit, true); err != nil {
-		return nil, nil, fmt.Errorf("failed to apply IPv6 control message flags: %v", err)
+		return nil, netip.Addr{}, fmt.Errorf("failed to apply IPv6 control message flags: %v", err)
 	}
 
 	// We are now a router or want to examine messages as one would.
-	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
-		return nil, nil, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
+	if err := c.JoinGroup(IPv6LinkLocalAllRouters); err != nil {
+		return nil, netip.Addr{}, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
 	}
 
 	return c, ip, nil

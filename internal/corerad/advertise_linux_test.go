@@ -51,7 +51,7 @@ func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 		}
 
 		cm := &ipv6.ControlMessage{HopLimit: ndp.HopLimit - 1}
-		if err := cctx.c.WriteTo(cctx.rs, cm, net.IPv6linklocalallrouters); err != nil {
+		if err := cctx.c.WriteTo(cctx.rs, cm, system.IPv6LinkLocalAllRouters); err != nil {
 			t.Fatalf("failed to send RS: %v", err)
 		}
 
@@ -68,8 +68,7 @@ func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 	t.Parallel()
 
-	ad, _, done := testAdvertiser(t, nil, nil)
-	defer done()
+	ad, _ := testAdvertiser(t, nil, nil)
 
 	timer := time.AfterFunc(5*time.Second, func() {
 		panic("took too long")
@@ -88,8 +87,7 @@ func TestAdvertiserLinuxContextCanceled(t *testing.T) {
 func TestAdvertiserLinuxNetstateChange(t *testing.T) {
 	t.Parallel()
 
-	ad, _, done := testAdvertiser(t, nil, nil)
-	defer done()
+	ad, _ := testAdvertiser(t, nil, nil)
 
 	t1 := time.AfterFunc(5*time.Second, func() {
 		panic("took too long")
@@ -119,8 +117,7 @@ func TestAdvertiserLinuxNetstateChange(t *testing.T) {
 func TestAdvertiserLinuxIPv6Autoconfiguration(t *testing.T) {
 	t.Parallel()
 
-	ad, _, done := testAdvertiser(t, nil, nil)
-	defer done()
+	ad, _ := testAdvertiser(t, nil, nil)
 
 	// Capture the IPv6 autoconfiguration state while the advertiser is running
 	// and immediately after it stops.
@@ -176,7 +173,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 		// Forwarding is disabled after the first RA arrives.
 		mustSysctl(t, cctx.router.Name, "forwarding", "0")
 
-		if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
+		if err := cctx.c.WriteTo(cctx.rs, nil, system.IPv6LinkLocalAllRouters); err != nil {
 			t.Fatalf("failed to send RS: %v", err)
 		}
 
@@ -329,7 +326,7 @@ func TestAdvertiserLinuxSolicitedUnicastOnly(t *testing.T) {
 				t.Fatalf("failed to extend read deadline: %v", err)
 			}
 
-			if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
+			if err := cctx.c.WriteTo(cctx.rs, nil, system.IPv6LinkLocalAllRouters); err != nil {
 				t.Fatalf("failed to send RS: %v", err)
 			}
 

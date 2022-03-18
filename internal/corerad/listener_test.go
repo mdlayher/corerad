@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -34,12 +35,12 @@ func Test_listenerReceiveRetryMetrics(t *testing.T) {
 	defer cancel()
 
 	conn := &testConn{
-		readFrom: func() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
+		readFrom: func() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error) {
 			// A read returns a message with a bad hop limit and immediately
 			// cancels the retry loop since this message would be ignored
 			// and the read would be retried.
 			defer cancel()
-			return &ndp.RouterAdvertisement{}, &ipv6.ControlMessage{HopLimit: 1}, net.IPv6loopback, nil
+			return &ndp.RouterAdvertisement{}, &ipv6.ControlMessage{HopLimit: 1}, system.IPv6Loopback, nil
 		},
 	}
 
@@ -74,7 +75,6 @@ func Test_listenerReceiveRetryErrors(t *testing.T) {
 		// don't care about the contents for the purposes of this test.
 		ra = &ndp.RouterAdvertisement{}
 		cm = &ipv6.ControlMessage{HopLimit: ndp.HopLimit}
-		ip = net.ParseIP("::1")
 
 		errFatal = errors.New("fatal error")
 	)
@@ -83,9 +83,9 @@ func Test_listenerReceiveRetryErrors(t *testing.T) {
 		return context.WithCancel(context.Background())
 	}
 
-	readFromErr := func(err error) func() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
-		return func() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
-			return nil, nil, nil, err
+	readFromErr := func(err error) func() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error) {
+		return func() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error) {
+			return nil, nil, netip.Addr{}, err
 		}
 	}
 
@@ -115,19 +115,19 @@ func Test_listenerReceiveRetryErrors(t *testing.T) {
 			name:  "backoff success",
 			mkCtx: noCancel,
 			conn: &testConn{
-				readFrom: func() func() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
+				readFrom: func() func() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error) {
 					// The first call to ReadFrom will always fail with a
 					// net.Error, so receiveRetry can back off and try again.
 					// Subsequent calls will always succeed.
 					var calls int
-					return func() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
+					return func() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error) {
 						defer func() { calls++ }()
 
 						if calls == 0 {
-							return nil, nil, nil, timeoutError{}
+							return nil, nil, netip.Addr{}, timeoutError{}
 						}
 
-						return ra, cm, ip, nil
+						return ra, cm, system.IPv6Loopback, nil
 					}
 				}(),
 			},
@@ -172,13 +172,15 @@ func (timeoutError) Timeout() bool   { return true }
 func (timeoutError) Temporary() bool { return true }
 
 type testConn struct {
-	readFrom        func() (ndp.Message, *ipv6.ControlMessage, net.IP, error)
+	readFrom        func() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error)
 	setReadDeadline func(t time.Time) error
-	writeTo         func(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error
+	writeTo         func(m ndp.Message, cm *ipv6.ControlMessage, dst netip.Addr) error
 }
 
-func (c *testConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error) { return c.readFrom() }
-func (c *testConn) SetReadDeadline(t time.Time) error                            { return c.setReadDeadline(t) }
-func (c *testConn) WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst net.IP) error {
+func (c *testConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error) {
+	return c.readFrom()
+}
+func (c *testConn) SetReadDeadline(t time.Time) error { return c.setReadDeadline(t) }
+func (c *testConn) WriteTo(m ndp.Message, cm *ipv6.ControlMessage, dst netip.Addr) error {
 	return c.writeTo(m, cm, dst)
 }

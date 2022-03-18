@@ -20,6 +20,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -153,19 +154,19 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 						OnLink:            true,
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
-						Prefix:            mustNetIP("2001:db8::"),
+						Prefix:            netip.MustParseAddr("2001:db8::"),
 					},
 					&ndp.RouteInformation{
 						PrefixLength:  64,
 						Preference:    ndp.High,
 						RouteLifetime: 10 * time.Second,
-						Prefix:        mustNetIP("2001:db8:ffff::"),
+						Prefix:        netip.MustParseAddr("2001:db8:ffff::"),
 					},
 					&ndp.RecursiveDNSServer{
 						Lifetime: 10 * time.Second,
-						Servers: []net.IP{
-							mustNetIP("2001:db8::1"),
-							mustNetIP("2001:db8::2"),
+						Servers: []netip.Addr{
+							netip.MustParseAddr("2001:db8::1"),
+							netip.MustParseAddr("2001:db8::2"),
 						},
 					},
 					ndp.NewMTU(1500),
@@ -183,7 +184,7 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 			// Option verified, trim it away.
 			ra.Options = ra.Options[:len(ra.Options)-1]
 
-			if diff := cmp.Diff(want, ra); diff != "" {
+			if diff := cmp.Diff(want, ra, cmp.Comparer(addrEqual)); diff != "" {
 				t.Fatalf("unexpected router advertisement (-want +got):\n%s", diff)
 			}
 		})
@@ -351,7 +352,7 @@ func TestAdvertiserSolicited(t *testing.T) {
 						t.Fatalf("failed to extend read deadline: %v", err)
 					}
 
-					if err := cctx.c.WriteTo(cctx.rs, nil, net.IPv6linklocalallrouters); err != nil {
+					if err := cctx.c.WriteTo(cctx.rs, nil, system.IPv6LinkLocalAllRouters); err != nil {
 						t.Fatalf("failed to send RS: %v", err)
 					}
 
@@ -615,6 +616,8 @@ func testSimulatedAdvertiserClient(
 	tcfg *testConfig,
 	fn func(cancel func(), cctx *clientContext),
 ) func() {
+	t.Helper()
+
 	if cfg == nil {
 		cfg = &config.Interface{}
 	}
@@ -636,7 +639,7 @@ func testSimulatedAdvertiserClient(
 	defer cancel()
 
 	// Swap out the underlying connections for a UDP socket pair.
-	sc, cc, cDone := testConnPair(t)
+	sc, cc := testConnPair(t)
 
 	ts := system.TestState{Forwarding: true}
 	mm := NewMetrics(metricslite.NewMemory(), ts, []config.Interface{*cfg})
@@ -654,7 +657,7 @@ func testSimulatedAdvertiserClient(
 						Name:         cfg.Name,
 						HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 					},
-					IP: net.IPv6loopback,
+					IP: system.IPv6Loopback,
 				}, nil
 			},
 		},
@@ -695,19 +698,22 @@ func testSimulatedAdvertiserClient(
 	// advertiser run loop.
 	fn(cancel, cctx)
 
+	// Notably this is not a candidate for t.Cleanup; we do occasionally
+	// terminate the listener in the middle of a test. Maybe it'd be a good idea
+	// to eventually swap in a caller's context instead.
 	done := func() {
 		cancel()
 		if err := eg.Wait(); err != nil {
 			t.Fatalf("failed to stop advertiser: %v", err)
 		}
-
-		cDone()
 	}
 
 	return done
 }
 
-func testConnPair(t *testing.T) (system.Conn, system.Conn, func()) {
+func testConnPair(t *testing.T) (c1, c2 system.Conn) {
+	t.Helper()
+
 	sc, err := net.ListenPacket("udp6", ":0")
 	if err != nil {
 		t.Fatalf("failed to create server peer: %v", err)
@@ -732,14 +738,16 @@ func testConnPair(t *testing.T) (system.Conn, system.Conn, func()) {
 		pc:             cc,
 	}
 
-	return server, client, func() {
+	t.Cleanup(func() {
 		if err := sc.Close(); err != nil {
 			t.Fatalf("failed to close server: %v", err)
 		}
 		if err := cc.Close(); err != nil {
 			t.Fatalf("failed to close client: %v", err)
 		}
-	}
+	})
+
+	return server, client
 }
 
 type udpConn struct {
@@ -753,24 +761,29 @@ var _ system.Conn = &udpConn{}
 
 func (c *udpConn) Close() error { return c.pc.Close() }
 
-func (c *udpConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, net.IP, error) {
+func (c *udpConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, netip.Addr, error) {
 	b := make([]byte, 1024)
 	n, addr, err := c.pc.ReadFrom(b)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, netip.Addr{}, err
 	}
 
 	m, err := ndp.ParseMessage(b[:n])
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, netip.Addr{}, err
 	}
 
-	return m, c.ControlMessage, addr.(*net.UDPAddr).IP, nil
+	ip, ok := netip.AddrFromSlice(addr.(*net.UDPAddr).IP)
+	if !ok {
+		panicf("failed to convert IPv6 address: %v", addr)
+	}
+
+	return m, c.ControlMessage, ip, nil
 }
 
 func (c *udpConn) SetReadDeadline(t time.Time) error { return c.pc.SetReadDeadline(t) }
 
-func (c *udpConn) WriteTo(m ndp.Message, _ *ipv6.ControlMessage, _ net.IP) error {
+func (c *udpConn) WriteTo(m ndp.Message, _ *ipv6.ControlMessage, _ netip.Addr) error {
 	b, err := ndp.MarshalMessage(m)
 	if err != nil {
 		return err
@@ -780,7 +793,7 @@ func (c *udpConn) WriteTo(m ndp.Message, _ *ipv6.ControlMessage, _ net.IP) error
 	return err
 }
 
-func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Advertiser, *clientContext, func()) {
+func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Advertiser, *clientContext) {
 	t.Helper()
 
 	if runtime.GOOS != "linux" {
@@ -899,16 +912,16 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		mm:     mm,
 	}
 
-	done := func() {
+	t.Cleanup(func() {
 		if err := cconn.Close(); err != nil {
 			t.Fatalf("failed to close NDP router solicitation connection: %v", err)
 		}
 
 		// Clean up the veth pair.
 		shell(t, "ip", "link", "del", veth0)
-	}
+	})
 
-	return ad, cctx, done
+	return ad, cctx
 }
 
 // testAdvertiserClient is a wrapper around testAdvertiser which focuses on
@@ -921,7 +934,7 @@ func testAdvertiserClient(
 ) func() {
 	t.Helper()
 
-	ad, cctx, adDone := testAdvertiser(t, cfg, tcfg)
+	ad, cctx := testAdvertiser(t, cfg, tcfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -944,8 +957,6 @@ func testAdvertiserClient(
 		if err := eg.Wait(); err != nil {
 			t.Fatalf("failed to stop advertiser: %v", err)
 		}
-
-		adDone()
 	}
 
 	return done
@@ -1083,15 +1094,6 @@ func mustSysctl(t *testing.T, iface, key, value string) {
 	}
 }
 
-func mustNetIP(s string) net.IP {
-	ip := net.ParseIP(s)
-	if ip == nil {
-		panicf("failed to parse %q as IP address", s)
-	}
-
-	return ip
-}
-
 func findMetric(t *testing.T, mm *Metrics, name string) metricslite.Series {
 	t.Helper()
 
@@ -1114,3 +1116,5 @@ func findMetric(t *testing.T, mm *Metrics, name string) metricslite.Series {
 	t.Fatalf("no metric with name %q was found", name)
 	panic("unreachable")
 }
+
+func addrEqual(x, y netip.Addr) bool { return x == y }
