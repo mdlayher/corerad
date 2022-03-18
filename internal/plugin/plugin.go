@@ -606,14 +606,9 @@ func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
 
 // apply unpacks servers into an ndp.RecursiveDNSServer option within ra.
 func (r *RDNSS) apply(servers []netip.Addr, ra *ndp.RouterAdvertisement) {
-	ips := make([]netip.Addr, 0, len(servers))
-	for _, s := range servers {
-		ips = append(ips, s)
-	}
-
 	ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{
 		Lifetime: r.Lifetime,
-		Servers:  ips,
+		Servers:  servers,
 	})
 }
 
