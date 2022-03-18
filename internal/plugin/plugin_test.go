@@ -22,7 +22,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
-	"inet.af/netaddr"
 )
 
 func TestPluginString(t *testing.T) {
@@ -31,12 +30,12 @@ func TestPluginString(t *testing.T) {
 	// different test cases for wildcard options.
 	addrs := func() ([]system.IP, error) {
 		return []system.IP{
-			{Address: netaddr.MustParseIPPrefix("2001:db8::/64")},
-			{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
-			{Address: netaddr.MustParseIPPrefix("fdff::/64")},
-			{Address: netaddr.MustParseIPPrefix("fdff::1/64")},
-			{Address: netaddr.MustParseIPPrefix("fe80::/64")},
-			{Address: netaddr.MustParseIPPrefix("fe80::1/64")},
+			{Address: netip.MustParsePrefix("2001:db8::/64")},
+			{Address: netip.MustParsePrefix("2001:db8::1/64")},
+			{Address: netip.MustParsePrefix("fdff::/64")},
+			{Address: netip.MustParsePrefix("fdff::1/64")},
+			{Address: netip.MustParsePrefix("fe80::/64")},
+			{Address: netip.MustParsePrefix("fe80::1/64")},
 		}, nil
 	}
 
@@ -76,7 +75,7 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "Prefix",
 			p: &Prefix{
-				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
+				Prefix:            netip.MustParsePrefix("2001:db8::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: 15 * time.Minute,
@@ -88,7 +87,7 @@ func TestPluginString(t *testing.T) {
 			name: "Prefix wildcard",
 			p: &Prefix{
 				Auto:              true,
-				Prefix:            netaddr.MustParseIPPrefix("::/64"),
+				Prefix:            netip.MustParsePrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: 15 * time.Minute,
@@ -101,7 +100,7 @@ func TestPluginString(t *testing.T) {
 		{
 			name: "Route",
 			p: &Route{
-				Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
+				Prefix:     netip.MustParsePrefix("2001:db8::/64"),
 				Preference: ndp.High,
 				Lifetime:   15 * time.Minute,
 				Deprecated: true,
@@ -112,12 +111,12 @@ func TestPluginString(t *testing.T) {
 			name: "Route wildcard",
 			p: &Route{
 				Auto:     true,
-				Prefix:   netaddr.MustParseIPPrefix("::/0"),
+				Prefix:   netip.MustParsePrefix("::/0"),
 				Lifetime: 10 * time.Minute,
 				Routes: func() ([]system.Route, error) {
 					return []system.Route{
-						{Prefix: netaddr.MustParseIPPrefix("fd00::/48")},
-						{Prefix: netaddr.MustParseIPPrefix("2001:db8::/32")},
+						{Prefix: netip.MustParsePrefix("fd00::/48")},
+						{Prefix: netip.MustParsePrefix("2001:db8::/32")},
 					}, nil
 				},
 			},
@@ -127,9 +126,9 @@ func TestPluginString(t *testing.T) {
 			name: "RDNSS",
 			p: &RDNSS{
 				Lifetime: 30 * time.Second,
-				Servers: []netaddr.IP{
-					netaddr.MustParseIP("2001:db8::1"),
-					netaddr.MustParseIP("2001:db8::2"),
+				Servers: []netip.Addr{
+					netip.MustParseAddr("2001:db8::1"),
+					netip.MustParseAddr("2001:db8::2"),
 				},
 			},
 			s: "servers: [2001:db8::1, 2001:db8::2], lifetime: 30s",
@@ -139,7 +138,7 @@ func TestPluginString(t *testing.T) {
 			p: &RDNSS{
 				Auto:     true,
 				Lifetime: 30 * time.Second,
-				Servers:  []netaddr.IP{netaddr.IPv6Unspecified()},
+				Servers:  []netip.Addr{netip.IPv6Unspecified()},
 				Addrs:    addrs,
 			},
 			s: "servers: [:: [fdff::]], lifetime: 30s",
@@ -149,9 +148,9 @@ func TestPluginString(t *testing.T) {
 			p: &RDNSS{
 				Auto:     true,
 				Lifetime: 30 * time.Second,
-				Servers: []netaddr.IP{
-					netaddr.IPv6Unspecified(),
-					netaddr.MustParseIP("2001:db8::1"),
+				Servers: []netip.Addr{
+					netip.IPv6Unspecified(),
+					netip.MustParseAddr("2001:db8::1"),
 				},
 				Addrs: addrs,
 			},
@@ -233,7 +232,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "static prefix",
 			plugin: &Prefix{
-				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/32"),
+				Prefix:            netip.MustParsePrefix("2001:db8::/32"),
 				OnLink:            true,
 				PreferredLifetime: 10 * time.Second,
 				ValidLifetime:     20 * time.Second,
@@ -255,7 +254,7 @@ func TestBuild(t *testing.T) {
 			name: "automatic prefixes /64",
 			plugin: &Prefix{
 				Auto:              true,
-				Prefix:            netaddr.MustParseIPPrefix("::/64"),
+				Prefix:            netip.MustParsePrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: 10 * time.Second,
@@ -264,21 +263,21 @@ func TestBuild(t *testing.T) {
 				Addrs: func() ([]system.IP, error) {
 					return []system.IP{
 						// Populate some addresses that should be ignored.
-						{Address: netaddr.MustParseIPPrefix("192.0.2.1/24")},
-						{Address: netaddr.MustParseIPPrefix("fe80::1/64")},
-						{Address: netaddr.MustParseIPPrefix("fdff::1/32")},
+						{Address: netip.MustParsePrefix("192.0.2.1/24")},
+						{Address: netip.MustParsePrefix("fe80::1/64")},
+						{Address: netip.MustParsePrefix("fdff::1/32")},
 						{
-							Address:   netaddr.MustParseIPPrefix("2001:db8::fff0/64"),
+							Address:   netip.MustParsePrefix("2001:db8::fff0/64"),
 							Temporary: true,
 						},
 						{
-							Address:   netaddr.MustParseIPPrefix("2001:db8::fff1/64"),
+							Address:   netip.MustParsePrefix("2001:db8::fff1/64"),
 							Tentative: true,
 						},
 						// Addresses which are not ignored.
-						{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
-						{Address: netaddr.MustParseIPPrefix("2001:db8::2/64")},
-						{Address: netaddr.MustParseIPPrefix("fd00::1/64")},
+						{Address: netip.MustParsePrefix("2001:db8::1/64")},
+						{Address: netip.MustParsePrefix("2001:db8::2/64")},
+						{Address: netip.MustParsePrefix("fd00::1/64")},
 					}, nil
 				},
 			},
@@ -308,14 +307,14 @@ func TestBuild(t *testing.T) {
 			name: "automatic prefixes /32",
 			plugin: &Prefix{
 				Auto:   true,
-				Prefix: netaddr.MustParseIPPrefix("::/32"),
+				Prefix: netip.MustParsePrefix("::/32"),
 				Addrs: func() ([]system.IP, error) {
 					return []system.IP{
 						// Specify an IPv4 address that could feasibly be
 						// matched, but must be skipped due to incorrect address
 						// family.
-						{Address: netaddr.MustParseIPPrefix("192.0.2.1/32")},
-						{Address: netaddr.MustParseIPPrefix("2001:db8::1/32")},
+						{Address: netip.MustParsePrefix("192.0.2.1/32")},
+						{Address: netip.MustParsePrefix("2001:db8::1/32")},
 					}, nil
 				},
 			},
@@ -332,7 +331,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "prefix deprecated preferred and valid",
 			plugin: &Prefix{
-				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
+				Prefix:            netip.MustParsePrefix("2001:db8::/64"),
 				Autonomous:        true,
 				OnLink:            true,
 				PreferredLifetime: 10 * time.Second,
@@ -359,7 +358,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "prefix deprecated valid",
 			plugin: &Prefix{
-				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
+				Prefix:            netip.MustParsePrefix("2001:db8::/64"),
 				Autonomous:        true,
 				OnLink:            true,
 				PreferredLifetime: 10 * time.Second,
@@ -386,7 +385,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "prefix deprecated invalid",
 			plugin: &Prefix{
-				Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
+				Prefix:            netip.MustParsePrefix("2001:db8::/64"),
 				Autonomous:        true,
 				OnLink:            true,
 				PreferredLifetime: 10 * time.Second,
@@ -413,7 +412,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "route",
 			plugin: &Route{
-				Prefix:     netaddr.MustParseIPPrefix("2001:db8::/32"),
+				Prefix:     netip.MustParsePrefix("2001:db8::/32"),
 				Preference: ndp.High,
 				Lifetime:   10 * time.Second,
 			},
@@ -437,12 +436,12 @@ func TestBuild(t *testing.T) {
 				Routes: func() ([]system.Route, error) {
 					return []system.Route{
 						// IPv4 or /128s should be skipped.
-						{Prefix: netaddr.MustParseIPPrefix("192.0.2.1/32")},
-						{Prefix: netaddr.MustParseIPPrefix("::1/128")},
+						{Prefix: netip.MustParsePrefix("192.0.2.1/32")},
+						{Prefix: netip.MustParsePrefix("::1/128")},
 						// The /48 is contained within the /32 and should be
 						// skipped.
-						{Prefix: netaddr.MustParseIPPrefix("2001:db8:ffff::/48")},
-						{Prefix: netaddr.MustParseIPPrefix("2001:db8::/32")},
+						{Prefix: netip.MustParsePrefix("2001:db8:ffff::/48")},
+						{Prefix: netip.MustParsePrefix("2001:db8::/32")},
 					}, nil
 				},
 			},
@@ -461,7 +460,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "route deprecated valid",
 			plugin: &Route{
-				Prefix:   netaddr.MustParseIPPrefix("2001:db8::/32"),
+				Prefix:   netip.MustParsePrefix("2001:db8::/32"),
 				Lifetime: 10 * time.Second,
 
 				Deprecated: true,
@@ -482,7 +481,7 @@ func TestBuild(t *testing.T) {
 		{
 			name: "route deprecated invalid",
 			plugin: &Route{
-				Prefix:   netaddr.MustParseIPPrefix("2001:db8::/32"),
+				Prefix:   netip.MustParsePrefix("2001:db8::/32"),
 				Lifetime: 10 * time.Second,
 
 				Deprecated: true,
@@ -504,9 +503,9 @@ func TestBuild(t *testing.T) {
 			name: "static RDNSS",
 			plugin: &RDNSS{
 				Lifetime: 10 * time.Second,
-				Servers: []netaddr.IP{
-					netaddr.MustParseIP("2001:db8::1"),
-					netaddr.MustParseIP("2001:db8::2"),
+				Servers: []netip.Addr{
+					netip.MustParseAddr("2001:db8::1"),
+					netip.MustParseAddr("2001:db8::2"),
 				},
 			},
 			ra: &ndp.RouterAdvertisement{
@@ -537,7 +536,7 @@ func TestBuild(t *testing.T) {
 				Lifetime: 10 * time.Second,
 				Addrs: func() ([]system.IP, error) {
 					return []system.IP{{
-						Address: netaddr.MustParseIPPrefix("2001:db8::1/64"),
+						Address: netip.MustParsePrefix("2001:db8::1/64"),
 					}}, nil
 				},
 			},
@@ -561,25 +560,25 @@ func TestBuild(t *testing.T) {
 						// Populate some addresses which should be ignored.
 						// Normally ULAs win the tie-breaker so use those
 						// explicitly for bad IPv6 addresses.
-						{Address: netaddr.MustParseIPPrefix("192.0.2.1/32")},
+						{Address: netip.MustParsePrefix("192.0.2.1/32")},
 						{
-							Address:    netaddr.MustParseIPPrefix("fd00::fff0/64"),
+							Address:    netip.MustParsePrefix("fd00::fff0/64"),
 							Deprecated: true,
 						},
 						{
-							Address:   netaddr.MustParseIPPrefix("fd00::fff1/64"),
+							Address:   netip.MustParsePrefix("fd00::fff1/64"),
 							Temporary: true,
 						},
 						{
-							Address:   netaddr.MustParseIPPrefix("fd00::fff2/64"),
+							Address:   netip.MustParsePrefix("fd00::fff2/64"),
 							Tentative: true,
 						},
 						// Addresses which are not ignored.
-						{Address: netaddr.MustParseIPPrefix("fdff::1/64")},
-						{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
+						{Address: netip.MustParsePrefix("fdff::1/64")},
+						{Address: netip.MustParsePrefix("2001:db8::1/64")},
 						// Winner.
 						{
-							Address:                  netaddr.MustParseIPPrefix("fdff::10/64"),
+							Address:                  netip.MustParsePrefix("fdff::10/64"),
 							ManageTemporaryAddresses: true,
 						},
 					}, nil
@@ -600,10 +599,10 @@ func TestBuild(t *testing.T) {
 			plugin: &RDNSS{
 				Auto:     true,
 				Lifetime: 10 * time.Second,
-				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::2")},
+				Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::2")},
 				Addrs: func() ([]system.IP, error) {
 					return []system.IP{{
-						Address: netaddr.MustParseIPPrefix("2001:db8::1/64"),
+						Address: netip.MustParsePrefix("2001:db8::1/64"),
 					}}, nil
 				},
 			},
@@ -650,30 +649,30 @@ func TestBuild(t *testing.T) {
 
 func Test_betterRDNSS(t *testing.T) {
 	var (
-		lo = system.IP{Address: netaddr.MustParseIPPrefix("::1/128")}
+		lo = system.IP{Address: netip.MustParsePrefix("::1/128")}
 
-		ula1   = system.IP{Address: netaddr.MustParseIPPrefix("fdff::1/64")}
-		ula2   = system.IP{Address: netaddr.MustParseIPPrefix("fdff::2/64")}
+		ula1   = system.IP{Address: netip.MustParsePrefix("fdff::1/64")}
+		ula2   = system.IP{Address: netip.MustParsePrefix("fdff::2/64")}
 		ulaMTA = system.IP{
-			Address:                  netaddr.MustParseIPPrefix("fdff::3/64"),
+			Address:                  netip.MustParsePrefix("fdff::3/64"),
 			ManageTemporaryAddresses: true,
 		}
 		ulaForever = system.IP{
-			Address:      netaddr.MustParseIPPrefix("fdff::4/64"),
+			Address:      netip.MustParsePrefix("fdff::4/64"),
 			ValidForever: true,
 		}
 
-		gua1      = system.IP{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")}
-		gua2      = system.IP{Address: netaddr.MustParseIPPrefix("2001:db8::2/64")}
+		gua1      = system.IP{Address: netip.MustParsePrefix("2001:db8::1/64")}
+		gua2      = system.IP{Address: netip.MustParsePrefix("2001:db8::2/64")}
 		guaStable = system.IP{
-			Address:       netaddr.MustParseIPPrefix("2001:db8::3/64"),
+			Address:       netip.MustParsePrefix("2001:db8::3/64"),
 			StablePrivacy: true,
 		}
 
-		lla1     = system.IP{Address: netaddr.MustParseIPPrefix("fe80::1/64")}
-		lla2     = system.IP{Address: netaddr.MustParseIPPrefix("fe80::2/64")}
+		lla1     = system.IP{Address: netip.MustParsePrefix("fe80::1/64")}
+		lla2     = system.IP{Address: netip.MustParsePrefix("fe80::2/64")}
 		llaEUI64 = system.IP{
-			Address: netaddr.MustParseIPPrefix("fe80::f:ff:fe00:ffff/64"),
+			Address: netip.MustParsePrefix("fe80::f:ff:fe00:ffff/64"),
 		}
 	)
 

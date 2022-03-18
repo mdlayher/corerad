@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -33,7 +34,6 @@ import (
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
-	"inet.af/netaddr"
 )
 
 func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
@@ -218,8 +218,8 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 		},
 	}
 
-	prefix := netaddr.MustParseIPPrefix("2001:db8:dead:beef::/64")
-	route := netaddr.MustParseIPPrefix("2001:db8:ffff:ffff::/64")
+	prefix := netip.MustParsePrefix("2001:db8:dead:beef::/64")
+	route := netip.MustParsePrefix("2001:db8:ffff:ffff::/64")
 
 	icfg := &config.Interface{
 		Plugins: []plugin.Plugin{
@@ -262,7 +262,7 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 				continue
 			}
 
-			ip, ok := netaddr.FromStdIP(a.IP)
+			ip, ok := netip.AddrFromSlice(a.IP)
 			if !ok {
 				panicf("bad IP address: %s", ip)
 			}
@@ -295,7 +295,7 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 				continue
 			}
 
-			dst, ok := netaddr.FromStdIP(r.Attributes.Dst)
+			dst, ok := netip.AddrFromSlice(r.Attributes.Dst)
 			if !ok {
 				panicf("bad IP address: %s", dst)
 			}

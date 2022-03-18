@@ -18,6 +18,7 @@ package system
 
 import (
 	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,7 +26,6 @@ import (
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netlink"
 	"golang.org/x/sys/unix"
-	"inet.af/netaddr"
 )
 
 func TestLinux_addresserAddressesByIndex(t *testing.T) {
@@ -105,9 +105,9 @@ func TestLinux_addresserAddressesByIndex(t *testing.T) {
 				},
 			},
 			ips: []IP{
-				{Address: netaddr.MustParseIPPrefix("2001:db8::1/64")},
+				{Address: netip.MustParsePrefix("2001:db8::1/64")},
 				{
-					Address:                  netaddr.MustParseIPPrefix("fe80::1/128"),
+					Address:                  netip.MustParsePrefix("fe80::1/128"),
 					Deprecated:               true,
 					ManageTemporaryAddresses: true,
 					StablePrivacy:            true,
@@ -156,7 +156,7 @@ func TestLinux_addresserAddressesByIndex(t *testing.T) {
 				t.Fatalf("unexpected function panic (-want +got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(tt.ips, ips, cmp.Comparer(ipPrefixEqual), cmp.Comparer(ipEqual)); diff != "" {
+			if diff := cmp.Diff(tt.ips, ips, cmp.Comparer(prefixEqual), cmp.Comparer(addrEqual)); diff != "" {
 				t.Fatalf("unexpected IPs (-want +got):\n%s", diff)
 			}
 		})
@@ -242,15 +242,15 @@ func TestLinux_addresserLoopbackRoutes(t *testing.T) {
 			},
 			routes: []Route{
 				{
-					Prefix: netaddr.MustParseIPPrefix("2001:db8::/32"),
+					Prefix: netip.MustParsePrefix("2001:db8::/32"),
 					Index:  index,
 				},
 				{
-					Prefix: netaddr.MustParseIPPrefix("::1/128"),
+					Prefix: netip.MustParsePrefix("::1/128"),
 					Index:  index,
 				},
 				{
-					Prefix:     netaddr.MustParseIPPrefix("fd00::/48"),
+					Prefix:     netip.MustParsePrefix("fd00::/48"),
 					Index:      index + 1,
 					Preference: ndp.High,
 				},
@@ -299,15 +299,15 @@ func TestLinux_addresserLoopbackRoutes(t *testing.T) {
 				t.Fatalf("unexpected function panic (-want +got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(tt.routes, routes, cmp.Comparer(ipPrefixEqual), cmp.Comparer(ipEqual)); diff != "" {
+			if diff := cmp.Diff(tt.routes, routes, cmp.Comparer(prefixEqual), cmp.Comparer(addrEqual)); diff != "" {
 				t.Fatalf("unexpected routes (-want +got):\n%s", diff)
 			}
 		})
 	}
 }
 
-func ipEqual(x, y netaddr.IP) bool             { return x == y }
-func ipPrefixEqual(x, y netaddr.IPPrefix) bool { return x == y }
+func addrEqual(x, y netip.Addr) bool     { return x == y }
+func prefixEqual(x, y netip.Prefix) bool { return x == y }
 
 func panics(t *testing.T, fn func()) (panicked bool) {
 	t.Helper()

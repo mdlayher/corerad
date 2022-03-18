@@ -19,13 +19,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/netip"
 	"os"
 	"os/user"
 	"testing"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/system"
-	"inet.af/netaddr"
 )
 
 const (
@@ -174,12 +174,12 @@ func testDialer(t *testing.T, privileged bool) *system.Dialer {
 				continue
 			}
 
-			ipp, ok := netaddr.FromStdIPNet(ipn)
+			ipp, ok := netip.AddrFromSlice(ipn.IP)
 			if !ok {
 				panicf("system: invalid net.IPNet: %+v", a)
 			}
 
-			if ipp.IP().IsLinkLocalUnicast() || ipp.IP().Is6() {
+			if ipp.IsLinkLocalUnicast() || ipp.Is6() {
 				hasLLA = true
 				break
 			}

@@ -24,8 +24,6 @@ import (
 
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
-	"inet.af/netaddr"
-	"tailscale.com/util/netconv"
 )
 
 // A Plugin specifies a CoreRAD plugin's configuration.
@@ -168,7 +166,7 @@ type Prefix struct {
 	Auto bool
 
 	// Parameters from configuration.
-	Prefix            netaddr.IPPrefix
+	Prefix            netip.Prefix
 	OnLink            bool
 	Autonomous        bool
 	ValidLifetime     time.Duration
@@ -242,7 +240,7 @@ func (p *Prefix) Prepare(ifi *net.Interface) error {
 func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 	if !p.Auto {
 		// User specified an exact prefix so apply it directly.
-		p.apply([]netaddr.IPPrefix{p.Prefix}, ra)
+		p.apply([]netip.Prefix{p.Prefix}, ra)
 		return nil
 	}
 
@@ -260,7 +258,7 @@ func (p *Prefix) Apply(ra *ndp.RouterAdvertisement) error {
 }
 
 // current fetches the current prefix IPs from the interface.
-func (p *Prefix) current() ([]netaddr.IPPrefix, error) {
+func (p *Prefix) current() ([]netip.Prefix, error) {
 	// Expand ::/N to all unique, non-link local prefixes with matching length
 	// on this interface.
 	addrs, err := p.Addrs()
@@ -268,13 +266,13 @@ func (p *Prefix) current() ([]netaddr.IPPrefix, error) {
 		return nil, fmt.Errorf("failed to fetch IP addresses: %v", err)
 	}
 
-	var prefixes []netaddr.IPPrefix
-	seen := make(map[netaddr.IPPrefix]struct{})
+	var prefixes []netip.Prefix
+	seen := make(map[netip.Prefix]struct{})
 	for _, a := range addrs {
 		// Only advertise non-link-local IPv6 prefixes that also have a
 		// matching mask:
 		// https://tools.ietf.org/html/rfc4861#section-4.6.2.
-		ip := a.Address.IP()
+		ip := a.Address.Addr()
 		if ip.Is4() || ip.IsLinkLocalUnicast() || a.Address.Bits() != p.Prefix.Bits() {
 			continue
 		}
@@ -301,14 +299,14 @@ func (p *Prefix) current() ([]netaddr.IPPrefix, error) {
 
 	// For output consistency.
 	sort.SliceStable(prefixes, func(i, j int) bool {
-		return prefixes[i].IP().Less(prefixes[j].IP())
+		return prefixes[i].Addr().Less(prefixes[j].Addr())
 	})
 
 	return prefixes, nil
 }
 
 // apply unpacks prefixes into ndp.PrefixInformation options within ra.
-func (p *Prefix) apply(prefixes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement) {
+func (p *Prefix) apply(prefixes []netip.Prefix, ra *ndp.RouterAdvertisement) {
 	var (
 		// Lifetime is the same for each prefix..
 		valid, pref = p.lifetimes()
@@ -319,12 +317,12 @@ func (p *Prefix) apply(prefixes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement)
 
 	for _, pfx := range prefixes {
 		opts = append(opts, &ndp.PrefixInformation{
-			PrefixLength:                   pfx.Bits(),
+			PrefixLength:                   uint8(pfx.Bits()),
 			OnLink:                         p.OnLink,
 			AutonomousAddressConfiguration: p.Autonomous,
 			ValidLifetime:                  valid,
 			PreferredLifetime:              pref,
-			Prefix:                         netconv.AsAddr(pfx.IP()),
+			Prefix:                         pfx.Addr(),
 		})
 	}
 
@@ -371,7 +369,7 @@ type Route struct {
 	Auto bool
 
 	// Parameters from configuration.
-	Prefix     netaddr.IPPrefix
+	Prefix     netip.Prefix
 	Preference ndp.Preference
 	Lifetime   time.Duration
 
@@ -434,7 +432,7 @@ func (r *Route) Prepare(_ *net.Interface) error {
 func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
 	if !r.Auto {
 		// User specified an exact route so apply it directly.
-		r.apply([]netaddr.IPPrefix{r.Prefix}, ra)
+		r.apply([]netip.Prefix{r.Prefix}, ra)
 		return nil
 	}
 
@@ -454,7 +452,7 @@ func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
 }
 
 // current fetches the current IPv6 loopback routes from the system.
-func (r *Route) current() ([]netaddr.IPPrefix, error) {
+func (r *Route) current() ([]netip.Prefix, error) {
 	// Expand ::/N to all loopback routes.
 	//
 	// TODO(mdlayher): if we choose to accept syntax other than ::/0, we'll have
@@ -464,17 +462,17 @@ func (r *Route) current() ([]netaddr.IPPrefix, error) {
 		return nil, err
 	}
 
-	var prefixes []netaddr.IPPrefix
+	var prefixes []netip.Prefix
 outer:
 	for _, rt := range routes {
 		// Skip IPv4 or /128s on loopbacks.
-		if rt.Prefix.IP().Is4() || rt.Prefix.IsSingleIP() {
+		if rt.Prefix.Addr().Is4() || rt.Prefix.IsSingleIP() {
 			continue
 		}
 
 		// Prefix covered by larger prefix which is not equal to itself.
 		for _, rt2 := range routes {
-			if rt.Prefix != rt2.Prefix && rt2.Prefix.Contains(rt.Prefix.IP()) {
+			if rt.Prefix != rt2.Prefix && rt2.Prefix.Contains(rt.Prefix.Addr()) {
 				continue outer
 			}
 		}
@@ -484,14 +482,14 @@ outer:
 
 	// For output consistency.
 	sort.SliceStable(prefixes, func(i, j int) bool {
-		return prefixes[i].IP().Less(prefixes[j].IP())
+		return prefixes[i].Addr().Less(prefixes[j].Addr())
 	})
 
 	return prefixes, nil
 }
 
 // apply unpacks routes into ndp.PrefixInformation options within ra.
-func (r *Route) apply(routes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement) {
+func (r *Route) apply(routes []netip.Prefix, ra *ndp.RouterAdvertisement) {
 	var (
 		// Lifetime is the same for each route.
 		lt = r.lifetime()
@@ -502,10 +500,10 @@ func (r *Route) apply(routes []netaddr.IPPrefix, ra *ndp.RouterAdvertisement) {
 
 	for _, rt := range routes {
 		ra.Options = append(ra.Options, &ndp.RouteInformation{
-			PrefixLength:  rt.Bits(),
+			PrefixLength:  uint8(rt.Bits()),
 			Preference:    r.Preference,
 			RouteLifetime: lt,
-			Prefix:        netconv.AsAddr(rt.IP()),
+			Prefix:        rt.Addr(),
 		})
 	}
 
@@ -541,7 +539,7 @@ type RDNSS struct {
 
 	// Parameters from configuration.
 	Lifetime time.Duration
-	Servers  []netaddr.IP
+	Servers  []netip.Addr
 
 	// Functions which can be swapped for tests.
 	Addrs func() ([]system.IP, error)
@@ -602,15 +600,15 @@ func (r *RDNSS) Apply(ra *ndp.RouterAdvertisement) error {
 	}
 
 	// Produce a RecursiveDNSServers option for this server.
-	r.apply(append([]netaddr.IP{server}, r.Servers...), ra)
+	r.apply(append([]netip.Addr{server}, r.Servers...), ra)
 	return nil
 }
 
 // apply unpacks servers into an ndp.RecursiveDNSServer option within ra.
-func (r *RDNSS) apply(servers []netaddr.IP, ra *ndp.RouterAdvertisement) {
+func (r *RDNSS) apply(servers []netip.Addr, ra *ndp.RouterAdvertisement) {
 	ips := make([]netip.Addr, 0, len(servers))
 	for _, s := range servers {
-		ips = append(ips, netconv.AsAddr(s))
+		ips = append(ips, s)
 	}
 
 	ra.Options = append(ra.Options, &ndp.RecursiveDNSServer{
@@ -620,13 +618,13 @@ func (r *RDNSS) apply(servers []netaddr.IP, ra *ndp.RouterAdvertisement) {
 }
 
 // current fetches the current DNS server IP from the interface.
-func (r *RDNSS) current() (netaddr.IP, error) {
+func (r *RDNSS) current() (netip.Addr, error) {
 	// Expand :: to one of the IPv6 addresses on this interface. The "best"
 	// address will be chosen by comparing all addresses on the interface for
 	// desired properties.
 	addrs, err := r.Addrs()
 	if err != nil {
-		return netaddr.IP{}, fmt.Errorf("failed to fetch IP addresses: %v", err)
+		return netip.Addr{}, fmt.Errorf("failed to fetch IP addresses: %v", err)
 	}
 
 	var best system.IP
@@ -635,7 +633,7 @@ func (r *RDNSS) current() (netaddr.IP, error) {
 		//  - deprecated: should not be used when possible
 		//  - temporary: short-lived, used for outbound connections
 		//  - tentative: may be awaiting duplicate address detection results
-		ip := a.Address.IP()
+		ip := a.Address.Addr()
 		if ip.Is4() || a.Deprecated || a.Temporary || a.Tentative {
 			continue
 		}
@@ -644,10 +642,10 @@ func (r *RDNSS) current() (netaddr.IP, error) {
 		best = betterRDNSS(best, a)
 	}
 
-	ip := best.Address.IP()
-	if ip.IsZero() {
+	ip := best.Address.Addr()
+	if !ip.IsValid() {
 		// No usable IPv6 addresses, cannot use wildcard syntax.
-		return netaddr.IP{}, errors.New("interface has no usable IPv6 addresses")
+		return netip.Addr{}, errors.New("interface has no usable IPv6 addresses")
 	}
 
 	return ip, nil
@@ -657,7 +655,7 @@ func (r *RDNSS) current() (netaddr.IP, error) {
 // address which is more favorable of the two for use as an automatic RDNSS
 // server.
 func betterRDNSS(best, current system.IP) system.IP {
-	if best.Address.IsZero() {
+	if !best.Address.IsValid() {
 		// When best is zero, current always wins.
 		return current
 	}
@@ -689,14 +687,14 @@ func betterRDNSS(best, current system.IP) system.IP {
 
 	// Tie on flags, so now we have to compare IP address properties.
 	var (
-		cIP = current.Address.IP()
-		bIP = best.Address.IP()
+		cIP = current.Address.Addr()
+		bIP = best.Address.Addr()
 	)
 
-	for _, fn := range []func(netaddr.IP) bool{
-		(netaddr.IP).IsPrivate,
-		(netaddr.IP).IsGlobalUnicast,
-		(netaddr.IP).IsLinkLocalUnicast,
+	for _, fn := range []func(netip.Addr) bool{
+		(netip.Addr).IsPrivate,
+		(netip.Addr).IsGlobalUnicast,
+		(netip.Addr).IsLinkLocalUnicast,
 	} {
 		okC, okB := fn(cIP), fn(bIP)
 		switch {
@@ -739,11 +737,11 @@ func isStable(ip system.IP) bool {
 		// machine serving router advertisements will remain on that network.
 		ip.StablePrivacy ||
 		// Last effort: does this address look like an EUI-64 format address?
-		isEUI64(ip.Address.IP())
+		isEUI64(ip.Address.Addr())
 }
 
 // isEUI64 checks if ip resembles an IPv6 EUI-64 format address.
-func isEUI64(ip netaddr.IP) bool {
+func isEUI64(ip netip.Addr) bool {
 	// Look for the "ff:fe" pattern in the address.
 	b := ip.As16()
 	return b[11] == 0xff && b[12] == 0xfe

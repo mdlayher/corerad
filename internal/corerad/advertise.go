@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -27,8 +28,6 @@ import (
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/schedgroup"
 	"golang.org/x/sync/errgroup"
-	"inet.af/netaddr"
-	"tailscale.com/util/netconv"
 )
 
 // An Advertiser sends NDP router advertisements.
@@ -105,7 +104,7 @@ func (a *Advertiser) Run(ctx context.Context) error {
 		// needless start/error/restart loop.
 		//
 		// TODO: don't do this for unicast-only mode.
-		if err := a.send(dctx.Conn, netaddr.IPv6LinkLocalAllNodes(), a.cfg); err != nil {
+		if err := a.send(dctx.Conn, netip.IPv6LinkLocalAllNodes(), a.cfg); err != nil {
 			return fmt.Errorf("failed to send initial multicast router advertisement: %v", err)
 		}
 
@@ -148,7 +147,7 @@ func (a *Advertiser) advertise(ctx context.Context, conn system.Conn) error {
 	// one of them returns an error.
 	eg, ctx := errgroup.WithContext(ctx)
 
-	ipC := make(chan netaddr.IP, 16)
+	ipC := make(chan netip.Addr, 16)
 
 	// RA scheduler which consumes requests to send RAs and dispatches them
 	// at the appropriate times.
@@ -203,7 +202,7 @@ const (
 )
 
 // multicast runs a multicast advertising loop until ctx is canceled.
-func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
+func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netip.Addr) {
 	// Initialize PRNG so we can add jitter to our unsolicited multicast RA
 	// delay times.
 	var (
@@ -220,7 +219,7 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 		default:
 		}
 
-		ipC <- netaddr.IPv6LinkLocalAllNodes()
+		ipC <- netip.IPv6LinkLocalAllNodes()
 
 		select {
 		case <-ctx.Done():
@@ -231,7 +230,7 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netaddr.IP) {
 }
 
 // handle handles an incoming NDP message from a remote host.
-func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error) {
+func (a *Advertiser) handle(m ndp.Message, host netip.Addr) (*netip.Addr, error) {
 	a.cctx.mm.AdvMessagesReceivedTotal(1.0, a.cfg.Name, m.Type().String())
 
 	switch m := m.(type) {
@@ -243,7 +242,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 		// RA for any client contacting us via the IPv6 unspecified address,
 		// per https://tools.ietf.org/html/rfc4861#section-6.2.6.
 		if host.IsUnspecified() {
-			host = netaddr.IPv6LinkLocalAllNodes()
+			host = netip.IPv6LinkLocalAllNodes()
 		}
 
 		// TODO: consider checking for numerous RS in succession and issuing
@@ -298,7 +297,7 @@ func (a *Advertiser) handle(m ndp.Message, host netaddr.IP) (*netaddr.IP, error)
 
 // schedule consumes RA requests and schedules them with workers so they may
 // occur at the appropriate times.
-func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan netaddr.IP) error {
+func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan netip.Addr) error {
 	// Enable canceling schedule's context on send RA error.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -321,7 +320,7 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 
 	for {
 		// New IP for each loop iteration to prevent races.
-		var ip netaddr.IP
+		var ip netip.Addr
 
 		select {
 		case err := <-errC:
@@ -370,7 +369,7 @@ func (a *Advertiser) schedule(ctx context.Context, conn system.Conn, ipC <-chan 
 }
 
 // sendWorker is a goroutine worker which sends a router advertisement to ip.
-func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
+func (a *Advertiser) sendWorker(conn system.Conn, ip netip.Addr) error {
 	if err := a.send(conn, ip, a.cfg); err != nil {
 		a.logf("failed to send scheduled router advertisement to %s: %v", ip, err)
 		a.cctx.mm.AdvErrorsTotal(1.0, a.cfg.Name, "transmit")
@@ -389,7 +388,7 @@ func (a *Advertiser) sendWorker(conn system.Conn, ip netaddr.IP) error {
 
 // send sends a single router advertisement built from cfg to the destination IP
 // address, which may be a unicast or multicast address.
-func (a *Advertiser) send(conn system.Conn, dst netaddr.IP, cfg config.Interface) error {
+func (a *Advertiser) send(conn system.Conn, dst netip.Addr, cfg config.Interface) error {
 	if cfg.UnicastOnly && dst.IsMulticast() {
 		// Nothing to do.
 		return nil
@@ -402,7 +401,7 @@ func (a *Advertiser) send(conn system.Conn, dst netaddr.IP, cfg config.Interface
 		return fmt.Errorf("failed to build router advertisement: %w", err)
 	}
 
-	if err := conn.WriteTo(ra, nil, netconv.AsAddr(dst)); err != nil {
+	if err := conn.WriteTo(ra, nil, dst); err != nil {
 		return fmt.Errorf("failed to send router advertisement to %s: %w", dst, err)
 	}
 
@@ -456,7 +455,7 @@ func (a *Advertiser) shutdown(conn system.Conn) {
 	cfg := a.cfg
 	cfg.DefaultLifetime = 0
 
-	if err := a.send(conn, netaddr.IPv6LinkLocalAllNodes(), cfg); err != nil {
+	if err := a.send(conn, netip.IPv6LinkLocalAllNodes(), cfg); err != nil {
 		a.logf("failed to send final multicast router advertisement: %v", err)
 	}
 }

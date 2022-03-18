@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"os"
 	"testing"
@@ -35,7 +36,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"inet.af/netaddr"
 )
 
 func TestHandlerRoutes(t *testing.T) {
@@ -134,14 +134,14 @@ func TestHandlerRoutes(t *testing.T) {
 							Autonomous:        true,
 							ValidLifetime:     10 * time.Minute,
 							PreferredLifetime: 5 * time.Minute,
-							Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
+							Prefix:            netip.MustParsePrefix("2001:db8::/64"),
 						},
 						&plugin.Prefix{
 							OnLink:            true,
 							Autonomous:        true,
 							ValidLifetime:     10 * time.Minute,
 							PreferredLifetime: 5 * time.Minute,
-							Prefix:            netaddr.MustParseIPPrefix("fdff:dead:beef:dead::/64"),
+							Prefix:            netip.MustParsePrefix("fdff:dead:beef:dead::/64"),
 						},
 						&plugin.DNSSL{
 							Lifetime:    1 * time.Hour,
@@ -149,13 +149,13 @@ func TestHandlerRoutes(t *testing.T) {
 						},
 						&plugin.RDNSS{
 							Lifetime: 1 * time.Hour,
-							Servers: []netaddr.IP{
-								netaddr.MustParseIP("2001:db8::1"),
-								netaddr.MustParseIP("2001:db8::2"),
+							Servers: []netip.Addr{
+								netip.MustParseAddr("2001:db8::1"),
+								netip.MustParseAddr("2001:db8::2"),
 							},
 						},
 						&plugin.Route{
-							Prefix:     netaddr.MustParseIPPrefix("2001:db8:ffff::/48"),
+							Prefix:     netip.MustParsePrefix("2001:db8:ffff::/48"),
 							Preference: ndp.High,
 							Lifetime:   10 * time.Minute,
 						},

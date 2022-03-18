@@ -14,6 +14,7 @@
 package config
 
 import (
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +23,6 @@ import (
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
 	"github.com/pelletier/go-toml"
-	"inet.af/netaddr"
 )
 
 // Tests in this file use a greatly reduced config to test plugin parsing edge
@@ -157,7 +157,7 @@ func Test_parsePrefix(t *testing.T) {
 
 	defaults := &plugin.Prefix{
 		Auto:              true,
-		Prefix:            netaddr.MustParseIPPrefix("::/64"),
+		Prefix:            netip.MustParsePrefix("::/64"),
 		OnLink:            true,
 		Autonomous:        true,
 		PreferredLifetime: 4 * time.Hour,
@@ -329,7 +329,7 @@ func Test_parsePrefix(t *testing.T) {
 			`,
 			p: &plugin.Prefix{
 				Auto:              true,
-				Prefix:            netaddr.MustParseIPPrefix("::/64"),
+				Prefix:            netip.MustParsePrefix("::/64"),
 				OnLink:            true,
 				Autonomous:        true,
 				PreferredLifetime: ndp.Infinity,
@@ -351,7 +351,7 @@ func Test_parsePrefix(t *testing.T) {
 			`,
 			p: &plugin.Prefix{
 				Auto:              true,
-				Prefix:            netaddr.MustParseIPPrefix("::/64"),
+				Prefix:            netip.MustParsePrefix("::/64"),
 				OnLink:            true,
 				PreferredLifetime: 30 * time.Second,
 				ValidLifetime:     60 * time.Second,
@@ -374,13 +374,13 @@ func Test_parseRoute(t *testing.T) {
 	var (
 		defaults = &plugin.Route{
 			Auto:       true,
-			Prefix:     netaddr.MustParseIPPrefix("::/0"),
+			Prefix:     netip.MustParsePrefix("::/0"),
 			Preference: ndp.Medium,
 			Lifetime:   24 * time.Hour,
 		}
 
 		explicit = &plugin.Route{
-			Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
+			Prefix:     netip.MustParsePrefix("2001:db8::/64"),
 			Preference: ndp.Medium,
 			Lifetime:   24 * time.Hour,
 		}
@@ -538,7 +538,7 @@ func Test_parseRoute(t *testing.T) {
 			  lifetime = "infinite"
 			`,
 			r: &plugin.Route{
-				Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
+				Prefix:     netip.MustParsePrefix("2001:db8::/64"),
 				Preference: ndp.Medium,
 				Lifetime:   ndp.Infinity,
 			},
@@ -555,7 +555,7 @@ func Test_parseRoute(t *testing.T) {
 			  deprecated = true
 			`,
 			r: &plugin.Route{
-				Prefix:     netaddr.MustParseIPPrefix("2001:db8::/64"),
+				Prefix:     netip.MustParsePrefix("2001:db8::/64"),
 				Preference: ndp.High,
 				Lifetime:   30 * time.Second,
 				Deprecated: true,
@@ -572,7 +572,7 @@ func Test_parseRoute(t *testing.T) {
 			  prefix = "::1/128"
 			`,
 			r: &plugin.Route{
-				Prefix:     netaddr.MustParseIPPrefix("::1/128"),
+				Prefix:     netip.MustParsePrefix("::1/128"),
 				Preference: ndp.Medium,
 				Lifetime:   24 * time.Hour,
 			},
@@ -654,9 +654,9 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 30 * time.Second,
-				Servers: []netaddr.IP{
-					netaddr.MustParseIP("2001:db8::1"),
-					netaddr.MustParseIP("2001:db8::2"),
+				Servers: []netip.Addr{
+					netip.MustParseAddr("2001:db8::1"),
+					netip.MustParseAddr("2001:db8::2"),
 				},
 			},
 			ok: true,
@@ -670,7 +670,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
-				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::1")},
+				Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 			},
 			ok: true,
 		},
@@ -684,7 +684,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Lifetime: 20 * time.Minute,
-				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::1")},
+				Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 			},
 			ok: true,
 		},
@@ -723,7 +723,7 @@ func Test_parseRDNSS(t *testing.T) {
 			r: &plugin.RDNSS{
 				Auto:     true,
 				Lifetime: 20 * time.Minute,
-				Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::1")},
+				Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 			},
 			ok: true,
 		},
@@ -770,7 +770,7 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 	}
 
 	opts := []cmp.Option{
-		cmp.Comparer(compareNetaddrIP), cmp.Comparer(compareNetaddrIPPrefix),
+		cmp.Comparer(addrEqual), cmp.Comparer(prefixEqual),
 	}
 
 	if diff := cmp.Diff([]plugin.Plugin{want}, got, opts...); diff != "" {
@@ -778,5 +778,5 @@ func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 	}
 }
 
-func compareNetaddrIP(x, y netaddr.IP) bool             { return x == y }
-func compareNetaddrIPPrefix(x, y netaddr.IPPrefix) bool { return x == y }
+func addrEqual(x, y netip.Addr) bool     { return x == y }
+func prefixEqual(x, y netip.Prefix) bool { return x == y }

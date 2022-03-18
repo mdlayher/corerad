@@ -19,12 +19,12 @@ package system
 import (
 	"math"
 	"net"
+	"net/netip"
 
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/ndp"
 	"github.com/mdlayher/netlink"
 	"golang.org/x/sys/unix"
-	"inet.af/netaddr"
 )
 
 var _ Addresser = &addresser{}
@@ -61,8 +61,8 @@ func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
 		if !ok || am.Family != unix.AF_INET6 || am.Attributes == nil {
 			panicf("corerad: invalid rtnetlink message type: %+v", m)
 		}
-		ip, ok := netaddr.FromStdIP(am.Attributes.Address)
-		if !ok || !ip.Is6() || ip.Is4in6() {
+		ip, ok := netip.AddrFromSlice(am.Attributes.Address)
+		if !ok || !ip.Is6() || ip.Is4In6() {
 			panicf("corerad: invalid IPv6 address from rtnetlink: %q", am.Attributes.Address)
 		}
 
@@ -75,7 +75,7 @@ func (a *addresser) AddressesByIndex(index int) ([]IP, error) {
 
 		f := am.Attributes.Flags
 		addrs = append(addrs, IP{
-			Address: netaddr.IPPrefixFrom(ip, am.PrefixLength),
+			Address: netip.PrefixFrom(ip, int(am.PrefixLength)),
 
 			Deprecated:               f&unix.IFA_F_DEPRECATED != 0,
 			ManageTemporaryAddresses: f&unix.IFA_F_MANAGETEMPADDR != 0,
@@ -152,8 +152,8 @@ func (a *addresser) routesByIndex(index int) ([]Route, error) {
 			panicf("corerad: invalid rtnetlink message type: %+v", m)
 		}
 
-		ip, ok := netaddr.FromStdIP(rm.Attributes.Dst)
-		if !ok || !ip.Is6() || ip.Is4in6() {
+		ip, ok := netip.AddrFromSlice(rm.Attributes.Dst)
+		if !ok || !ip.Is6() || ip.Is4In6() {
 			panicf("corerad: invalid IPv6 route from rtnetlink: %q", rm.Attributes.Dst)
 		}
 
@@ -164,7 +164,7 @@ func (a *addresser) routesByIndex(index int) ([]Route, error) {
 		}
 
 		routes = append(routes, Route{
-			Prefix:     netaddr.IPPrefixFrom(ip, rm.DstLength),
+			Prefix:     netip.PrefixFrom(ip, int(rm.DstLength)),
 			Index:      int(rm.Attributes.OutIface),
 			Preference: pref,
 		})

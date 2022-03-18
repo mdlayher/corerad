@@ -15,13 +15,13 @@ package system_test
 
 import (
 	"net"
+	"net/netip"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/system"
 	"golang.org/x/net/nettest"
-	"inet.af/netaddr"
 )
 
 func TestIntegrationAddresserAddresses(t *testing.T) {
@@ -49,7 +49,7 @@ func TestIntegrationAddresserAddresses(t *testing.T) {
 
 		// For each interface, track all of the known IPv6 addresses to compare
 		// against the stdlib's output.
-		seen := make(map[netaddr.IPPrefix]bool)
+		seen := make(map[netip.Prefix]bool)
 		for _, ip := range gotIPs {
 			seen[ip.Address] = false
 
@@ -85,7 +85,7 @@ func TestIntegrationAddresserAddresses(t *testing.T) {
 		for _, ip := range wantIPs {
 			// The netAddresser should always set all flags to false, so just
 			// compare against zero values with the Address set.
-			if diff := cmp.Diff(system.IP{Address: ip.Address}, ip, cmp.Comparer(ipPrefixEqual)); diff != "" {
+			if diff := cmp.Diff(system.IP{Address: ip.Address}, ip, cmp.Comparer(prefixEqual)); diff != "" {
 				t.Fatalf("unexpected system IP from netAddresser (-want +got):\n%s", diff)
 			}
 
@@ -122,4 +122,4 @@ func TestIntegrationAddresserLoopbackRoutes(t *testing.T) {
 	}
 }
 
-func ipPrefixEqual(x, y netaddr.IPPrefix) bool { return x == y }
+func prefixEqual(x, y netip.Prefix) bool { return x == y }

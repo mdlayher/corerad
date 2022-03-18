@@ -15,9 +15,9 @@ package system
 
 import (
 	"net"
+	"net/netip"
 
 	"github.com/mdlayher/ndp"
-	"inet.af/netaddr"
 )
 
 // An Addresser is a type that can fetch IP address and route information from
@@ -35,7 +35,7 @@ type IP struct {
 	// The IP address of an interface. Note that address is not actually a
 	// "prefix" but instead an IP address and its associated CIDR mask, which
 	// may be in non-canonical form such as 2001:db8::1/64.
-	Address netaddr.IPPrefix
+	Address netip.Prefix
 
 	// Interface flags fetched from the operating system which are used for
 	// address preference logic.
@@ -50,7 +50,7 @@ type IP struct {
 // metadata.
 type Route struct {
 	// A destination route for an interface.
-	Prefix netaddr.IPPrefix
+	Prefix netip.Prefix
 
 	// The index of the network interface which contains this route.
 	Index int
@@ -86,14 +86,15 @@ func (*netAddresser) AddressesByIndex(index int) ([]IP, error) {
 			continue
 		}
 
-		ipp, ok := netaddr.FromStdIPNet(ipn)
-		if !ok || !ipp.IP().Is6() || ipp.IP().Is4in6() {
+		ip, ok := netip.AddrFromSlice(ipn.IP)
+		if !ok || !ip.Is6() || ip.Is4In6() {
 			continue
 		}
 
 		// Unfortunately this generic Addresser cannot infer any address flags
 		// so just return the IP.
-		ips = append(ips, IP{Address: ipp})
+		bits, _ := ipn.Mask.Size()
+		ips = append(ips, IP{Address: netip.PrefixFrom(ip, bits)})
 	}
 
 	return ips, nil

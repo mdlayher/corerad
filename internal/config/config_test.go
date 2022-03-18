@@ -14,6 +14,7 @@
 package config_test
 
 import (
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
@@ -23,7 +24,6 @@ import (
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
-	"inet.af/netaddr"
 )
 
 func TestParse(t *testing.T) {
@@ -209,14 +209,14 @@ func TestParse(t *testing.T) {
 						Plugins: []plugin.Plugin{
 							&plugin.Prefix{
 								Auto:              true,
-								Prefix:            netaddr.MustParseIPPrefix("::/64"),
+								Prefix:            netip.MustParsePrefix("::/64"),
 								OnLink:            true,
 								Autonomous:        true,
 								ValidLifetime:     24 * time.Hour,
 								PreferredLifetime: 4 * time.Hour,
 							},
 							&plugin.Prefix{
-								Prefix:            netaddr.MustParseIPPrefix("2001:db8::/64"),
+								Prefix:            netip.MustParsePrefix("2001:db8::/64"),
 								OnLink:            true,
 								Autonomous:        false,
 								ValidLifetime:     24 * time.Hour,
@@ -225,18 +225,18 @@ func TestParse(t *testing.T) {
 							},
 							&plugin.Route{
 								Auto:       true,
-								Prefix:     netaddr.MustParseIPPrefix("::/0"),
+								Prefix:     netip.MustParsePrefix("::/0"),
 								Preference: ndp.Medium,
 								Lifetime:   24 * time.Hour,
 							},
 							&plugin.Route{
-								Prefix:     netaddr.MustParseIPPrefix("2001:db8:ffff::/64"),
+								Prefix:     netip.MustParsePrefix("2001:db8:ffff::/64"),
 								Preference: ndp.Medium,
 								Lifetime:   24 * time.Hour,
 							},
 							&plugin.RDNSS{
 								Lifetime: 20 * time.Minute,
-								Servers:  []netaddr.IP{netaddr.MustParseIP("2001:db8::1")},
+								Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 							},
 							&plugin.DNSSL{
 								Lifetime:    20 * time.Minute,
@@ -325,7 +325,7 @@ func TestParse(t *testing.T) {
 			}
 
 			opts := []cmp.Option{
-				cmp.Comparer(ipEqual), cmp.Comparer(ipPrefixEqual),
+				cmp.Comparer(addrEqual), cmp.Comparer(prefixEqual),
 			}
 
 			if diff := cmp.Diff(tt.c, c, opts...); diff != "" {
@@ -425,5 +425,5 @@ func TestInterfaceRouterAdvertisement(t *testing.T) {
 	}
 }
 
-func ipEqual(x, y netaddr.IP) bool             { return x == y }
-func ipPrefixEqual(x, y netaddr.IPPrefix) bool { return x == y }
+func addrEqual(x, y netip.Addr) bool     { return x == y }
+func prefixEqual(x, y netip.Prefix) bool { return x == y }

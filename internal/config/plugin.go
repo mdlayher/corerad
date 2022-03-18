@@ -16,12 +16,12 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"sort"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
-	"inet.af/netaddr"
 )
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
@@ -153,7 +153,7 @@ func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
 
 // autoPrefix is the sentinel prefix which is used to automatically infer the
 // appropriate prefixes to advertise for a given interface.
-var autoPrefix = netaddr.MustParseIPPrefix("::/64")
+var autoPrefix = netip.MustParsePrefix("::/64")
 
 // parsePrefix parses a Prefix plugin.
 func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
@@ -164,7 +164,7 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 
 	// Allow an empty prefix to be used in place of ::/64 as that is the default
 	// most users will want.
-	if prefix.IsZero() {
+	if !prefix.IsValid() {
 		prefix = autoPrefix
 	}
 
@@ -176,7 +176,7 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 
 	// Only permit ::/64 as a special case. It isn't clear if other prefix
 	// lengths with :: would be useful, so throw an error for now.
-	if prefix.IP().IsUnspecified() && prefix.Bits() != 64 {
+	if prefix.Addr().IsUnspecified() && prefix.Bits() != 64 {
 		return nil, errors.New("only ::/64 is permitted for inferring prefixes from interface addresses")
 	}
 
@@ -236,7 +236,7 @@ func parsePrefix(p rawPrefix, epoch time.Time) (*plugin.Prefix, error) {
 
 // autoRoute is the sentinel prefix which is used to automatically infer the
 // appropriate routes to advertise for a given interface.
-var autoRoute = netaddr.MustParseIPPrefix("::/0")
+var autoRoute = netip.MustParsePrefix("::/0")
 
 // parseRoute parses a Route plugin.
 func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
@@ -247,7 +247,7 @@ func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
 
 	// Allow an empty prefix to be used in place of ::/0 as that is the default
 	// most users will want.
-	if prefix.IsZero() {
+	if !prefix.IsValid() {
 		prefix = autoRoute
 	}
 
@@ -255,7 +255,7 @@ func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
 	// for example ::/48 or ::/56 in the future to match any route of that
 	// length or longer, but this would be a natural extension of ::/0 ("any
 	// length").
-	if prefix.IP().IsUnspecified() && prefix.Bits() != 0 {
+	if prefix.Addr().IsUnspecified() && prefix.Bits() != 0 {
 		return nil, errors.New("only ::/0 is permitted for inferring routes from loopback interfaces")
 	}
 
@@ -311,15 +311,15 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	// Parse all server addresses as unique IPv6 addresses.
 	var (
 		auto    bool
-		servers = make(map[netaddr.IP]struct{})
+		servers = make(map[netip.Addr]struct{})
 	)
 
 	for _, s := range d.Servers {
-		ip, err := netaddr.ParseIP(s)
+		ip, err := netip.ParseAddr(s)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse IP address %q: %v", s, err)
 		}
-		if !ip.Is6() || ip.Is4in6() {
+		if !ip.Is6() || ip.Is4In6() {
 			return nil, fmt.Errorf("string %q is not an IPv6 address", s)
 		}
 
@@ -346,9 +346,9 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 
 	// If any servers are present, flatten the set into a slice and sort for
 	// deterministic output.
-	var ips []netaddr.IP
+	var ips []netip.Addr
 	if len(servers) > 0 {
-		ips = make([]netaddr.IP, 0, len(servers))
+		ips = make([]netip.Addr, 0, len(servers))
 		for ip := range servers {
 			ips = append(ips, ip)
 		}
@@ -367,15 +367,15 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 // parseIPPrefix parses s an IPv6 prefix which may optionally be empty. It
 // returns an error if the prefix is invalid, refers to an address within a
 // prefix, or is an IPv4 prefix.
-func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
+func parseIPPrefix(s string) (netip.Prefix, error) {
 	if s == "" {
 		// Empty string produces a valid zero IPPrefix.
-		return netaddr.IPPrefix{}, nil
+		return netip.Prefix{}, nil
 	}
 
-	p1, err := netaddr.ParseIPPrefix(s)
+	p1, err := netip.ParsePrefix(s)
 	if err != nil {
-		return netaddr.IPPrefix{}, err
+		return netip.Prefix{}, err
 	}
 
 	// Make sure that once masked (e.g. 2001:db8::1/64 becomes 2001:db8::/64)
@@ -384,12 +384,12 @@ func parseIPPrefix(s string) (netaddr.IPPrefix, error) {
 	// validation logic for that case.
 	p2 := p1.Masked()
 	if p1 != p2 {
-		return netaddr.IPPrefix{}, errors.New("individual IP address, not a CIDR prefix")
+		return netip.Prefix{}, errors.New("individual IP address, not a CIDR prefix")
 	}
 
 	// Only allow IPv6 addresses.
-	if !p1.IP().Is6() || p1.IP().Is4in6() {
-		return netaddr.IPPrefix{}, errors.New("not an IPv6 CIDR prefix")
+	if !p1.Addr().Is6() || p1.Addr().Is4In6() {
+		return netip.Prefix{}, errors.New("not an IPv6 CIDR prefix")
 	}
 
 	return p1, nil

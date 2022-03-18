@@ -38,7 +38,6 @@ import (
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
-	"inet.af/netaddr"
 )
 
 // A testAdvertiserFunc is a function which sets up an Advertiser for testing.
@@ -103,21 +102,21 @@ func TestAdvertiserUnsolicitedFull(t *testing.T) {
 						},
 					},
 					&plugin.Prefix{
-						Prefix:            netaddr.MustParseIPPrefix("2001:db8::/32"),
+						Prefix:            netip.MustParsePrefix("2001:db8::/32"),
 						OnLink:            true,
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
 					},
 					&plugin.Route{
-						Prefix:     netaddr.MustParseIPPrefix("2001:db8:ffff::/64"),
+						Prefix:     netip.MustParsePrefix("2001:db8:ffff::/64"),
 						Preference: ndp.High,
 						Lifetime:   10 * time.Second,
 					},
 					&plugin.RDNSS{
 						Lifetime: 10 * time.Second,
-						Servers: []netaddr.IP{
-							netaddr.MustParseIP("2001:db8::1"),
-							netaddr.MustParseIP("2001:db8::2"),
+						Servers: []netip.Addr{
+							netip.MustParseAddr("2001:db8::1"),
+							netip.MustParseAddr("2001:db8::2"),
 						},
 					},
 					plugin.NewMTU(1500),
@@ -497,14 +496,14 @@ func TestAdvertiserPrometheusMetrics(t *testing.T) {
 					// Expose two prefixes with differing flags to verify
 					// against the metrics output.
 					&plugin.Prefix{
-						Prefix:            netaddr.MustParseIPPrefix("2001:db8:1111::/64"),
+						Prefix:            netip.MustParsePrefix("2001:db8:1111::/64"),
 						Autonomous:        true,
 						OnLink:            true,
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
 					},
 					&plugin.Prefix{
-						Prefix:            netaddr.MustParseIPPrefix("2001:db8:2222::/64"),
+						Prefix:            netip.MustParsePrefix("2001:db8:2222::/64"),
 						PreferredLifetime: 10 * time.Second,
 						ValidLifetime:     20 * time.Second,
 					},

@@ -18,13 +18,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/sync/errgroup"
-	"inet.af/netaddr"
-	"tailscale.com/util/netconv"
 )
 
 var (
@@ -56,7 +55,7 @@ func newListener(cctx *Context, iface string, conn system.Conn) *listener {
 // A message contains information from a single NDP read.
 type message struct {
 	Message ndp.Message
-	Host    netaddr.IP
+	Host    netip.Addr
 }
 
 // Listen receives NDP messages and invokes onMessage for each until ctx is
@@ -105,21 +104,21 @@ func (l *listener) Listen(ctx context.Context, onMessage func(msg message) error
 
 // receiveRetry will attempt to read an NDP message from conn until ctx is
 // canceled or it exhausts a fixed number of retries.
-func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netaddr.IP, error) {
+func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netip.Addr, error) {
 	// TODO(mdlayher): consider parameterizing in the future if need be.
 	const retries = 5
 
 	for i := 0; i < retries; i++ {
 		// Enable cancelation before receiving any messages, if necessary.
 		if err := ctx.Err(); err != nil {
-			return nil, netaddr.IP{}, err
+			return nil, netip.Addr{}, err
 		}
 
-		m, cm, from, err := l.c.ReadFrom()
+		m, cm, host, err := l.c.ReadFrom()
 		if err != nil {
 			if cerr := ctx.Err(); cerr != nil {
 				// Context canceled.
-				return nil, netaddr.IP{}, cerr
+				return nil, netip.Addr{}, cerr
 			}
 
 			var nerr net.Error
@@ -128,17 +127,14 @@ func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netaddr.IP, e
 				// return if the context is canceled.
 				select {
 				case <-ctx.Done():
-					return nil, netaddr.IP{}, ctx.Err()
+					return nil, netip.Addr{}, ctx.Err()
 				case <-time.After(time.Duration(i) * 50 * time.Millisecond):
 				}
 				continue
 			}
 
-			return nil, netaddr.IP{}, err
+			return nil, netip.Addr{}, err
 		}
-
-		// Convert to netaddr.IP for use elsewhere.
-		host := netconv.AsIP(from)
 
 		// Ensure this message has a valid hop limit.
 		if cm.HopLimit != ndp.HopLimit {
@@ -150,7 +146,7 @@ func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netaddr.IP, e
 		return m, host, nil
 	}
 
-	return nil, netaddr.IP{}, errRetriesExhausted
+	return nil, netip.Addr{}, errRetriesExhausted
 }
 
 // logf prints a formatted log with the listener's interface name.

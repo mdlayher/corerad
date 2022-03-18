@@ -15,6 +15,7 @@ package corerad
 
 import (
 	"errors"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -23,7 +24,6 @@ import (
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
-	"inet.af/netaddr"
 )
 
 func TestMetrics(t *testing.T) {
@@ -107,9 +107,9 @@ func TestMetrics(t *testing.T) {
 					Name:      "eth1",
 					Advertise: true,
 					Plugins: []plugin.Plugin{
-						&plugin.Prefix{Prefix: netaddr.MustParseIPPrefix("2001:db8::/64")},
+						&plugin.Prefix{Prefix: netip.MustParsePrefix("2001:db8::/64")},
 						&plugin.Prefix{
-							Prefix:            netaddr.MustParseIPPrefix("fdff:dead:beef:dead::/64"),
+							Prefix:            netip.MustParsePrefix("fdff:dead:beef:dead::/64"),
 							Autonomous:        true,
 							OnLink:            true,
 							ValidLifetime:     20 * time.Minute,

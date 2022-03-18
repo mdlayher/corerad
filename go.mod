@@ -15,8 +15,6 @@ require (
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20220318055525-2edf467146b5
-	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6
-	tailscale.com v1.1.1-0.20220317183509-086832993683
 )
 
 require (
@@ -30,7 +28,5 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
-	go4.org/intern v0.0.0-20220301175310-a089fc204883 // indirect
-	go4.org/unsafe/assume-no-moving-gc v0.0.0-20211027215541-db492cf91b37 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 )
