@@ -1,6 +1,7 @@
 # CHANGELOG
 
-## Unreleased
+## v1.1.0
+March 19, 2022
 
 - The `interfaces.route.prefix` option now supports automatic route
   advertisement for IPv6 destination routes configured on loopback interfaces by
