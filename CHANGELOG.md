@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## Unreleased
+
+- The `interfaces.route.prefix` option now supports automatic route
+  advertisement for IPv6 destination routes configured on loopback interfaces by
+  specifying a route of `::/0` or an empty string. This is similar to the
+  `::/64` wildcard for prefix advertising and the `::` wildcard for RDNSS
+  servers.
+
+Assume the following IPv6 routes are defined on Linux loopback interface `lo`.
+Note that these routes reside in Linux's "main" routing table.
+
+```
+$ ip -6 route show dev lo
+::1 proto kernel metric 256 pref medium
+unreachable fd9e:1a04:f01d::/48 proto static metric 1024 pref medium
+```
+
+Before:
+```toml
+[[interfaces]]
+name = "eth0"
+advertise = true
+  [[interfaces.route]]
+  prefix = "fd9e:1a04:f01d::/48"
+```
+
+After:
+```toml
+[[interfaces]]
+name = "eth0"
+advertise = true
+  [[interfaces.route]]
+  # No route options means "::/0". Equivalents are:
+  # prefix = ""
+  # prefix = "::/0"
+```
+
 ## v1.0.0
 January 31, 2022
 
