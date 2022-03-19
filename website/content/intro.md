@@ -36,16 +36,23 @@ $ echo 1 | sudo tee /proc/sys/net/ipv6/conf/eth0/forwarding
 1
 ```
 
-Create a minimal `corerad.toml` configuration file with the following text:
+Create a minimal `corerad.toml` configuration file with the following contents.
 
 ```toml
-# Advertise an IPv6 default route and SLAAC-capable prefixes on eth0.
+# Advertise an IPv6 default route on eth0.
 [[interfaces]]
 name = "eth0"
 advertise = true
 
-  # Advertise an on-link, autonomous prefix for all /64 addresses on eth0.
+  # Advertise an on-link, autonomous prefix for all /64 addresses on eth0. This
+  # also enables stateless address autoconfiguration (SLAAC) for clients.
   [[interfaces.prefix]]
+
+  # Serve route information for IPv6 routes destined to the loopback interface.
+  [[interfaces.route]]
+
+  # Inform clients of a recursive DNS server running on this interface.
+  [[interfaces.rdnss]]
 
 # Optional: enable Prometheus metrics.
 [debug]
@@ -60,13 +67,13 @@ As of January 2022, CoreRAD packages are available for:
 
 For other Linux distributions or operating systems, download and build [the
 latest CoreRAD release from
-source](https://github.com/mdlayher/corerad/releases). A Go 1.17+ compiler is
+source](https://github.com/mdlayher/corerad/releases). A Go 1.18+ compiler is
 required.
 
 ```text
 $ go build ./cmd/corerad/
 $ ./corerad -h
-CoreRAD v1.0.0 (2022-01-31)
+CoreRAD v1.1.0 (2022-03-19)
 flags:
   -c string
         path to configuration file (default "corerad.toml")
@@ -87,11 +94,13 @@ Finally, start CoreRAD with the configuration file:
 
 ```text
 $ ./corerad -c ./corerad.toml
-CoreRAD v1.0.0 (2022-01-31) starting with configuration file "corerad.toml"
+CoreRAD v1.1.0 (2022-01-31) starting with configuration file "corerad.toml"
 starting HTTP debug listener on "localhost:9430": prometheus: true, pprof: false
 eth0: "prefix": ::/64 [2600:6c4a:787f:d100::/64, fd9e:1a04:f01d::/64] [on-link, autonomous], preferred: 4h0m0s, valid: 24h0m0s
+eth0: "route": ::/0 [fd9e:1a04:f01d::/48], preference: Medium, lifetime: 24h0m0s
+eth0: "rdnss": servers: [:: [fd9e:1a04:f01d::1]], lifetime: 20m0s
 eth0: "lla": source link-layer address: 00:0d:b9:53:ea:cd
-eth0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
+eth0: initialized, advertising from fe80::20d:b9ff:fe53:eacd%eth0
 ```
 
 Client machines on the router's LAN should now have an IPv6 default route and
@@ -101,6 +110,7 @@ one or more IPv6 addresses per advertised prefix, generated via SLAAC:
 client $ ip -6 route show dev eth0
 2600:6c4a:787f:d100::/64 proto ra metric 101 pref medium
 fd9e:1a04:f01d::/64 proto ra metric 101 pref medium
+fd9e:1a04:f01d::/48 via fe80::20d:b9ff:fe53:eacd dev wlp170s0 proto ra metric 600 pref medium
 fe80::/64 proto kernel metric 101 pref medium
 default via fe80::20d:b9ff:fe53:eacd proto ra metric 20101 pref medium
 ```

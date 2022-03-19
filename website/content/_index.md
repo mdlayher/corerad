@@ -6,10 +6,13 @@ layout: default
 Protocol](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol) router
 advertisement daemon, released under the Apache 2.0 License.
 
-CoreRAD has reached v1.0.0 and is considered stable and ready for production
-use on Linux routers.
+CoreRAD has reached v1.x.x and is considered stable and ready for production use
+on Linux routers.
 
-[You can find the source code at `github.com/mdlayher/corerad`.](https://github.com/mdlayher/corerad)
+You can find the source code at
+[`github.com/mdlayher/corerad`](https://github.com/mdlayher/corerad). The latest
+release can be found [on the releases
+page](https://github.com/mdlayher/corerad/releases) in the repository.
 
 [![CoreRAD Grafana + Prometheus dashboard](/img/grafana.png)](/img/grafana.png)
 

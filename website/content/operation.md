@@ -35,13 +35,20 @@ Assuming `eth0` is a downstream interface and `eth1` is an upstream interface,
 both modes can be deployed as follows:
 
 ```toml
-# Advertise an IPv6 default route and SLAAC-capable prefixes on eth0.
+# Advertise an IPv6 default route on eth0.
 [[interfaces]]
 name = "eth0"
 advertise = true
 
-  # Advertise an on-link, autonomous prefix for all /64 addresses on eth0.
+  # Advertise an on-link, autonomous prefix for all /64 addresses on eth0. This
+  # also enables stateless address autoconfiguration (SLAAC) for clients.
   [[interfaces.prefix]]
+
+  # Serve route information for IPv6 routes destined to the loopback interface.
+  [[interfaces.route]]
+
+  # Inform clients of a recursive DNS server running on this interface.
+  [[interfaces.rdnss]]
 
 # Monitor upstream router advertisements on eth1.
 [[interfaces]]
@@ -60,7 +67,7 @@ is resolved before retry attempts run out:
 
 ```text
 $ corerad -c ./corerad.toml 
-CoreRAD v1.0.0 (2022-01-31) starting with configuration file "corerad.toml"
+CoreRAD v1.1.0 (2022-03-19) starting with configuration file "corerad.toml"
 starting HTTP debug listener on "localhost:9430": prometheus: true, pprof: false
 eth0: interface not ready, reinitializing
 eth0: retrying initialization in 250ms, 49 attempt(s) remaining: interface "eth0" is not up: link not ready
@@ -68,16 +75,18 @@ eth0: retrying initialization in 500ms, 48 attempt(s) remaining: interface "eth0
 eth0: retrying initialization in 750ms, 47 attempt(s) remaining: interface "eth0" is not up: link not ready
 eth0: retrying initialization in 1s, 46 attempt(s) remaining: listen ip6:ipv6-icmp fe80::20d:b9ff:fe53:eacd%eth0: bind: cannot assign requested address
 eth0: "prefix": ::/64 [2600:6c4a:787f:d100::/64, fd9e:1a04:f01d::/64] [on-link, autonomous], preferred: 4h0m0s, valid: 24h0m0s
+eth0: "route": ::/0 [fd9e:1a04:f01d::/48], preference: Medium, lifetime: 24h0m0s
+eth0: "rdnss": servers: [:: [fd9e:1a04:f01d::1]], lifetime: 20m0s
 eth0: "lla": source link-layer address: 00:0d:b9:53:ea:cd
 eth0: initialized, advertising from fe80::20d:b9ff:fe53:eacd
 ```
 
 ## HTTP debug server
 
-An HTTP debug server can be enabled which serves Prometheus metrics, a limited
-HTTP API, and `pprof` data for development. Add the following block to your
-configuration to bind the HTTP server, adjusting `address` as needed to allow
-Prometheus and/or `pprof` to reach the server.
+An HTTP debug server can be enabled which serves Prometheus metrics and `pprof`
+data for development. Add the following block to your configuration to bind the
+HTTP server, adjusting `address` as needed to allow Prometheus and/or `pprof` to
+reach the server.
 
 ```toml
 # Optional: enable Prometheus metrics.
@@ -93,11 +102,11 @@ You can verify the server is running with `curl`:
 ```text
 $ curl -i localhost:9430
 HTTP/1.1 200 OK
-Date: Tue, 22 Jun 2021 11:25:29 GMT
+Date: Sat, 19 Mar 2022 18:19:13 GMT
 Content-Length: 28
 Content-Type: text/plain; charset=utf-8
 
-CoreRAD v1.0.0 (2022-01-31)
+CoreRAD v1.1.0 (2022-03-19)
 ```
 
 If enabled, you can also check the Prometheus metrics output:

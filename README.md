@@ -9,8 +9,8 @@ To get started with CoreRAD, [check out corerad.net](https://corerad.net/)!
 
 ## Overview
 
-CoreRAD has reached v1.0.0 and is considered stable and ready for production
-use on Linux routers. Users are welcome to join us on:
+CoreRAD has reached v1.x.x and is considered stable and ready for production use
+on Linux routers. Users are welcome to join us on:
 
 - [`#corerad` on Gophers Slack](https://invite.slack.golangbridge.org/)
 - [`#corerad` on Libera.Chat](https://web.libera.chat/)
