@@ -18,7 +18,6 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/mdlayher/corerad/internal/build"
 	"github.com/mdlayher/corerad/internal/config"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
@@ -79,7 +78,13 @@ type Metrics struct {
 
 // NewMetrics produces a Metrics structure which will register its metrics to
 // the specified metricslite.Interface. If m is nil, metrics are discarded.
-func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Interface) *Metrics {
+func NewMetrics(
+	m metricslite.Interface,
+	version string,
+	buildTime time.Time,
+	state system.State,
+	ifis []config.Interface,
+) *Metrics {
 	if m == nil {
 		m = metricslite.Discard()
 	}
@@ -175,14 +180,13 @@ func NewMetrics(m metricslite.Interface, state system.State, ifis []config.Inter
 
 	// Initialize any info metrics which are static throughout the lifetime of
 	// the program.
-	mm.Info(1, build.Version())
+	mm.Info(1, version)
 
-	bt := build.Time()
-	if bt.IsZero() {
+	if buildTime.IsZero() {
 		// Report UNIX time 0 if no build time set.
-		bt = time.Unix(0, 0)
+		buildTime = time.Unix(0, 0)
 	}
-	mm.Time(float64(bt.Unix()))
+	mm.Time(float64(buildTime.Unix()))
 
 	// Initialize const metrics.
 	m.ConstGauge(

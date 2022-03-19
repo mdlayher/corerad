@@ -28,12 +28,10 @@ import (
 
 func TestMetrics(t *testing.T) {
 	var (
-		// Server-wide timeseries which are always set regardless of configuration.
-		//
-		// These series would normally be affected by linker flags but these defaults
-		// should be sufficient for tests.
+		// Server-wide timeseries which are always set regardless of
+		// configuration. Hard-coded values are passed in the test table.
 		base = map[string]metricslite.Series{
-			"corerad_build_info":              {Samples: map[string]float64{"version=development": 1}},
+			"corerad_build_info":              {Samples: map[string]float64{"version=test": 1}},
 			"corerad_build_timestamp_seconds": {Samples: map[string]float64{"": 0}},
 		}
 
@@ -149,7 +147,13 @@ func TestMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mm := NewMetrics(metricslite.NewMemory(), tt.ts, tt.ifis)
+			mm := NewMetrics(
+				metricslite.NewMemory(),
+				"test",
+				time.Time{},
+				tt.ts,
+				tt.ifis,
+			)
 
 			raw, ok := mm.Series()
 			if !ok {

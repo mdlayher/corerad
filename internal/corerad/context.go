@@ -17,6 +17,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"log"
+	"time"
 
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
@@ -38,7 +39,7 @@ func NewContext(ll *log.Logger, mm *Metrics, state system.State) *Context {
 	}
 
 	if mm == nil {
-		mm = NewMetrics(metricslite.Discard(), nil, nil)
+		mm = NewMetrics(metricslite.Discard(), "", time.Time{}, nil, nil)
 	}
 
 	if state == nil {

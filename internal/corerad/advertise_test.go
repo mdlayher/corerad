@@ -641,7 +641,13 @@ func testSimulatedAdvertiserClient(
 	sc, cc := testConnPair(t)
 
 	ts := system.TestState{Forwarding: true}
-	mm := NewMetrics(metricslite.NewMemory(), ts, []config.Interface{*cfg})
+	mm := NewMetrics(
+		metricslite.NewMemory(),
+		"test",
+		time.Time{},
+		ts,
+		[]config.Interface{*cfg},
+	)
 
 	crctx := NewContext(log.New(os.Stderr, "", 0), mm, ts)
 
@@ -855,7 +861,13 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 
 	ll := log.New(os.Stderr, "", 0)
 	state := system.NewState()
-	mm := NewMetrics(metricslite.NewMemory(), state, []config.Interface{*cfg})
+	mm := NewMetrics(
+		metricslite.NewMemory(),
+		"test",
+		time.Time{},
+		state,
+		[]config.Interface{*cfg},
+	)
 
 	crctx := NewContext(ll, mm, state)
 
@@ -1051,6 +1063,8 @@ func skipShort(t *testing.T) {
 }
 
 func skipUnprivileged(t *testing.T) {
+	t.Helper()
+
 	const ifName = "cradprobe0"
 	shell(t, "ip", "tuntap", "add", ifName, "mode", "tun")
 	shell(t, "ip", "link", "del", ifName)
@@ -1061,7 +1075,7 @@ func shell(t *testing.T, name string, arg ...string) {
 
 	bin, err := exec.LookPath(name)
 	if err != nil {
-		t.Fatalf("failed to look up binary path: %v", err)
+		t.Skipf("skipping, binary %q not found: %v", name, err)
 	}
 
 	t.Logf("$ %s %v", bin, arg)

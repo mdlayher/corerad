@@ -148,7 +148,13 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 
 	// Set up metrics node so we can inspect its contents at a later time.
 	state := system.TestState{Forwarding: true}
-	mm := NewMetrics(metricslite.NewMemory(), state, nil)
+	mm := NewMetrics(
+		metricslite.NewMemory(),
+		"test",
+		time.Time{},
+		state,
+		nil,
+	)
 
 	crctx := NewContext(nil, mm, state)
 

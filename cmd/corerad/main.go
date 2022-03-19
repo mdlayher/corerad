@@ -115,7 +115,13 @@ func main() {
 	var (
 		// Construct the types to produce a Context for the Server.
 		state = system.NewState()
-		mm    = corerad.NewMetrics(metricslite.NewPrometheus(reg), state, cfg.Interfaces)
+		mm    = corerad.NewMetrics(
+			metricslite.NewPrometheus(reg),
+			build.Version(),
+			build.Time(),
+			state,
+			cfg.Interfaces,
+		)
 
 		// Construct a Context and plumb it throughout the HTTP handler and
 		// Server.

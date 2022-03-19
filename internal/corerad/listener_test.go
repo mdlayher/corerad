@@ -44,7 +44,13 @@ func Test_listenerReceiveRetryMetrics(t *testing.T) {
 		},
 	}
 
-	mm := NewMetrics(metricslite.NewMemory(), nil, nil)
+	mm := NewMetrics(
+		metricslite.NewMemory(),
+		"test",
+		time.Time{},
+		nil,
+		nil,
+	)
 
 	cctx := NewContext(nil, mm, nil)
 
