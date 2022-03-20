@@ -175,8 +175,8 @@ func (a *Advertiser) advertise(ctx context.Context, conn system.Conn) error {
 			if err != nil {
 				return fmt.Errorf("failed to handle NDP message: %w", err)
 			}
-			if ip != nil {
-				ipC <- *ip
+			if ip.IsValid() {
+				ipC <- ip
 			}
 
 			return nil
@@ -230,7 +230,7 @@ func (a *Advertiser) multicast(ctx context.Context, ipC chan<- netip.Addr) {
 }
 
 // handle handles an incoming NDP message from a remote host.
-func (a *Advertiser) handle(m ndp.Message, host netip.Addr) (*netip.Addr, error) {
+func (a *Advertiser) handle(m ndp.Message, host netip.Addr) (netip.Addr, error) {
 	a.cctx.mm.AdvMessagesReceivedTotal(1.0, a.cfg.Name, m.Type().String())
 
 	switch m := m.(type) {
@@ -247,7 +247,7 @@ func (a *Advertiser) handle(m ndp.Message, host netip.Addr) (*netip.Addr, error)
 
 		// TODO: consider checking for numerous RS in succession and issuing
 		// a multicast RA in response.
-		return &host, nil
+		return host, nil
 	case *ndp.RouterAdvertisement:
 		a.debugf("received router advertisement from IP %q, source link-layer address %q, router lifetime %s",
 			host, sourceLLA(m.Options), m.RouterLifetime)
@@ -256,7 +256,7 @@ func (a *Advertiser) handle(m ndp.Message, host netip.Addr) (*netip.Addr, error)
 		// LAN, verify its consistency with our own.
 		want, err := a.buildRA(a.cfg)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build router advertisement: %w", err)
+			return netip.Addr{}, fmt.Errorf("failed to build router advertisement: %w", err)
 		}
 
 		// Ensure the RAs are consistent.
@@ -292,7 +292,7 @@ func (a *Advertiser) handle(m ndp.Message, host netip.Addr) (*netip.Addr, error)
 	}
 
 	// No response necessary.
-	return nil, nil
+	return netip.Addr{}, nil
 }
 
 // schedule consumes RA requests and schedules them with workers so they may
