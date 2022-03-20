@@ -26,7 +26,7 @@ import (
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
 func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) ([]plugin.Plugin, error) {
-	var prefixes []*plugin.Prefix
+	prefixes := make([]*plugin.Prefix, 0, len(ifi.Prefixes))
 	for _, p := range ifi.Prefixes {
 		pfx, err := parsePrefix(p, epoch)
 		if err != nil {
@@ -54,7 +54,7 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		plugins = append(plugins, p)
 	}
 
-	var routes []*plugin.Route
+	routes := make([]*plugin.Route, 0, len(ifi.Routes))
 	for _, r := range ifi.Routes {
 		rt, err := parseRoute(r, epoch)
 		if err != nil {
