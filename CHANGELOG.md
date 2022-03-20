@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v1.1.1
+March 20, 2022
+
+This is a minor bug fix release following v1.1.0.
+
+- v1.1.0 switched to Go 1.18's `net/netip` library, and an upgrade to
+  `github.com/mdlayher/ndp` resulted in IPv6 zone identifiers accidentally
+  appearing in existing Prometheus metric labels. This is resolved and the
+  previous behavior is restored.
+- Internal cleanups to use more Go 1.18 features and to enable testing with less
+  reliance on the host environment.
+
 ## v1.1.0
 March 19, 2022
 
