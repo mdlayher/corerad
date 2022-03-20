@@ -93,7 +93,12 @@ func (l *listener) Listen(ctx context.Context, onMessage func(msg message) error
 
 		msg := message{
 			Message: m,
-			Host:    host,
+
+			// Package ndp used to send net.IPs which have no zone info, but the
+			// conversion to net/netip always attaches a zone. CoreRAD manages
+			// this on its own since every advertiser or monitor is already
+			// bound to a single interface, so clear the zone.
+			Host: host.WithZone(""),
 		}
 
 		if err := onMessage(msg); err != nil {

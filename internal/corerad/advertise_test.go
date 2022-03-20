@@ -783,6 +783,9 @@ func (c *udpConn) ReadFrom() (ndp.Message, *ipv6.ControlMessage, netip.Addr, err
 		panicf("failed to convert IPv6 address: %v", addr)
 	}
 
+	// The NDP library attaches zones to all addresses.
+	ip = ip.WithZone("lo")
+
 	return m, c.ControlMessage, ip, nil
 }
 
