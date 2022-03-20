@@ -22,7 +22,6 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -31,13 +30,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/corerad/internal/config"
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/metricslite"
 	"github.com/mdlayher/ndp"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sys/unix"
 )
 
 // A testAdvertiserFunc is a function which sets up an Advertiser for testing.
@@ -827,7 +826,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 	// Set up a temporary veth pair in the appropriate state for use with
 	// the tests.
 	// TODO: use rtnetlink.
-	shell(t, "ip", "link", "add", veth0, "type", "veth", "peer", "name", veth1)
+	crtest.Shell(t, "ip", "link", "add", veth0, "type", "veth", "peer", "name", veth1)
 	mustSysctl(t, veth0, "accept_dad", "0")
 	mustSysctl(t, veth1, "accept_dad", "0")
 	mustSysctl(t, veth0, "forwarding", "1")
@@ -836,8 +835,8 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		tcfg.vethConfig(t, veth0, veth1)
 	}
 
-	shell(t, "ip", "link", "set", "up", veth0)
-	shell(t, "ip", "link", "set", "up", veth1)
+	crtest.Shell(t, "ip", "link", "set", "up", veth0)
+	crtest.Shell(t, "ip", "link", "set", "up", veth1)
 
 	// Make sure the interfaces are up and ready.
 	waitInterfacesReady(t, veth0, veth1)
@@ -932,7 +931,7 @@ func testAdvertiser(t *testing.T, cfg *config.Interface, tcfg *testConfig) (*Adv
 		}
 
 		// Clean up the veth pair.
-		shell(t, "ip", "link", "del", veth0)
+		crtest.Shell(t, "ip", "link", "del", veth0)
 	})
 
 	return ad, cctx
@@ -1069,33 +1068,8 @@ func skipUnprivileged(t *testing.T) {
 	t.Helper()
 
 	const ifName = "cradprobe0"
-	shell(t, "ip", "tuntap", "add", ifName, "mode", "tun")
-	shell(t, "ip", "link", "del", ifName)
-}
-
-func shell(t *testing.T, name string, arg ...string) {
-	t.Helper()
-
-	bin, err := exec.LookPath(name)
-	if err != nil {
-		t.Skipf("skipping, binary %q not found: %v", name, err)
-	}
-
-	t.Logf("$ %s %v", bin, arg)
-
-	cmd := exec.Command(bin, arg...)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("failed to start command %q: %v", name, err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		// Shell operations in these tests require elevated privileges.
-		if cmd.ProcessState.ExitCode() == int(unix.EPERM) {
-			t.Skipf("skipping, permission denied: %v", err)
-		}
-
-		t.Fatalf("failed to wait for command %q: %v", name, err)
-	}
+	crtest.Shell(t, "ip", "tuntap", "add", ifName, "mode", "tun")
+	crtest.Shell(t, "ip", "link", "del", ifName)
 }
 
 func mustSysctl(t *testing.T, iface, key, value string) {

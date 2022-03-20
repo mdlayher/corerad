@@ -20,13 +20,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os/exec"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/mdlayher/corerad/internal/crtest"
 	"github.com/mdlayher/corerad/internal/netstate"
-	"golang.org/x/sys/unix"
 )
 
 func TestIntegrationWatcherWatch(t *testing.T) {
@@ -69,7 +68,7 @@ func TestIntegrationWatcherWatch(t *testing.T) {
 			dir = "down"
 		}
 
-		shell(t, "ip", "link", "set", dir, dummy)
+		crtest.Shell(t, "ip", "link", "set", dir, dummy)
 		changes = append(changes, <-watchC)
 	}
 
@@ -110,11 +109,11 @@ func dummyInterface(t *testing.T) (string, func()) {
 	// Set up a dummy interface that can be used to trigger state change
 	// notifications.
 	// TODO: use rtnetlink.
-	shell(t, "ip", "link", "add", dummy, "type", "dummy")
+	crtest.Shell(t, "ip", "link", "add", dummy, "type", "dummy")
 
 	done := func() {
 		// Clean up the interface.
-		shell(t, "ip", "link", "del", dummy)
+		crtest.Shell(t, "ip", "link", "del", dummy)
 	}
 
 	return dummy, done
@@ -122,33 +121,8 @@ func dummyInterface(t *testing.T) (string, func()) {
 
 func skipUnprivileged(t *testing.T) {
 	const ifName = "lsprobe0"
-	shell(t, "ip", "tuntap", "add", ifName, "mode", "tun")
-	shell(t, "ip", "link", "del", ifName)
-}
-
-func shell(t *testing.T, name string, arg ...string) {
-	t.Helper()
-
-	bin, err := exec.LookPath(name)
-	if err != nil {
-		t.Fatalf("failed to look up binary path: %v", err)
-	}
-
-	t.Logf("$ %s %v", bin, arg)
-
-	cmd := exec.Command(bin, arg...)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("failed to start command %q: %v", name, err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		// Shell operations in these tests require elevated privileges.
-		if cmd.ProcessState.ExitCode() == int(unix.EPERM) {
-			t.Skipf("skipping, permission denied: %v", err)
-		}
-
-		t.Fatalf("failed to wait for command %q: %v", name, err)
-	}
+	crtest.Shell(t, "ip", "tuntap", "add", ifName, "mode", "tun")
+	crtest.Shell(t, "ip", "link", "del", ifName)
 }
 
 func panicf(format string, a ...interface{}) {
