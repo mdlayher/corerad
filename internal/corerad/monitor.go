@@ -155,7 +155,7 @@ func (m *Monitor) handle(msg ndp.Message, host string) {
 		}
 
 		// Export metrics for each prefix option.
-		for _, p := range pickPrefixes(msg.Options) {
+		for _, p := range pick[*ndp.PrefixInformation](msg.Options) {
 			str := cidrStr(p.Prefix, p.PrefixLength)
 
 			m.cctx.mm.MonPrefixAutonomous(

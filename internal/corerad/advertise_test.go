@@ -541,7 +541,7 @@ func TestAdvertiserPrometheusMetrics(t *testing.T) {
 				onLink = make(map[string]float64)
 			)
 
-			for _, p := range pickPrefixes(ra.Options) {
+			for _, p := range pick[*ndp.PrefixInformation](ra.Options) {
 				labels := fmt.Sprintf("interface=%s,prefix=%s/%d",
 					iface, p.Prefix, p.PrefixLength)
 

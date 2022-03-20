@@ -94,7 +94,7 @@ func verifyRAs(a, b *ndp.RouterAdvertisement) []problem {
 	return ps
 }
 
-// raConsistent verifies the base non-option fields of a and b for consistency.
+// checkRAs verifies the base non-option fields of a and b for consistency.
 func checkRAs(a, b *ndp.RouterAdvertisement) problems {
 	var ps problems
 	if a.CurrentHopLimit != b.CurrentHopLimit {
@@ -109,19 +109,19 @@ func checkRAs(a, b *ndp.RouterAdvertisement) problems {
 		ps.push("other_configuration", "", a.OtherConfiguration, b.OtherConfiguration)
 	}
 
-	if !durationsConsistent(a.ReachableTime, b.ReachableTime) {
+	if !checkDurations(a.ReachableTime, b.ReachableTime) {
 		ps.push("reachable_time", "", a.ReachableTime, b.ReachableTime)
 	}
 
-	if !durationsConsistent(a.RetransmitTimer, b.RetransmitTimer) {
+	if !checkDurations(a.RetransmitTimer, b.RetransmitTimer) {
 		ps.push("retransmit_timer", "", a.RetransmitTimer, b.RetransmitTimer)
 	}
 
 	return ps
 }
 
-// durationsConsistent reports whether two time.Duration values are consistent.
-func durationsConsistent(want, got time.Duration) bool {
+// checkDurations reports whether two time.Duration values are consistent.
+func checkDurations(want, got time.Duration) bool {
 	if want == 0 || got == 0 {
 		// If either duration is unspecified, nothing to do.
 		return true
@@ -153,17 +153,19 @@ func checkMTUs(want, got []ndp.Option) problems {
 // checkPrefixes reports whether two NDP PrefixInformation option values
 // are consistent, or returns non-empty problems if not.
 func checkPrefixes(want, got []ndp.Option) problems {
-	pfxA := pickPrefixes(want)
-	pfxB := pickPrefixes(got)
+	var (
+		piA = pick[*ndp.PrefixInformation](want)
+		piB = pick[*ndp.PrefixInformation](got)
+	)
 
-	if len(pfxA) == 0 || len(pfxB) == 0 {
+	if len(piA) == 0 || len(piB) == 0 {
 		// If either are advertising no prefixes, nothing to do.
 		return nil
 	}
 
 	var ps problems
-	for _, a := range pfxA {
-		for _, b := range pfxB {
+	for _, a := range piA {
+		for _, b := range piB {
 			if a.Prefix != b.Prefix || a.PrefixLength != b.PrefixLength {
 				// a and b don't match, don't compare them.
 				continue
@@ -188,17 +190,19 @@ func checkPrefixes(want, got []ndp.Option) problems {
 // checkRoutes reports whether two NDP Route Information option values are
 // consistent, or returns non-empty problems if not.
 func checkRoutes(want, got []ndp.Option) problems {
-	pfxA := pickRoutes(want)
-	pfxB := pickRoutes(got)
+	var (
+		riA = pick[*ndp.RouteInformation](want)
+		riB = pick[*ndp.RouteInformation](got)
+	)
 
-	if len(pfxA) == 0 || len(pfxB) == 0 {
+	if len(riA) == 0 || len(riB) == 0 {
 		// If either are advertising no routes, nothing to do.
 		return nil
 	}
 
 	var ps problems
-	for _, a := range pfxA {
-		for _, b := range pfxB {
+	for _, a := range riA {
+		for _, b := range riB {
 			if a.Prefix != b.Prefix || a.PrefixLength != b.PrefixLength {
 				// a and b don't match, don't compare them.
 				continue
@@ -225,42 +229,44 @@ func checkRoutes(want, got []ndp.Option) problems {
 // checkRDNSS reports whether two NDP Recursive DNS Servers option values are
 // consistent, or returns non-empty problems if not.
 func checkRDNSS(want, got []ndp.Option) problems {
-	a := pickRDNSS(want)
-	b := pickRDNSS(got)
+	var (
+		dnsA = pick[*ndp.RecursiveDNSServer](want)
+		dnsB = pick[*ndp.RecursiveDNSServer](got)
+	)
 
-	if len(a) == 0 || len(b) == 0 {
+	if len(dnsA) == 0 || len(dnsB) == 0 {
 		// If either are advertising no RDNSS, nothing to do.
 		return nil
 	}
 
 	var ps problems
-	if len(a) != len(b) {
+	if len(dnsA) != len(dnsB) {
 		// Inconsistent number of options, so we can perform no further checks.
-		ps.push("rdnss_count", "", len(a), len(b))
+		ps.push("rdnss_count", "", len(dnsA), len(dnsB))
 		return ps
 	}
 
 	// Assuming both are advertising RDNSS, the options must be identical.
-	for i := range a {
-		if a, b := a[i].Lifetime, b[i].Lifetime; a != b {
+	for i := range dnsA {
+		if a, b := dnsA[i].Lifetime, dnsB[i].Lifetime; a != b {
 			ps.push("rdnss_lifetime", "", a, b)
 		}
 
-		if len(a[i].Servers) != len(b[i].Servers) {
+		if len(dnsA[i].Servers) != len(dnsB[i].Servers) {
 			// Inconsistent number of servers, so we can perform no further checks.
-			ps.push("rdnss_servers", "", ipsStr(a[i].Servers), ipsStr(b[i].Servers))
+			ps.push("rdnss_servers", "", ipsStr(dnsA[i].Servers), ipsStr(dnsB[i].Servers))
 			continue
 		}
 
 		equal := true
-		for j := range a[i].Servers {
-			if a, b := a[i].Servers[j], b[i].Servers[j]; a != b {
+		for j := range dnsA[i].Servers {
+			if a, b := dnsA[i].Servers[j], dnsB[i].Servers[j]; a != b {
 				equal = false
 				break
 			}
 		}
 		if !equal {
-			ps.push("rdnss_servers", "", ipsStr(a[i].Servers), ipsStr(b[i].Servers))
+			ps.push("rdnss_servers", "", ipsStr(dnsA[i].Servers), ipsStr(dnsB[i].Servers))
 		}
 	}
 
@@ -270,18 +276,20 @@ func checkRDNSS(want, got []ndp.Option) problems {
 // checkDNSSL reports whether two NDP DNS Search List option values are
 // consistent, or returns non-empty problems if not.
 func checkDNSSL(want, got []ndp.Option) problems {
-	a := pickDNSSL(want)
-	b := pickDNSSL(got)
+	var (
+		dnsA = pick[*ndp.DNSSearchList](want)
+		dnsB = pick[*ndp.DNSSearchList](got)
+	)
 
-	if len(a) == 0 || len(b) == 0 {
+	if len(dnsA) == 0 || len(dnsB) == 0 {
 		// If either are advertising no DNSSL, nothing to do.
 		return nil
 	}
 
 	var ps problems
-	if len(a) != len(b) {
+	if len(dnsA) != len(dnsB) {
 		// Inconsistent number of domains, so we can perform no further checks.
-		ps.push("dnssl_count", "", len(a), len(b))
+		ps.push("dnssl_count", "", len(dnsA), len(dnsB))
 		return ps
 	}
 
@@ -290,31 +298,43 @@ func checkDNSSL(want, got []ndp.Option) problems {
 	}
 
 	// Assuming both are advertising DNSSL, the options must be identical.
-	for i := range a {
-		if a, b := a[i].Lifetime, b[i].Lifetime; a != b {
+	for i := range dnsA {
+		if a, b := dnsA[i].Lifetime, dnsB[i].Lifetime; a != b {
 			ps.push("dnssl_lifetime", "", a, b)
 		}
 
-		if len(a[i].DomainNames) != len(b[i].DomainNames) {
-			ps.push("dnssl_domain_names", "", join(a[i].DomainNames), join(b[i].DomainNames))
+		if len(dnsA[i].DomainNames) != len(dnsB[i].DomainNames) {
+			ps.push("dnssl_domain_names", "", join(dnsA[i].DomainNames), join(dnsB[i].DomainNames))
 			// Inconsistent number of domain names, so we can perform no
 			// further checks.
 			continue
 		}
 
 		equal := true
-		for j := range a[i].DomainNames {
-			if a, b := a[i].DomainNames[j], b[i].DomainNames[j]; a != b {
+		for j := range dnsA[i].DomainNames {
+			if a, b := dnsA[i].DomainNames[j], dnsB[i].DomainNames[j]; a != b {
 				equal = false
 				break
 			}
 		}
 		if !equal {
-			ps.push("dnssl_domain_names", "", join(a[i].DomainNames), join(b[i].DomainNames))
+			ps.push("dnssl_domain_names", "", join(dnsA[i].DomainNames), join(dnsB[i].DomainNames))
 		}
 	}
 
 	return ps
+}
+
+// pick selects all ndp.Options of type T from options.
+func pick[T ndp.Option](options []ndp.Option) []T {
+	var ts []T
+	for _, o := range options {
+		if t, ok := o.(T); ok {
+			ts = append(ts, t)
+		}
+	}
+
+	return ts
 }
 
 // pickMTU selects a ndp.MTU option from the input options, reporting whether
@@ -327,54 +347,6 @@ func pickMTU(options []ndp.Option) (ndp.MTU, bool) {
 	}
 
 	return 0, false
-}
-
-// pickPrefixes selects all ndp.PrefixInformation options from the input options.
-func pickPrefixes(options []ndp.Option) []*ndp.PrefixInformation {
-	var prefixes []*ndp.PrefixInformation
-	for _, o := range options {
-		if p, ok := o.(*ndp.PrefixInformation); ok {
-			prefixes = append(prefixes, p)
-		}
-	}
-
-	return prefixes
-}
-
-// pickRoutes selects all ndp.RouteInformation options from the input options.
-func pickRoutes(options []ndp.Option) []*ndp.RouteInformation {
-	var routes []*ndp.RouteInformation
-	for _, o := range options {
-		if r, ok := o.(*ndp.RouteInformation); ok {
-			routes = append(routes, r)
-		}
-	}
-
-	return routes
-}
-
-// pickRDNSS selects all ndp.RDNSS options from the input options.
-func pickRDNSS(options []ndp.Option) []*ndp.RecursiveDNSServer {
-	var rdnss []*ndp.RecursiveDNSServer
-	for _, o := range options {
-		if r, ok := o.(*ndp.RecursiveDNSServer); ok {
-			rdnss = append(rdnss, r)
-		}
-	}
-
-	return rdnss
-}
-
-// pickDNSSL selects all ndp.DNSSL options from the input options.
-func pickDNSSL(options []ndp.Option) []*ndp.DNSSearchList {
-	var dnssl []*ndp.DNSSearchList
-	for _, o := range options {
-		if d, ok := o.(*ndp.DNSSearchList); ok {
-			dnssl = append(dnssl, d)
-		}
-	}
-
-	return dnssl
 }
 
 // sourceLLA returns either the string for a source link-layer address or "unknown".

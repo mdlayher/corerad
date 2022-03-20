@@ -303,7 +303,7 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 	if mctx.Advertisement != nil {
 		// Gather prefix information options for metrics reporting since a
 		// non-nil advertisement was passed.
-		prefixes = pickPrefixes(mctx.Advertisement.Options)
+		prefixes = pick[*ndp.PrefixInformation](mctx.Advertisement.Options)
 	}
 
 	for m, c := range metrics {
