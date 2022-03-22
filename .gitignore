@@ -1,3 +1,4 @@
+*.test
 cmd/corerad/corerad
 corerad.toml
 website/public/
