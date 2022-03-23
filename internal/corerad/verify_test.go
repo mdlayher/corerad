@@ -97,31 +97,31 @@ func Test_verifyRAs(t *testing.T) {
 			name:     "hop limit",
 			a:        &ndp.RouterAdvertisement{CurrentHopLimit: 1},
 			b:        &ndp.RouterAdvertisement{CurrentHopLimit: 2},
-			problems: []problem{*newProblem("hop_limit", "", 1, 2)},
+			problems: []problem{newProblem("hop_limit", "", 1, 2)},
 		},
 		{
 			name:     "managed",
 			a:        &ndp.RouterAdvertisement{ManagedConfiguration: true},
 			b:        &ndp.RouterAdvertisement{ManagedConfiguration: false},
-			problems: []problem{*newProblem("managed_configuration", "", true, false)},
+			problems: []problem{newProblem("managed_configuration", "", true, false)},
 		},
 		{
 			name:     "other",
 			a:        &ndp.RouterAdvertisement{OtherConfiguration: true},
 			b:        &ndp.RouterAdvertisement{OtherConfiguration: false},
-			problems: []problem{*newProblem("other_configuration", "", true, false)},
+			problems: []problem{newProblem("other_configuration", "", true, false)},
 		},
 		{
 			name:     "reachable time",
 			a:        &ndp.RouterAdvertisement{ReachableTime: 1 * time.Second},
 			b:        &ndp.RouterAdvertisement{ReachableTime: 2 * time.Second},
-			problems: []problem{*newProblem("reachable_time", "", 1*time.Second, 2*time.Second)},
+			problems: []problem{newProblem("reachable_time", "", 1*time.Second, 2*time.Second)},
 		},
 		{
 			name:     "retransmit timer",
 			a:        &ndp.RouterAdvertisement{RetransmitTimer: 1 * time.Second},
 			b:        &ndp.RouterAdvertisement{RetransmitTimer: 2 * time.Second},
-			problems: []problem{*newProblem("retransmit_timer", "", 1*time.Second, 2*time.Second)},
+			problems: []problem{newProblem("retransmit_timer", "", 1*time.Second, 2*time.Second)},
 		},
 		{
 			name: "MTU",
@@ -131,7 +131,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{ndp.NewMTU(9000)},
 			},
-			problems: []problem{*newProblem("mtu", "", 1500, 9000)},
+			problems: []problem{newProblem("mtu", "", 1500, 9000)},
 		},
 		{
 			name: "prefix lifetimes",
@@ -149,8 +149,8 @@ func Test_verifyRAs(t *testing.T) {
 				},
 			},
 			problems: []problem{
-				*newProblem("prefix_information_preferred_lifetime", "2001:db8::/64", 1*time.Second, 3*time.Second),
-				*newProblem("prefix_information_valid_lifetime", "2001:db8::/64", 2*time.Second, 4*time.Second),
+				newProblem("prefix_information_preferred_lifetime", "2001:db8::/64", 1*time.Second, 3*time.Second),
+				newProblem("prefix_information_valid_lifetime", "2001:db8::/64", 2*time.Second, 4*time.Second),
 			},
 		},
 		{
@@ -168,7 +168,7 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			problems: []problem{*newProblem("route_information_lifetime", "2001:db8:ffff::/64", 1*time.Second, 3*time.Second)},
+			problems: []problem{newProblem("route_information_lifetime", "2001:db8:ffff::/64", 1*time.Second, 3*time.Second)},
 		},
 		{
 			name: "RDNSS length",
@@ -183,7 +183,7 @@ func Test_verifyRAs(t *testing.T) {
 					&ndp.RecursiveDNSServer{},
 				},
 			},
-			problems: []problem{*newProblem("rdnss_count", "", 1, 2)},
+			problems: []problem{newProblem("rdnss_count", "", 1, 2)},
 		},
 		{
 			name: "RDNSS lifetime",
@@ -198,7 +198,7 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			problems: []problem{*newProblem("rdnss_lifetime", "", 0*time.Second, 2*time.Second)},
+			problems: []problem{newProblem("rdnss_lifetime", "", 0*time.Second, 2*time.Second)},
 		},
 		{
 			name: "RDNSS server length",
@@ -210,7 +210,7 @@ func Test_verifyRAs(t *testing.T) {
 					&ndp.RecursiveDNSServer{},
 				},
 			},
-			problems: []problem{*newProblem("rdnss_servers", "", "2001:db8::1, 2001:db8::2", "")},
+			problems: []problem{newProblem("rdnss_servers", "", "2001:db8::1, 2001:db8::2", "")},
 		},
 		{
 			name: "RDNSS server IPs",
@@ -224,7 +224,7 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			problems: []problem{*newProblem("rdnss_servers", "", "2001:db8::1, 2001:db8::2", "2001:db8::2, 2001:db8::3")},
+			problems: []problem{newProblem("rdnss_servers", "", "2001:db8::1, 2001:db8::2", "2001:db8::2, 2001:db8::3")},
 		},
 		{
 			name: "DNSSL length",
@@ -239,7 +239,7 @@ func Test_verifyRAs(t *testing.T) {
 					&ndp.DNSSearchList{},
 				},
 			},
-			problems: []problem{*newProblem("dnssl_count", "", 1, 2)},
+			problems: []problem{newProblem("dnssl_count", "", 1, 2)},
 		},
 		{
 			name: "DNSSL lifetime",
@@ -254,7 +254,7 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			problems: []problem{*newProblem("dnssl_lifetime", "", 10*time.Second, 2*time.Second)},
+			problems: []problem{newProblem("dnssl_lifetime", "", 10*time.Second, 2*time.Second)},
 		},
 		{
 			name: "DNSSL domains length",
@@ -269,7 +269,7 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			problems: []problem{*newProblem("dnssl_domain_names", "", "foo.example.com", "bar.example.com, baz.example.com")},
+			problems: []problem{newProblem("dnssl_domain_names", "", "foo.example.com", "bar.example.com, baz.example.com")},
 		},
 		{
 			name: "DNSSL domains",
@@ -284,7 +284,7 @@ func Test_verifyRAs(t *testing.T) {
 					},
 				},
 			},
-			problems: []problem{*newProblem("dnssl_domain_names", "", "foo.example.com", "bar.example.com")},
+			problems: []problem{newProblem("dnssl_domain_names", "", "foo.example.com", "bar.example.com")},
 		},
 		{
 			name: "captive portal",
@@ -294,7 +294,7 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{mustCaptivePortal("conflict")},
 			},
-			problems: []problem{*newProblem("captive_portal", "", ndp.Unrestricted, "conflict")},
+			problems: []problem{newProblem("captive_portal", "", ndp.Unrestricted, "conflict")},
 		},
 		{
 			name: "OK, reachable time unspecified",

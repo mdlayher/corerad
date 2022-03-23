@@ -28,7 +28,7 @@ type problems []problem
 
 // push adds a problem with the input data.
 func (ps *problems) push(field, details string, want, got any) {
-	*ps = append(*ps, *newProblem(field, details, want, got))
+	*ps = append(*ps, newProblem(field, details, want, got))
 }
 
 // merge merges another problems slice with this one.
@@ -42,7 +42,7 @@ type problem struct {
 }
 
 // newProblem constructs a problem with the input fields.
-func newProblem(field, details string, want, got any) *problem {
+func newProblem(field, details string, want, got any) problem {
 	// Sanity check: any code using this API must pass identical types for
 	// any sort of sane output.
 	if reflect.TypeOf(want) != reflect.TypeOf(got) {
@@ -54,7 +54,7 @@ func newProblem(field, details string, want, got any) *problem {
 	ws, okW := want.(string)
 	gs, okG := got.(string)
 	if okW && okG {
-		return &problem{
+		return problem{
 			Field:   field,
 			Details: details,
 			Message: fmt.Sprintf("want: %q, got: %q", ws, gs),
@@ -64,7 +64,7 @@ func newProblem(field, details string, want, got any) *problem {
 	wStr, okW := want.(fmt.Stringer)
 	gStr, okG := got.(fmt.Stringer)
 	if okW && okG {
-		return &problem{
+		return problem{
 			Field:   field,
 			Details: details,
 			Message: fmt.Sprintf("want: %q, got: %q", wStr.String(), gStr.String()),
@@ -72,7 +72,7 @@ func newProblem(field, details string, want, got any) *problem {
 	}
 
 	// Fall back to normal formatting.
-	return &problem{
+	return problem{
 		Field:   field,
 		Details: details,
 		Message: fmt.Sprintf("want: %v, got: %v", want, got),
