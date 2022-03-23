@@ -90,6 +90,7 @@ func verifyRAs(a, b *ndp.RouterAdvertisement) []problem {
 	ps.merge(checkRoutes(a.Options, b.Options))
 	ps.merge(checkRDNSS(a.Options, b.Options))
 	ps.merge(checkDNSSL(a.Options, b.Options))
+	ps.merge(checkCaptivePortal(a.Options, b.Options))
 
 	return ps
 }
@@ -133,8 +134,8 @@ func checkDurations(want, got time.Duration) bool {
 // checkMTUs reports whether two NDP MTU option values are consistent, or
 // returns non-empty problems if not.
 func checkMTUs(want, got []ndp.Option) problems {
-	mtuA, okA := pickMTU(want)
-	mtuB, okB := pickMTU(got)
+	mtuA, okA := pickFirst[*ndp.MTU](want)
+	mtuB, okB := pickFirst[*ndp.MTU](got)
 
 	if !okA || !okB {
 		// If either are not advertising MTUs, nothing to do.
@@ -325,6 +326,26 @@ func checkDNSSL(want, got []ndp.Option) problems {
 	return ps
 }
 
+// checkCaptivePortal reports whether two NDP CaptivePortal option values are
+// consistent, or returns non-empty problems if not.
+func checkCaptivePortal(want, got []ndp.Option) problems {
+	cpA, okA := pickFirst[*ndp.CaptivePortal](want)
+	cpB, okB := pickFirst[*ndp.CaptivePortal](got)
+
+	if !okA || !okB {
+		// If either are not advertising captive portal, nothing to do.
+		return nil
+	}
+
+	if cpA == cpB {
+		return nil
+	}
+
+	var ps problems
+	ps.push("captive_portal", "", cpA.URI, cpB.URI)
+	return ps
+}
+
 // pick selects all ndp.Options of type T from options.
 func pick[T ndp.Option](options []ndp.Option) []T {
 	var ts []T
@@ -337,16 +358,16 @@ func pick[T ndp.Option](options []ndp.Option) []T {
 	return ts
 }
 
-// pickMTU selects a ndp.MTU option from the input options, reporting whether
-// one was found.
-func pickMTU(options []ndp.Option) (*ndp.MTU, bool) {
+// pickFirst selects the first ndp.Option of type T from options, reporting
+// whether one was found.
+func pickFirst[T ndp.Option](options []ndp.Option) (T, bool) {
 	for _, o := range options {
-		if m, ok := o.(*ndp.MTU); ok {
-			return m, true
+		if t, ok := o.(T); ok {
+			return t, true
 		}
 	}
 
-	return nil, false
+	return *new(T), false
 }
 
 // sourceLLA returns either the string for a source link-layer address or "unknown".

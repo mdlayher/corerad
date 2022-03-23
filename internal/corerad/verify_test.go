@@ -83,6 +83,7 @@ func Test_verifyRAs(t *testing.T) {
 				rdnss[0],
 				dnssl[0],
 				ndp.NewMTU(1500),
+				mustCaptivePortal(ndp.Unrestricted),
 			},
 		}
 	)
@@ -286,6 +287,16 @@ func Test_verifyRAs(t *testing.T) {
 			problems: []problem{*newProblem("dnssl_domain_names", "", "foo.example.com", "bar.example.com")},
 		},
 		{
+			name: "captive portal",
+			a: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{mustCaptivePortal(ndp.Unrestricted)},
+			},
+			b: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{mustCaptivePortal("conflict")},
+			},
+			problems: []problem{*newProblem("captive_portal", "", ndp.Unrestricted, "conflict")},
+		},
+		{
 			name: "OK, reachable time unspecified",
 			a:    &ndp.RouterAdvertisement{},
 			b:    &ndp.RouterAdvertisement{ReachableTime: 1 * time.Second},
@@ -378,6 +389,13 @@ func Test_verifyRAs(t *testing.T) {
 			b: &ndp.RouterAdvertisement{},
 		},
 		{
+			name: "OK, captive portal unspecified",
+			a: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{mustCaptivePortal(ndp.Unrestricted)},
+			},
+			b: &ndp.RouterAdvertisement{},
+		},
+		{
 			name: "OK, all",
 			a:    full,
 			b:    full,
@@ -391,4 +409,13 @@ func Test_verifyRAs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustCaptivePortal(uri string) *ndp.CaptivePortal {
+	cp, err := ndp.NewCaptivePortal(uri)
+	if err != nil {
+		panicf("failed to create captive portal: %v", err)
+	}
+
+	return cp
 }
