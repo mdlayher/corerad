@@ -14,6 +14,7 @@
 package plugin
 
 import (
+	"fmt"
 	"net"
 	"net/netip"
 	"testing"
@@ -46,8 +47,8 @@ func TestPluginString(t *testing.T) {
 	}{
 		{
 			name: "Captive Portal",
-			p:    NewCaptivePortal("http://router/portal"),
-			s:    `URI: "http://router/portal"`,
+			p:    UnrestrictedPortal(),
+			s:    `URI: "urn:ietf:params:capport:unrestricted"`,
 		},
 		{
 			name: "DNSSL",
@@ -177,9 +178,9 @@ func TestBuild(t *testing.T) {
 	}{
 		{
 			name:   "CaptivePortal",
-			plugin: NewCaptivePortal("http://router/portal"),
+			plugin: UnrestrictedPortal(),
 			ra: &ndp.RouterAdvertisement{
-				Options: []ndp.Option{ndp.NewCaptivePortal("http://router/portal")},
+				Options: []ndp.Option{mustCaptivePortal(ndp.Unrestricted)},
 			},
 			ok: true,
 		},
@@ -807,3 +808,16 @@ func Test_betterRDNSS(t *testing.T) {
 
 func addrEqual(x, y netip.Addr) bool { return x == y }
 func ipEqual(x, y system.IP) bool    { return x == y }
+
+func mustCaptivePortal(uri string) *ndp.CaptivePortal {
+	cp, err := ndp.NewCaptivePortal(uri)
+	if err != nil {
+		panicf("failed to create captive portal: %v", err)
+	}
+
+	return cp
+}
+
+func panicf(format string, a ...any) {
+	panic(fmt.Sprintf(format, a...))
+}

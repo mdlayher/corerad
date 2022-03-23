@@ -6,7 +6,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/jsimonetti/rtnetlink v1.1.1
 	github.com/mdlayher/metricslite v0.0.0-20200705182329-f8b577e97896
-	github.com/mdlayher/ndp v0.9.0
+	github.com/mdlayher/ndp v0.10.0
 	github.com/mdlayher/netlink v1.6.0
 	github.com/mdlayher/schedgroup v0.0.0-20200506182200-45678742bdc7
 	github.com/mdlayher/sdnotify v0.0.0-20210228150836-ea3ec207d697
@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220318055525-2edf467146b5
+	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
 )
 
 require (

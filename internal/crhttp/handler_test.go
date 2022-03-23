@@ -159,7 +159,7 @@ func TestHandlerRoutes(t *testing.T) {
 							Preference: ndp.High,
 							Lifetime:   10 * time.Minute,
 						},
-						plugin.NewCaptivePortal("capport:unrestricted"),
+						plugin.UnrestrictedPortal(),
 					},
 				},
 				{
@@ -211,7 +211,7 @@ func TestHandlerRoutes(t *testing.T) {
 										RouteLifetimeSeconds: 60 * 10,
 									}},
 									SourceLinkLayerAddress: "de:ad:be:ef:de:ad",
-									CaptivePortal:          "capport:unrestricted",
+									CaptivePortal:          ndp.Unrestricted,
 								},
 							},
 						},

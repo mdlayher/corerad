@@ -117,8 +117,15 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 	}
 
 	// Only set when key is not empty.
+	//
+	// TODO(mdlayher): advertise ndp.Unrestricted by default if empty?
 	if cp := ifi.CaptivePortal; cp != "" {
-		plugins = append(plugins, plugin.NewCaptivePortal(cp))
+		cp, err := plugin.NewCaptivePortal(cp)
+		if err != nil {
+			return nil, err
+		}
+
+		plugins = append(plugins, cp)
 	}
 
 	return plugins, nil

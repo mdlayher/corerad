@@ -146,7 +146,7 @@ func checkMTUs(want, got []ndp.Option) problems {
 	}
 
 	var ps problems
-	ps.push("mtu", "", mtuA, mtuB)
+	ps.push("mtu", "", mtuA.MTU, mtuB.MTU)
 	return ps
 }
 
@@ -339,14 +339,14 @@ func pick[T ndp.Option](options []ndp.Option) []T {
 
 // pickMTU selects a ndp.MTU option from the input options, reporting whether
 // one was found.
-func pickMTU(options []ndp.Option) (ndp.MTU, bool) {
+func pickMTU(options []ndp.Option) (*ndp.MTU, bool) {
 	for _, o := range options {
 		if m, ok := o.(*ndp.MTU); ok {
-			return *m, true
+			return m, true
 		}
 	}
 
-	return 0, false
+	return nil, false
 }
 
 // sourceLLA returns either the string for a source link-layer address or "unknown".

@@ -177,7 +177,7 @@ func TestParse(t *testing.T) {
 			hop_limit = 0
 			unicast_only = true
 			source_lla = false
-			captive_portal = "http://router/portal"
+			captive_portal = "urn:ietf:params:capport:unrestricted"
 			preference = "high"
 
 			[[interfaces]]
@@ -276,7 +276,7 @@ func TestParse(t *testing.T) {
 						DefaultLifetime: 30 * time.Minute,
 						UnicastOnly:     true,
 						Preference:      ndp.High,
-						Plugins:         []plugin.Plugin{plugin.NewCaptivePortal("http://router/portal")},
+						Plugins:         []plugin.Plugin{plugin.UnrestrictedPortal()},
 					},
 					{
 						Name:    "eth3",

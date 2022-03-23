@@ -124,7 +124,7 @@ func packOptions(opts []ndp.Option) options {
 	for _, o := range opts {
 		switch o := o.(type) {
 		case *ndp.CaptivePortal:
-			out.CaptivePortal = string(*o)
+			out.CaptivePortal = o.URI
 		case *ndp.DNSSearchList:
 			out.DNSSL = append(out.DNSSL, dnssl{
 				LifetimeSeconds: int(o.Lifetime.Seconds()),
@@ -133,7 +133,7 @@ func packOptions(opts []ndp.Option) options {
 		case *ndp.LinkLayerAddress:
 			out.SourceLinkLayerAddress = o.Addr.String()
 		case *ndp.MTU:
-			out.MTU = int(*o)
+			out.MTU = int(o.MTU)
 		case *ndp.PrefixInformation:
 			out.Prefixes = append(out.Prefixes, prefix{
 				Prefix:                             prefixString(o.Prefix, o.PrefixLength),
