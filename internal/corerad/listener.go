@@ -127,7 +127,7 @@ func (l *listener) receiveRetry(ctx context.Context) (ndp.Message, netip.Addr, e
 			}
 
 			var nerr net.Error
-			if errors.As(err, &nerr) && nerr.Temporary() {
+			if errors.As(err, &nerr) && nerr.Timeout() {
 				// Temporary error or timeout, either back off and retry or
 				// return if the context is canceled.
 				select {
