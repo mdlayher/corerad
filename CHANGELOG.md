@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v1.1.2
+April 6, 2022
+
+This is a minor bug fix release following v1.1.1.
+
+- CoreRAD will now verify inconsistent NDP Captive Portal options advertised by
+  other routers on the same subnet. This was an oversight from when the captive
+  portal option was introduced in v0.3.2.
+- More internal cleanups to use Go 1.18 features, including an updated version
+  of `github.com/mdlayher/ndp`.
+
 ## v1.1.1
 March 20, 2022
 
