@@ -163,8 +163,8 @@ github.com/mdlayher/netlink v1.6.0 h1:rOHX5yl7qnlpiVkFWoqccueppMtXzeziFjWAjLg6sz
 github.com/mdlayher/netlink v1.6.0/go.mod h1:0o3PlBmGst1xve7wQ7j/hwpNaFaH4qCRyWCdcZk8/vA=
 github.com/mdlayher/schedgroup v1.0.0 h1:MJS37Rkver2jHaRV5WE5xszN56xZt5yQlqNjtBI7Hsc=
 github.com/mdlayher/schedgroup v1.0.0/go.mod h1:1i5jZ9Z+r9TUTWtmaXbeOX/4ek5HXqgAdREZJGP5Ry4=
-github.com/mdlayher/sdnotify v0.0.0-20210228150836-ea3ec207d697 h1:PBb7ld5cQGfxHF2pKvb/ydtuPwdRaltGI4e0QSCuiNI=
-github.com/mdlayher/sdnotify v0.0.0-20210228150836-ea3ec207d697/go.mod h1:HtjVsQfsrBm1GDcDTUFn4ZXhftxTwO/hxrvEiRc61U4=
+github.com/mdlayher/sdnotify v1.0.0 h1:Ma9XeLVN/l0qpyx1tNeMSeTjCPH6NtuD6/N9XdTlQ3c=
+github.com/mdlayher/sdnotify v1.0.0/go.mod h1:HQUmpM4XgYkhDLtd+Uad8ZFK1T9D5+pNxnXQjCeJlGE=
 github.com/mdlayher/socket v0.1.1/go.mod h1:mYV5YIZAfHh4dzDVzI8x8tWLWCliuX8Mon5Awbj+qDs=
 github.com/mdlayher/socket v0.2.2 h1:UOh5gQk70kRl1YMLCTRwRF4MvsAQsudjkEA+ZDXS4jo=
 github.com/mdlayher/socket v0.2.2/go.mod h1:IcNFWYJJuSGgnfKie27UfpEDWytPDqy+TrDd9I5hUKQ=

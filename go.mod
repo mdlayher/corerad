@@ -9,7 +9,7 @@ require (
 	github.com/mdlayher/ndp v0.10.0
 	github.com/mdlayher/netlink v1.6.0
 	github.com/mdlayher/schedgroup v1.0.0
-	github.com/mdlayher/sdnotify v0.0.0-20210228150836-ea3ec207d697
+	github.com/mdlayher/sdnotify v1.0.0
 	github.com/pelletier/go-toml v1.9.4
 	github.com/prometheus/client_golang v1.12.1
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
