@@ -1,4 +1,4 @@
-# CoreRAD [![Test](https://github.com/mdlayher/corerad/workflows/Test/badge.svg)](https://github.com/mdlayher/corerad/actions) [![GoDoc](https://godoc.org/github.com/mdlayher/corerad?status.svg)](https://godoc.org/github.com/mdlayher/corerad) [![Go Report Card](https://goreportcard.com/badge/github.com/mdlayher/corerad)](https://goreportcard.com/report/github.com/mdlayher/corerad)
+# CoreRAD [![Test](https://github.com/mdlayher/corerad/workflows/Test/badge.svg)](https://github.com/mdlayher/corerad/actions) [![Go Reference](https://pkg.go.dev/badge/github.com/mdlayher/corerad.svg)](https://pkg.go.dev/github.com/mdlayher/corerad) [![Go Report Card](https://goreportcard.com/badge/github.com/mdlayher/corerad)](https://goreportcard.com/report/github.com/mdlayher/corerad)
 
 CoreRAD is an extensible and observable IPv6 Neighbor Discovery Protocol router
 advertisement daemon.
