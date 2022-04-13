@@ -16,6 +16,7 @@ package corerad
 import (
 	"fmt"
 	"net/netip"
+	"strings"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/config"
@@ -31,11 +32,12 @@ const (
 	ifiForwarding        = "corerad_interface_forwarding"
 	ifiMonitoring        = "corerad_interface_monitoring"
 	msgInvalid           = "corerad_messages_received_invalid_total"
+	advInconsistencies   = "corerad_advertiser_inconsistencies_total"
 	advPrefixAutonomous  = "corerad_advertiser_prefix_autonomous"
 	advPrefixOnLink      = "corerad_advertiser_prefix_on_link"
 	advPrefixValid       = "corerad_advertiser_prefix_valid_seconds"
 	advPrefixPreferred   = "corerad_advertiser_prefix_preferred_seconds"
-	advInconsistencies   = "corerad_advertiser_inconsistencies_total"
+	advRDNSSLifetime     = "corerad_advertiser_rdnss_lifetime_seconds"
 	monReceived          = "corerad_monitor_messages_received_total"
 	monDefaultRoute      = "corerad_monitor_default_route_expiration_timestamp_seconds"
 	monPrefixAutonomous  = "corerad_monitor_prefix_autonomous"
@@ -236,6 +238,12 @@ func NewMetrics(
 		"interface", "prefix",
 	)
 
+	m.ConstGauge(
+		advRDNSSLifetime,
+		"The amount of time in seconds that clients should consider advertised recursive DNS servers valid.",
+		"interface", "servers",
+	)
+
 	// Enable const metrics collection.
 	m.OnConstScrape(mm.constScrape)
 
@@ -299,11 +307,16 @@ type metricsContext struct {
 // collectMetrics sets const metrics using the input data for the specified
 // interface.
 func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsContext) {
-	var prefixes []*ndp.PrefixInformation
+	var (
+		prefixes []*ndp.PrefixInformation
+		rdnss    []*ndp.RecursiveDNSServer
+	)
+
 	if mctx.Advertisement != nil {
-		// Gather prefix information options for metrics reporting since a
-		// non-nil advertisement was passed.
+		// Gather options for metrics reporting since a non-nil advertisement
+		// was passed.
 		prefixes = pick[*ndp.PrefixInformation](mctx.Advertisement.Options)
+		rdnss = pick[*ndp.RecursiveDNSServer](mctx.Advertisement.Options)
 	}
 
 	for m, c := range metrics {
@@ -330,6 +343,10 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 				default:
 					panicf("corerad: prefix metrics collection for %q is not handled", m)
 				}
+			}
+		case advRDNSSLifetime:
+			for _, r := range rdnss {
+				c(r.Lifetime.Seconds(), mctx.Interface, stringerStr(r.Servers))
 			}
 		default:
 			panicf("corerad: metrics collection for %q is not handled", m)
@@ -359,6 +376,15 @@ func routeStr(r *ndp.RouteInformation) string   { return cidrStr(r.Prefix, r.Pre
 
 func cidrStr(prefix netip.Addr, length uint8) string {
 	return netip.PrefixFrom(prefix, int(length)).String()
+}
+
+func stringerStr[T fmt.Stringer](strs []T) string {
+	ss := make([]string, 0, len(strs))
+	for _, s := range strs {
+		ss = append(ss, s.String())
+	}
+
+	return strings.Join(ss, ", ")
 }
 
 func boolFloat(b bool) float64 {

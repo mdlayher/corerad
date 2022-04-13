@@ -113,6 +113,17 @@ func TestMetrics(t *testing.T) {
 							ValidLifetime:     20 * time.Minute,
 							PreferredLifetime: 10 * time.Minute,
 						},
+						&plugin.RDNSS{
+							Lifetime: 10 * time.Minute,
+							Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
+						},
+						&plugin.RDNSS{
+							Lifetime: 5 * time.Minute,
+							Servers: []netip.Addr{
+								netip.MustParseAddr("fdff::1"),
+								netip.MustParseAddr("fdff::2"),
+							},
+						},
 					},
 				},
 			},
@@ -139,6 +150,12 @@ func TestMetrics(t *testing.T) {
 					Samples: map[string]float64{
 						"interface=eth1,prefix=2001:db8::/64":            0,
 						"interface=eth1,prefix=fdff:dead:beef:dead::/64": 600,
+					},
+				},
+				advRDNSSLifetime: {
+					Samples: map[string]float64{
+						"interface=eth1,servers=2001:db8::1":      600,
+						"interface=eth1,servers=fdff::1, fdff::2": 300,
 					},
 				},
 			}),
