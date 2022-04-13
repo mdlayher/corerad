@@ -39,6 +39,7 @@ const (
 	advPrefixValid       = "corerad_advertiser_prefix_valid_seconds"
 	advPrefixPreferred   = "corerad_advertiser_prefix_preferred_seconds"
 	advRDNSSLifetime     = "corerad_advertiser_rdnss_lifetime_seconds"
+	advRouteLifetime     = "corerad_adveriser_route_lifetime_seconds"
 	monReceived          = "corerad_monitor_messages_received_total"
 	monDefaultRoute      = "corerad_monitor_default_route_expiration_timestamp_seconds"
 	monPrefixAutonomous  = "corerad_monitor_prefix_autonomous"
@@ -252,6 +253,12 @@ func NewMetrics(
 		"interface", "servers",
 	)
 
+	m.ConstGauge(
+		advRouteLifetime,
+		"The amount of time in seconds that clients should consider this advertised route valid for this interface.",
+		"interface", "route",
+	)
+
 	// Enable const metrics collection.
 	m.OnConstScrape(mm.constScrape)
 
@@ -319,6 +326,7 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 		dnssl    []*ndp.DNSSearchList
 		prefixes []*ndp.PrefixInformation
 		rdnss    []*ndp.RecursiveDNSServer
+		routes   []*ndp.RouteInformation
 	)
 
 	if mctx.Advertisement != nil {
@@ -327,6 +335,7 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 		dnssl = pick[*ndp.DNSSearchList](mctx.Advertisement.Options)
 		prefixes = pick[*ndp.PrefixInformation](mctx.Advertisement.Options)
 		rdnss = pick[*ndp.RecursiveDNSServer](mctx.Advertisement.Options)
+		routes = pick[*ndp.RouteInformation](mctx.Advertisement.Options)
 	}
 
 	for m, c := range metrics {
@@ -361,6 +370,10 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 		case advRDNSSLifetime:
 			for _, r := range rdnss {
 				c(r.Lifetime.Seconds(), mctx.Interface, stringerStr(r.Servers))
+			}
+		case advRouteLifetime:
+			for _, r := range routes {
+				c(r.RouteLifetime.Seconds(), mctx.Interface, routeStr(r))
 			}
 		default:
 			panicf("corerad: metrics collection for %q is not handled", m)

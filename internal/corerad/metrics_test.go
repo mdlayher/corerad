@@ -128,6 +128,11 @@ func TestMetrics(t *testing.T) {
 								netip.MustParseAddr("fdff::2"),
 							},
 						},
+						&plugin.Route{Prefix: netip.MustParsePrefix("2001:db8::/48")},
+						&plugin.Route{
+							Prefix:   netip.MustParsePrefix("fdff::/48"),
+							Lifetime: 10 * time.Minute,
+						},
 					},
 				},
 			},
@@ -165,6 +170,12 @@ func TestMetrics(t *testing.T) {
 					Samples: map[string]float64{
 						"interface=eth1,servers=2001:db8::1":      600,
 						"interface=eth1,servers=fdff::1, fdff::2": 300,
+					},
+				},
+				advRouteLifetime: {
+					Samples: map[string]float64{
+						"interface=eth1,route=2001:db8::/48": 0,
+						"interface=eth1,route=fdff::/48":     600,
 					},
 				},
 			}),
