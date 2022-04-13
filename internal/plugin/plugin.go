@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
+	"golang.org/x/exp/slices"
 )
 
 // A Plugin specifies a CoreRAD plugin's configuration.
@@ -312,8 +312,8 @@ func (p *Prefix) current() ([]netip.Prefix, error) {
 	}
 
 	// For output consistency.
-	sort.SliceStable(prefixes, func(i, j int) bool {
-		return prefixes[i].Addr().Less(prefixes[j].Addr())
+	slices.SortStableFunc(prefixes, func(a, b netip.Prefix) bool {
+		return a.Addr().Less(b.Addr())
 	})
 
 	return prefixes, nil
@@ -495,8 +495,8 @@ outer:
 	}
 
 	// For output consistency.
-	sort.SliceStable(prefixes, func(i, j int) bool {
-		return prefixes[i].Addr().Less(prefixes[j].Addr())
+	slices.SortStableFunc(prefixes, func(a, b netip.Prefix) bool {
+		return a.Addr().Less(b.Addr())
 	})
 
 	return prefixes, nil

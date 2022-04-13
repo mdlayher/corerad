@@ -17,11 +17,11 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	"sort"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
+	"golang.org/x/exp/slices"
 )
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
@@ -360,7 +360,7 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 			ips = append(ips, ip)
 		}
 
-		sort.SliceStable(ips, func(i, j int) bool { return ips[i].Less(ips[j]) })
+		slices.SortStableFunc(ips, func(a, b netip.Addr) bool { return a.Less(b) })
 	}
 
 	return &plugin.RDNSS{
