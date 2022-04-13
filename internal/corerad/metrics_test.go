@@ -105,6 +105,10 @@ func TestMetrics(t *testing.T) {
 					Name:      "eth1",
 					Advertise: true,
 					Plugins: []plugin.Plugin{
+						&plugin.DNSSL{
+							Lifetime:    5 * time.Minute,
+							DomainNames: []string{"foo.example.com", "bar.example.com"},
+						},
 						&plugin.Prefix{Prefix: netip.MustParsePrefix("2001:db8::/64")},
 						&plugin.Prefix{
 							Prefix:            netip.MustParsePrefix("fdff:dead:beef:dead::/64"),
@@ -128,6 +132,11 @@ func TestMetrics(t *testing.T) {
 				},
 			},
 			series: mergeSeries(base, wan, lan, map[string]metricslite.Series{
+				advDNSSLLifetime: {
+					Samples: map[string]float64{
+						"interface=eth1,domains=foo.example.com, bar.example.com": 300,
+					},
+				},
 				advPrefixAutonomous: {
 					Samples: map[string]float64{
 						"interface=eth1,prefix=2001:db8::/64":            0,

@@ -32,6 +32,7 @@ const (
 	ifiForwarding        = "corerad_interface_forwarding"
 	ifiMonitoring        = "corerad_interface_monitoring"
 	msgInvalid           = "corerad_messages_received_invalid_total"
+	advDNSSLLifetime     = "corerad_advertiser_dnssl_lifetime_seconds"
 	advInconsistencies   = "corerad_advertiser_inconsistencies_total"
 	advPrefixAutonomous  = "corerad_advertiser_prefix_autonomous"
 	advPrefixOnLink      = "corerad_advertiser_prefix_on_link"
@@ -209,9 +210,16 @@ func NewMetrics(
 		"interface",
 	)
 
-	m.ConstGauge(ifiForwarding,
+	m.ConstGauge(
+		ifiForwarding,
 		"Indicates whether or not IPv6 forwarding is enabled on this interface.",
 		"interface",
+	)
+
+	m.ConstGauge(
+		advDNSSLLifetime,
+		"The amount of time in seconds that clients should consider advertised DNS search list domain names valid.",
+		"interface", "domains",
 	)
 
 	m.ConstGauge(
@@ -308,6 +316,7 @@ type metricsContext struct {
 // interface.
 func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsContext) {
 	var (
+		dnssl    []*ndp.DNSSearchList
 		prefixes []*ndp.PrefixInformation
 		rdnss    []*ndp.RecursiveDNSServer
 	)
@@ -315,6 +324,7 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 	if mctx.Advertisement != nil {
 		// Gather options for metrics reporting since a non-nil advertisement
 		// was passed.
+		dnssl = pick[*ndp.DNSSearchList](mctx.Advertisement.Options)
 		prefixes = pick[*ndp.PrefixInformation](mctx.Advertisement.Options)
 		rdnss = pick[*ndp.RecursiveDNSServer](mctx.Advertisement.Options)
 	}
@@ -329,6 +339,10 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 			c(boolFloat(mctx.Forwarding), mctx.Interface)
 		case ifiMonitoring:
 			c(boolFloat(mctx.Monitoring), mctx.Interface)
+		case advDNSSLLifetime:
+			for _, d := range dnssl {
+				c(d.Lifetime.Seconds(), mctx.Interface, strings.Join(d.DomainNames, ", "))
+			}
 		case advPrefixAutonomous, advPrefixOnLink, advPrefixValid, advPrefixPreferred:
 			for _, p := range prefixes {
 				switch m {
