@@ -44,7 +44,9 @@ func TestMonitorMetrics(t *testing.T) {
 		rs = &ndp.RouterSolicitation{Options: []ndp.Option{sll}}
 		ra = &ndp.RouterAdvertisement{
 			// Pretend to be a default router.
-			RouterLifetime: routerLifetime,
+			ManagedConfiguration: true,
+			OtherConfiguration:   true,
+			RouterLifetime:       routerLifetime,
 			Options: []ndp.Option{
 				sll,
 				&ndp.PrefixInformation{
@@ -83,6 +85,14 @@ func TestMonitorMetrics(t *testing.T) {
 				"interface=test0,host=::1,message=router advertisement": 2,
 				"interface=test0,host=::1,message=router solicitation":  3,
 			},
+		},
+		{
+			Name:    monFlagManaged,
+			Samples: map[string]float64{"interface=test0,router=::1": 1},
+		},
+		{
+			Name:    monFlagOther,
+			Samples: map[string]float64{"interface=test0,router=::1": 1},
 		},
 		{
 			Name: monDefaultRoute,
@@ -133,7 +143,7 @@ func fixedNow() time.Time { return time.Unix(0, 0) }
 
 func makeReady() (<-chan struct{}, func(ndp.Message)) {
 	readyC := make(chan struct{})
-	return readyC, func(m ndp.Message) {
+	return readyC, func(_ ndp.Message) {
 		readyC <- struct{}{}
 	}
 }

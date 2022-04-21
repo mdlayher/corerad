@@ -145,6 +145,16 @@ func (m *Monitor) handle(msg ndp.Message, host string) {
 	case *ndp.RouterAdvertisement:
 		now := m.now()
 
+		m.cctx.mm.MonFlagManaged(
+			boolFloat(msg.ManagedConfiguration),
+			m.iface, host,
+		)
+
+		m.cctx.mm.MonFlagOther(
+			boolFloat(msg.OtherConfiguration),
+			m.iface, host,
+		)
+
 		if msg.RouterLifetime != 0 {
 			// This is an advertisement from a default router. Calculate the
 			// UNIX timestamp of when the default route will expire.

@@ -42,6 +42,8 @@ const (
 	advRDNSSLifetime     = "corerad_advertiser_rdnss_lifetime_seconds"
 	advRouteLifetime     = "corerad_adveriser_route_lifetime_seconds"
 	monReceived          = "corerad_monitor_messages_received_total"
+	monFlagManaged       = "corerad_monitor_flag_managed"
+	monFlagOther         = "corerad_monitor_flag_other"
 	monDefaultRoute      = "corerad_monitor_default_route_expiration_timestamp_seconds"
 	monPrefixAutonomous  = "corerad_monitor_prefix_autonomous"
 	monPrefixOnLink      = "corerad_monitor_prefix_on_link"
@@ -67,6 +69,8 @@ type Metrics struct {
 
 	// Per-monitor metrics.
 	MonMessagesReceivedTotal                 metricslite.Counter
+	MonFlagManaged                           metricslite.Gauge
+	MonFlagOther                             metricslite.Gauge
 	MonDefaultRouteExpirationTime            metricslite.Gauge
 	MonPrefixAutonomous                      metricslite.Gauge
 	MonPrefixOnLink                          metricslite.Gauge
@@ -150,6 +154,18 @@ func NewMetrics(
 			monReceived,
 			"The total number of valid NDP messages received on a monitoring interface.",
 			"interface", "host", "message",
+		),
+
+		MonFlagManaged: m.Gauge(
+			monFlagManaged,
+			"Indicates whether or not the Managed address configuration flag is set in a router advertisement received on a monitoring interface.",
+			"interface", "router",
+		),
+
+		MonFlagOther: m.Gauge(
+			monFlagOther,
+			"Indicates whether or not the Other configuration flag is set in a router advertisement received on a monitoring interface.",
+			"interface", "router",
 		),
 
 		MonDefaultRouteExpirationTime: m.Gauge(
