@@ -34,6 +34,7 @@ const (
 	msgInvalid           = "corerad_messages_received_invalid_total"
 	advDNSSLLifetime     = "corerad_advertiser_dnssl_lifetime_seconds"
 	advInconsistencies   = "corerad_advertiser_inconsistencies_total"
+	advMisconfiguration  = "corerad_advertiser_misconfiguration"
 	advPrefixAutonomous  = "corerad_advertiser_prefix_autonomous"
 	advPrefixOnLink      = "corerad_advertiser_prefix_on_link"
 	advPrefixValid       = "corerad_advertiser_prefix_valid_seconds"
@@ -218,6 +219,12 @@ func NewMetrics(
 	)
 
 	m.ConstGauge(
+		advMisconfiguration,
+		"Indicates whether or not an advertising interface is misconfigured, with details as to why.",
+		"interface", "details",
+	)
+
+	m.ConstGauge(
 		advDNSSLLifetime,
 		"The amount of time in seconds that clients should consider advertised DNS search list domain names valid.",
 		"interface", "domains",
@@ -288,12 +295,14 @@ func (m *Metrics) constScrape(metrics map[string]func(float64, ...string)) error
 			return errorf("failed to check IPv6 forwarding for %q: %v", ifi.Name, err)
 		}
 
-		var ra *ndp.RouterAdvertisement
+		var (
+			ra *ndp.RouterAdvertisement
+			ms []config.Misconfiguration
+		)
+
 		if ifi.Advertise {
 			// Generate a current RA advertising interfaces and report on it.
-			//
-			// TODO(mdlayher): plumb in misconfigurations.
-			ra, _, err = ifi.RouterAdvertisement(fwd)
+			ra, ms, err = ifi.RouterAdvertisement(fwd)
 			if err != nil {
 				return errorf("failed to generate router advertisement for metrics for %q: %v", ifi.Name, err)
 			}
@@ -306,6 +315,7 @@ func (m *Metrics) constScrape(metrics map[string]func(float64, ...string)) error
 			Forwarding:        fwd,
 			Monitoring:        ifi.Monitor,
 			Advertisement:     ra,
+			Misconfigurations: ms,
 		})
 	}
 
@@ -317,6 +327,7 @@ type metricsContext struct {
 	Interface                                              string
 	Advertising, Autoconfiguration, Forwarding, Monitoring bool
 	Advertisement                                          *ndp.RouterAdvertisement
+	Misconfigurations                                      []config.Misconfiguration
 }
 
 // collectMetrics sets const metrics using the input data for the specified
@@ -348,6 +359,15 @@ func collectMetrics(metrics map[string]func(float64, ...string), mctx metricsCon
 			c(boolFloat(mctx.Forwarding), mctx.Interface)
 		case ifiMonitoring:
 			c(boolFloat(mctx.Monitoring), mctx.Interface)
+		case advMisconfiguration:
+			for _, m := range mctx.Misconfigurations {
+				switch m {
+				case config.InterfaceNotForwarding:
+					c(1, mctx.Interface, "interface_not_forwarding")
+				default:
+					panicf("corerad: unhandled config.Misconfiguration: %d", m)
+				}
+			}
 		case advDNSSLLifetime:
 			for _, d := range dnssl {
 				c(d.Lifetime.Seconds(), mctx.Interface, strings.Join(d.DomainNames, ", "))

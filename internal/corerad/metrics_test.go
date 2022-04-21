@@ -59,10 +59,9 @@ func TestMetrics(t *testing.T) {
 			ifiMonitoring:        {Samples: map[string]float64{"interface=eth1": 0}},
 		}
 
-		// An unused interface which is in the config but neither advertising
-		// nor monitoring.
-		unused = map[string]metricslite.Series{
-			ifiAdvertising:       {Samples: map[string]float64{"interface=eth2": 0}},
+		// An LAN interface which is misconfigured to advertise but not forward.
+		lanBad = map[string]metricslite.Series{
+			ifiAdvertising:       {Samples: map[string]float64{"interface=eth2": 1}},
 			ifiAutoconfiguration: {Samples: map[string]float64{"interface=eth2": 0}},
 			ifiForwarding:        {Samples: map[string]float64{"interface=eth2": 0}},
 			ifiMonitoring:        {Samples: map[string]float64{"interface=eth2": 0}},
@@ -88,10 +87,12 @@ func TestMetrics(t *testing.T) {
 			}),
 		},
 		{
-			name:   "interface not configured",
-			ts:     state,
-			ifis:   []config.Interface{{Name: "eth2"}},
-			series: mergeSeries(base, unused),
+			name: "interface not configured",
+			ts:   state,
+			ifis: []config.Interface{{Name: "eth2"}},
+			series: mergeSeries(base, lanBad, map[string]metricslite.Series{
+				ifiAdvertising: {Samples: map[string]float64{"interface=eth2": 0}},
+			}),
 		},
 		{
 			name: "interfaces monitoring and advertising",
@@ -135,8 +136,19 @@ func TestMetrics(t *testing.T) {
 						},
 					},
 				},
+				{
+					Name:      "eth2",
+					Advertise: true,
+					// Not forwarding, but trying to be a default router.
+					DefaultLifetime: 1 * time.Minute,
+				},
 			},
-			series: mergeSeries(base, wan, lan, map[string]metricslite.Series{
+			series: mergeSeries(base, wan, lan, lanBad, map[string]metricslite.Series{
+				advMisconfiguration: {
+					Samples: map[string]float64{
+						"interface=eth2,details=interface_not_forwarding": 1,
+					},
+				},
 				advDNSSLLifetime: {
 					Samples: map[string]float64{
 						"interface=eth1,domains=foo.example.com, bar.example.com": 300,
