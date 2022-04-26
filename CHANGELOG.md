@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v1.2.0
+April 26, 2022
+
+- A variety of new Prometheus metrics are supported, including
+  - advertiser misconfigurations (such as an interface which advertises itself
+    as a default router but is not forwarding IPv6 traffic)
+  - advertiser DNS Search List lifetimes
+  - advertiser Recursive DNS Servers lifetimes
+  - advertiser Route Information lifetimes
+  - monitor router advertisement flag states
+
 ## v1.1.2
 April 6, 2022
 
