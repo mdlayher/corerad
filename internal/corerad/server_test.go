@@ -16,8 +16,6 @@ package corerad
 import (
 	"context"
 	"errors"
-	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -95,46 +93,13 @@ func TestServerBuildTasks(t *testing.T) {
 func TestServerServeBasicTasks(t *testing.T) {
 	t.Parallel()
 
-	const text = "CoreRAD"
-	var (
-		// Pick an address that is likely to be unoccupied for the debug HTTP
-		// server bind.
-		addr = randAddr(t)
-		ll   = log.New(os.Stderr, "", 0)
-	)
+	ll := log.New(os.Stderr, "", 0)
 
 	tests := []struct {
 		name  string
 		task  Task
 		check func(t *testing.T)
 	}{
-		{
-			name: "debug HTTP",
-			task: &httpTask{
-				addr: addr,
-				h: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-					_, _ = io.WriteString(w, text)
-				}),
-				readyC: make(chan struct{}),
-			},
-			check: func(t *testing.T) {
-				res := httpGet(t, addr)
-				defer res.Body.Close()
-
-				if diff := cmp.Diff(res.StatusCode, http.StatusOK); diff != "" {
-					t.Fatalf("unexpected HTTP status (-want +got):\n%s", diff)
-				}
-
-				b, err := ioutil.ReadAll(res.Body)
-				if err != nil {
-					t.Fatalf("failed to read HTTP body: %v", err)
-				}
-
-				if diff := cmp.Diff(text, string(b)); diff != "" {
-					t.Fatalf("unexpected HTTP body (-want +got):\n%s", diff)
-				}
-			},
-		},
 		{
 			name: "watcher not exist",
 			task: &watcherTask{
@@ -274,16 +239,4 @@ func httpGet(t *testing.T, addr string) *http.Response {
 
 	t.Fatal("failed to HTTP GET, ran out of retry attempts")
 	return nil
-}
-
-func randAddr(t *testing.T) string {
-	t.Helper()
-
-	l, err := net.Listen("tcp", "localhost:0")
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
-	_ = l.Close()
-
-	return l.Addr().String()
 }
