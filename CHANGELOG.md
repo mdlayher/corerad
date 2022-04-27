@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v1.2.1
+April 27, 2022
+
+This is a minor bug fix release following v1.2.0.
+
+- Fixes a typo in the new advertiser Route Information metric name
+
 ## v1.2.0
 April 26, 2022
 
