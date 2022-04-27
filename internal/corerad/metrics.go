@@ -40,7 +40,7 @@ const (
 	advPrefixValid       = "corerad_advertiser_prefix_valid_seconds"
 	advPrefixPreferred   = "corerad_advertiser_prefix_preferred_seconds"
 	advRDNSSLifetime     = "corerad_advertiser_rdnss_lifetime_seconds"
-	advRouteLifetime     = "corerad_adveriser_route_lifetime_seconds"
+	advRouteLifetime     = "corerad_advertiser_route_lifetime_seconds"
 	monReceived          = "corerad_monitor_messages_received_total"
 	monFlagManaged       = "corerad_monitor_flag_managed"
 	monFlagOther         = "corerad_monitor_flag_other"
