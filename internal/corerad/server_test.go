@@ -19,7 +19,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"sync"
 	"testing"
@@ -214,29 +213,4 @@ func Test_serve(t *testing.T) {
 			}
 		})
 	}
-}
-
-func httpGet(t *testing.T, addr string) *http.Response {
-	t.Helper()
-
-	addr = "http://" + addr
-	u, err := url.Parse(addr)
-	if err != nil {
-		t.Fatalf("failed to parse URL: %v", err)
-	}
-
-	c := &http.Client{Timeout: 1 * time.Second}
-
-	for i := 0; i < 5; i++ {
-		res, err := c.Get(u.String())
-		if err == nil {
-			return res
-		}
-
-		t.Logf("HTTP GET retry %02d: %v", i, err)
-		time.Sleep(250 * time.Millisecond)
-	}
-
-	t.Fatal("failed to HTTP GET, ran out of retry attempts")
-	return nil
 }
