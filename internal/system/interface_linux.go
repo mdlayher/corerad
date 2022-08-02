@@ -19,7 +19,7 @@ package system
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 )
 
@@ -43,7 +43,7 @@ func getIPv6Forwarding(iface string) (bool, error) {
 
 // sysctlBool reads a 0/1 boolean value from a file.
 func sysctlBool(file string) (bool, error) {
-	out, err := ioutil.ReadFile(file)
+	out, err := os.ReadFile(file)
 	if err != nil {
 		return false, err
 	}
@@ -63,5 +63,5 @@ func sysctlEnable(iface, key string, enable bool) error {
 		in = []byte("1")
 	}
 
-	return ioutil.WriteFile(sysctl(iface, key), in, 0o644)
+	return os.WriteFile(sysctl(iface, key), in, 0o644)
 }

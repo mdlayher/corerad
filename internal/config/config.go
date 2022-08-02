@@ -141,6 +141,7 @@ type Interface struct {
 // A Misconfiguration indicates that the user configuration conflicts with the
 // generated router advertisement in some way, and thus should be reported to
 // the user.
+//
 //enumcheck:exhaustive
 type Misconfiguration int
 

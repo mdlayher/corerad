@@ -15,7 +15,7 @@ package corerad
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"log"
 	"time"
 
@@ -35,7 +35,7 @@ type Context struct {
 // are nil, a no-op implementation will be used.
 func NewContext(ll *log.Logger, mm *Metrics, state system.State) *Context {
 	if ll == nil {
-		ll = log.New(ioutil.Discard, "", 0)
+		ll = log.New(io.Discard, "", 0)
 	}
 
 	if mm == nil {

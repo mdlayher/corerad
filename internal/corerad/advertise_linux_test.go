@@ -39,7 +39,7 @@ import (
 func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 	t.Parallel()
 
-	done := testAdvertiserClient(t, nil, nil, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, nil, nil, func(_ func(), cctx *clientContext) {
 		// Consume the initial multicast.
 		if _, _, _, err := cctx.c.ReadFrom(); err != nil {
 			t.Fatalf("failed to read multicast RA: %v", err)
@@ -164,7 +164,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 		DefaultLifetime: lifetime,
 	}
 
-	done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, cfg, nil, func(_ func(), cctx *clientContext) {
 		m0, _, _, err := cctx.c.ReadFrom()
 		if err != nil {
 			t.Fatalf("failed to read RA: %v", err)
@@ -238,7 +238,7 @@ func TestAdvertiserLinuxConfiguresInterfaces(t *testing.T) {
 		},
 	}
 
-	done := testAdvertiserClient(t, icfg, tcfg, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, icfg, tcfg, func(_ func(), cctx *clientContext) {
 		// Consume the initial multicast router advertisement.
 		_, cm, _, err := cctx.c.ReadFrom()
 		if err != nil {
@@ -318,7 +318,7 @@ func TestAdvertiserLinuxSolicitedUnicastOnly(t *testing.T) {
 	t.Parallel()
 
 	cfg := &config.Interface{UnicastOnly: true}
-	done := testAdvertiserClient(t, cfg, nil, func(cancel func(), cctx *clientContext) {
+	done := testAdvertiserClient(t, cfg, nil, func(_ func(), cctx *clientContext) {
 		// Issue repeated router solicitations and expect router advertisements
 		// in response.
 		for i := 0; i < 3; i++ {

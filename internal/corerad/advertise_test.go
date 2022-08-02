@@ -16,7 +16,6 @@ package corerad
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -337,7 +336,7 @@ func TestAdvertiserSolicited(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// No configuration, bare minimum router advertisement.
-			done := tt.fn(t, nil, nil, func(cancel func(), cctx *clientContext) {
+			done := tt.fn(t, nil, nil, func(_ func(), cctx *clientContext) {
 				if _, _, _, err := cctx.c.ReadFrom(); err != nil {
 					t.Fatalf("failed to read initial RA: %v", err)
 				}
@@ -1079,7 +1078,7 @@ func mustSysctl(t *testing.T, iface, key, value string) {
 
 	t.Logf("sysctl %q = %q", file, value)
 
-	if err := ioutil.WriteFile(file, []byte(value), 0o644); err != nil {
+	if err := os.WriteFile(file, []byte(value), 0o644); err != nil {
 		t.Fatalf("failed to write sysctl %s/%s: %v", iface, key, err)
 	}
 }

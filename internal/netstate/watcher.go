@@ -20,7 +20,8 @@ import (
 )
 
 // A changeMap is a map of:
-//  interface names -> Change subscription bitmasks -> slice of Change channels
+//
+//	interface names -> Change subscription bitmasks -> slice of Change channels
 //
 // When network interface state changes, any callers interested in a certain
 // type of Change will be notified via the Change channels.

@@ -17,7 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/netip"
@@ -69,7 +69,7 @@ const (
 // NewDialer creates a Dialer using the specified logger and network interface.
 func NewDialer(iface string, state State, mode DialerMode, ll *log.Logger) *Dialer {
 	if ll == nil {
-		ll = log.New(ioutil.Discard, "", 0)
+		ll = log.New(io.Discard, "", 0)
 	}
 
 	switch mode {

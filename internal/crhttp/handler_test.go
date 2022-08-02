@@ -17,7 +17,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -106,7 +105,7 @@ func TestHandlerRoutes(t *testing.T) {
 			},
 			path:   "/_/api/interfaces",
 			status: http.StatusOK,
-			check: func(t *testing.T, h http.Header, b []byte) {
+			check: func(t *testing.T, _ http.Header, b []byte) {
 				body := parseJSONBody(b)
 
 				if diff := cmp.Diff(0, len(body.Interfaces)); diff != "" {
@@ -260,7 +259,7 @@ func TestHandlerRoutes(t *testing.T) {
 
 			srv := httptest.NewServer(
 				NewHandler(
-					log.New(ioutil.Discard, "", 0),
+					log.New(io.Discard, "", 0),
 					tt.state,
 					config.Config{
 						Interfaces: tt.ifaces,
@@ -299,7 +298,7 @@ func TestHandlerRoutes(t *testing.T) {
 
 			// Don't consume a stream larger than a sane upper bound.
 			const mb = 1 << 20
-			body, err := ioutil.ReadAll(io.LimitReader(res.Body, 2*mb))
+			body, err := io.ReadAll(io.LimitReader(res.Body, 2*mb))
 			if err != nil {
 				t.Fatalf("failed to read HTTP body: %v", err)
 			}
