@@ -161,6 +161,9 @@ NotifyAccess=main
 Restart=on-failure
 RestartKillSignal=SIGHUP
 Type=notify
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 Note also the use of `RestartKillSignal=SIGHUP`. This allows the service to be
