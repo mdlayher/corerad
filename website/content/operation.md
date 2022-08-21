@@ -91,7 +91,7 @@ reach the server.
 ```toml
 # Optional: enable Prometheus metrics.
 [debug]
-address = "localhost:9430"
+address = ":9430"
 prometheus = true
 # WARNING: do not expose pprof on a public network!
 pprof = false

@@ -214,6 +214,10 @@ preference = "medium"
 #
 # Warning: do not expose pprof on an untrusted network!
 [debug]
-address = "localhost:9430"
+# Address syntax follows net.Listen semantics.
+# In particular, while you can pass a hostname (localhost:9430) or IP address,
+# if you only specify a port, the server will listen on all available unicast
+# and anycast UP addresses of the local system.
+address = ":9430"
 prometheus = false
 pprof = false
