@@ -3,10 +3,10 @@ name: Linux Integration Test
 on:
   push:
     branches:
-      - '*'
+      - "*"
   pull_request:
     branches:
-      - '*'
+      - "*"
 
 jobs:
   build:
@@ -16,23 +16,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: ${{ matrix.go-version }}
-      id: go
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+        id: go
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
 
-    - name: Build package corerad test binary
-      run: go test -c -race ./internal/corerad/
+      - name: Build package corerad test binary
+        run: go test -c -race ./internal/corerad/
 
-    - name: Run package corerad integration tests
-      run: sudo ./corerad.test -test.run TestAdvertiser
+      - name: Run package corerad integration tests
+        run: sudo ./corerad.test -test.run TestAdvertiser
 
-    - name: Build package system test binary
-      run: go test -c -race ./internal/system/
+      - name: Build package system test binary
+        run: go test -c -race ./internal/system/
 
-    - name: Run package system integration tests
-      run: sudo ./system.test
+      - name: Run package system integration tests
+        run: sudo ./system.test
