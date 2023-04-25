@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v1.2.2
+April 25, 2023
+
+This is a minor bug fix release following v1.2.1.
+
+- Updates dependencies to fix [`rtnetlink` package errors on newer Linux kernels](https://github.com/mdlayher/corerad/issues/37).
+
 ## v1.2.1
 April 27, 2022
 
