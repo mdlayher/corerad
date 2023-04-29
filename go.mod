@@ -6,8 +6,8 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/jsimonetti/rtnetlink v1.3.2
 	github.com/mdlayher/metricslite v0.0.0-20220406114248-d75c70dd4887
-	github.com/mdlayher/ndp v1.0.0
-	github.com/mdlayher/netlink v1.7.1
+	github.com/mdlayher/ndp v1.0.1
+	github.com/mdlayher/netlink v1.7.2
 	github.com/mdlayher/schedgroup v1.0.0
 	github.com/mdlayher/sdnotify v1.0.0
 	github.com/pelletier/go-toml v1.9.5
@@ -24,7 +24,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/mdlayher/socket v0.4.0 // indirect
+	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
