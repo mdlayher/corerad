@@ -69,7 +69,7 @@ func TestMonitorMetrics(t *testing.T) {
 			m = rs
 		}
 
-		if err := cctx.c.WriteTo(m, nil, system.IPv6LinkLocalAllRouters); err != nil {
+		if err := cctx.c.WriteTo(m, nil, netip.IPv6LinkLocalAllRouters()); err != nil {
 			t.Fatalf("failed to send NDP message: %v", err)
 		}
 
@@ -179,7 +179,7 @@ func testSimulatedMonitorClient(t *testing.T, onMessage func(m ndp.Message)) *cl
 						Name:         iface,
 						HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
 					},
-					IP: system.IPv6Loopback,
+					IP: netip.IPv6Loopback(),
 				}, nil
 			},
 		},

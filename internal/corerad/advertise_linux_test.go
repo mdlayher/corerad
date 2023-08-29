@@ -51,7 +51,7 @@ func TestAdvertiserLinuxSolicitedBadHopLimit(t *testing.T) {
 		}
 
 		cm := &ipv6.ControlMessage{HopLimit: ndp.HopLimit - 1}
-		if err := cctx.c.WriteTo(cctx.rs, cm, system.IPv6LinkLocalAllRouters); err != nil {
+		if err := cctx.c.WriteTo(cctx.rs, cm, netip.IPv6LinkLocalAllRouters()); err != nil {
 			t.Fatalf("failed to send RS: %v", err)
 		}
 
@@ -173,7 +173,7 @@ func TestAdvertiserLinuxIPv6Forwarding(t *testing.T) {
 		// Forwarding is disabled after the first RA arrives.
 		mustSysctl(t, cctx.router.Name, "forwarding", "0")
 
-		if err := cctx.c.WriteTo(cctx.rs, nil, system.IPv6LinkLocalAllRouters); err != nil {
+		if err := cctx.c.WriteTo(cctx.rs, nil, netip.IPv6LinkLocalAllRouters()); err != nil {
 			t.Fatalf("failed to send RS: %v", err)
 		}
 
@@ -326,7 +326,7 @@ func TestAdvertiserLinuxSolicitedUnicastOnly(t *testing.T) {
 				t.Fatalf("failed to extend read deadline: %v", err)
 			}
 
-			if err := cctx.c.WriteTo(cctx.rs, nil, system.IPv6LinkLocalAllRouters); err != nil {
+			if err := cctx.c.WriteTo(cctx.rs, nil, netip.IPv6LinkLocalAllRouters()); err != nil {
 				t.Fatalf("failed to send RS: %v", err)
 			}
 

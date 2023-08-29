@@ -28,21 +28,6 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
-var (
-	// IPv6LinkLocalRouters is the IPv6 link-local all routers multicast
-	// address.
-	//
-	// TODO(mdlayher): land in net/netip:
-	// https://github.com/golang/go/issues/51766.
-	IPv6LinkLocalAllRouters = netip.MustParseAddr("ff02::2")
-
-	// IPv6Loopback is the IPv6 loopback address.
-	//
-	// TODO(mdlayher): land in net/netip:
-	// https://github.com/golang/go/issues/51766.
-	IPv6Loopback = netip.MustParseAddr("::1")
-)
-
 // A Dialer can create Conns which can be reinitialized on certain errors.
 type Dialer struct {
 	// DialFunc specifies a function which will override the default dialing
@@ -240,7 +225,7 @@ func (d *Dialer) dial() (*DialContext, error) {
 		// In general, many of these actions are best-effort and should not halt
 		// shutdown on failure.
 
-		if err := conn.LeaveGroup(IPv6LinkLocalAllRouters); err != nil {
+		if err := conn.LeaveGroup(netip.IPv6LinkLocalAllRouters()); err != nil {
 			d.logf("failed to leave IPv6 link-local all routers multicast group: %v", err)
 		}
 
@@ -335,7 +320,7 @@ func dialNDP(ifi *net.Interface) (*ndp.Conn, netip.Addr, error) {
 	}
 
 	// We are now a router or want to examine messages as one would.
-	if err := c.JoinGroup(IPv6LinkLocalAllRouters); err != nil {
+	if err := c.JoinGroup(netip.IPv6LinkLocalAllRouters()); err != nil {
 		return nil, netip.Addr{}, fmt.Errorf("failed to join IPv6 link-local all routers multicast group: %v", err)
 	}
 

@@ -40,7 +40,7 @@ func Test_listenerReceiveRetryMetrics(t *testing.T) {
 			// cancels the retry loop since this message would be ignored
 			// and the read would be retried.
 			defer cancel()
-			return &ndp.RouterAdvertisement{}, &ipv6.ControlMessage{HopLimit: 1}, system.IPv6Loopback, nil
+			return &ndp.RouterAdvertisement{}, &ipv6.ControlMessage{HopLimit: 1}, netip.IPv6Loopback(), nil
 		},
 	}
 
@@ -133,7 +133,7 @@ func Test_listenerReceiveRetryErrors(t *testing.T) {
 							return nil, nil, netip.Addr{}, timeoutError{}
 						}
 
-						return ra, cm, system.IPv6Loopback, nil
+						return ra, cm, netip.IPv6Loopback(), nil
 					}
 				}(),
 			},
