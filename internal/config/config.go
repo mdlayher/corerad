@@ -82,6 +82,7 @@ type rawInterface struct {
 	Routes        []rawRoute  `toml:"route"`
 	RDNSS         []rawRDNSS  `toml:"rdnss"`
 	DNSSL         []rawDNSSL  `toml:"dnssl"`
+	PREF64        []rawPREF64 `toml:"pref64"`
 	MTU           int         `toml:"mtu"`
 	SourceLLA     *bool       `toml:"source_lla"`
 	CaptivePortal string      `toml:"captive_portal"`
@@ -115,6 +116,10 @@ type rawDNSSL struct {
 type rawRDNSS struct {
 	Lifetime *string  `toml:"lifetime"`
 	Servers  []string `toml:"servers"`
+}
+
+type rawPREF64 struct {
+	Prefix *string `toml:"prefix"`
 }
 
 // Config specifies the configuration for CoreRAD.

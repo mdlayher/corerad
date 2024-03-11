@@ -209,6 +209,12 @@ preference = "medium"
   lifetime = "auto"
   domain_names = ["foo.example.com"]
 
+  # Enable PREF64 on the interface using the given prefix. Note that this often
+  # requires further configuration of the network for NAT64 and/or DNS64. If an
+  # empty string is given, the default prefix of "64:ff9b::/96" is assumed.
+  [[interfaces.pref64]]
+  prefix = "64:ff9b::/96"
+
 # Enable or disable the debug HTTP server for facilities such as Prometheus
 # metrics and pprof support.
 #

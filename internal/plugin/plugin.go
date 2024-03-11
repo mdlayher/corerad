@@ -79,6 +79,51 @@ func (cp *CaptivePortal) Apply(ra *ndp.RouterAdvertisement) error {
 	return nil
 }
 
+// PREF64 configures a NDP PREF64 option, used to communicate prefixes to
+// clients for NAT64.
+type PREF64 struct {
+	Inner *ndp.PREF64
+}
+
+const maxPref64Lifetime = 8191 * 8 * time.Second
+
+func NewPREF64(prefix netip.Prefix, maxInterval time.Duration) *PREF64 {
+	// Calculate the scaled lifetime using MaxRtrAdvInterval.
+	// See https://datatracker.ietf.org/doc/html/rfc8781#section-4.1-2
+	lifetime := maxPref64Lifetime
+
+	if int(maxInterval.Seconds())*3 < int(lifetime.Seconds()) {
+
+		lifetimeSeconds := int(maxInterval.Seconds())
+
+		if r := int(lifetimeSeconds) % 8; r > 0 {
+			lifetimeSeconds += 8 - r
+		}
+
+		lifetime = time.Duration(lifetimeSeconds) * time.Second
+	}
+
+	return &PREF64{Inner: &ndp.PREF64{Prefix: prefix, Lifetime: lifetime}}
+}
+
+// Name implements Plugin.
+func (*PREF64) Name() string { return "pref64" }
+
+// String implements Plugin.
+func (p *PREF64) String() string {
+	return fmt.Sprintf("%s, lifetime: %s", p.Inner.Prefix, p.Inner.Lifetime)
+}
+
+// Prepare implements Plugin.
+func (*PREF64) Prepare(_ *net.Interface) error { return nil }
+
+// Apply implements Plugin.
+func (p *PREF64) Apply(ra *ndp.RouterAdvertisement) error {
+	ra.Options = append(ra.Options, p.Inner)
+
+	return nil
+}
+
 // DNSSL configures a NDP DNS Search List option.
 type DNSSL struct {
 	Lifetime    time.Duration
