@@ -24,6 +24,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// The Well-Known Prefix for IPv4 to IPv6 translation, as specified in RFC
+// 6052 Section 2.1.
+const defaultPREF64Prefix = "64:ff9b::/96"
+
 // parsePlugin parses raw plugin configuration into a slice of plugins.
 func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) ([]plugin.Plugin, error) {
 	prefixes := make([]*plugin.Prefix, 0, len(ifi.Prefixes))
@@ -126,6 +130,21 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		}
 
 		plugins = append(plugins, cp)
+	}
+
+	for _, p := range ifi.PREF64 {
+		base := defaultPREF64Prefix
+		if p.Prefix != nil && *p.Prefix != "" {
+			// Use the caller's prefix.
+			base = *p.Prefix
+		}
+
+		prefix, err := netip.ParsePrefix(base)
+		if err != nil {
+			return nil, err
+		}
+
+		plugins = append(plugins, plugin.NewPREF64(prefix, maxInterval))
 	}
 
 	return plugins, nil

@@ -74,6 +74,16 @@ func TestPluginString(t *testing.T) {
 			s:    "MTU: 1500",
 		},
 		{
+			name: "PREF64",
+			p: &PREF64{
+				Inner: &ndp.PREF64{
+					Lifetime: time.Minute * 10,
+					Prefix:   netip.MustParsePrefix("2001:db8::/96"),
+				},
+			},
+			s: "2001:db8::/96, lifetime: 10m0s",
+		},
+		{
 			name: "Prefix",
 			p: &Prefix{
 				Prefix:            netip.MustParsePrefix("2001:db8::/64"),
@@ -181,6 +191,19 @@ func TestBuild(t *testing.T) {
 			plugin: UnrestrictedPortal(),
 			ra: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{mustCaptivePortal(ndp.Unrestricted)},
+			},
+			ok: true,
+		},
+		{
+			name:   "PREF64",
+			plugin: NewPREF64(netip.MustParsePrefix("2001:db8::/96"), 24*time.Hour),
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.PREF64{
+						Lifetime: 8191 * 8 * time.Second, // max lifetime
+						Prefix:   netip.MustParsePrefix("2001:db8::/96"),
+					},
+				},
 			},
 			ok: true,
 		},
@@ -641,7 +664,7 @@ func TestBuild(t *testing.T) {
 				return
 			}
 
-			if diff := cmp.Diff(tt.ra, ra, cmp.Comparer(addrEqual)); diff != "" {
+			if diff := cmp.Diff(tt.ra, ra, cmp.Comparer(addrEqual), cmp.Comparer(prefixEqual)); diff != "" {
 				t.Fatalf("unexpected RA (-want +got):\n%s", diff)
 			}
 		})
@@ -806,8 +829,95 @@ func Test_betterRDNSS(t *testing.T) {
 	}
 }
 
-func addrEqual(x, y netip.Addr) bool { return x == y }
-func ipEqual(x, y system.IP) bool    { return x == y }
+func TestNewPREF64(t *testing.T) {
+	simplePrefix := netip.MustParsePrefix("2001:db8::/96")
+
+	tests := []struct {
+		name        string
+		prefix      netip.Prefix
+		maxInterval time.Duration
+		want        *PREF64
+	}{
+		{
+			name:        "zero lifetime",
+			prefix:      simplePrefix,
+			maxInterval: time.Second * 0,
+			want: &PREF64{
+				Inner: &ndp.PREF64{
+					Prefix:   simplePrefix,
+					Lifetime: time.Second * 0,
+				},
+			},
+		},
+		{
+			name:        "small lifetime",
+			prefix:      simplePrefix,
+			maxInterval: time.Minute * 10,
+			want: &PREF64{
+				Inner: &ndp.PREF64{
+					Prefix:   simplePrefix,
+					Lifetime: time.Minute * 10,
+				},
+			},
+		},
+		{
+			name:        "max lifetime",
+			prefix:      simplePrefix,
+			maxInterval: time.Second * 8 * 8191,
+			want: &PREF64{
+				Inner: &ndp.PREF64{
+					Prefix:   simplePrefix,
+					Lifetime: time.Second * 8 * 8191,
+				},
+			},
+		},
+		{
+			name:        "larger than max lifetime",
+			prefix:      simplePrefix,
+			maxInterval: time.Second * (8*8191 + 1),
+			want: &PREF64{
+				Inner: &ndp.PREF64{
+					Prefix:   simplePrefix,
+					Lifetime: time.Second * 8 * 8191,
+				},
+			},
+		},
+		{
+			name:        "lifetime not divisible by 8",
+			prefix:      simplePrefix,
+			maxInterval: time.Second * 9,
+			want: &PREF64{
+				Inner: &ndp.PREF64{
+					Prefix:   simplePrefix,
+					Lifetime: time.Second * 16,
+				},
+			},
+		},
+		{
+			name:        "non-zero lifetime less than 8",
+			prefix:      simplePrefix,
+			maxInterval: time.Second * 1,
+			want: &PREF64{
+				Inner: &ndp.PREF64{
+					Prefix:   simplePrefix,
+					Lifetime: time.Second * 8,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if diff := cmp.Diff(tt.want, NewPREF64(tt.prefix, tt.maxInterval), cmp.Comparer(prefixEqual)); diff != "" {
+				t.Fatalf("unexpected pref64 result (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func addrEqual(x, y netip.Addr) bool     { return x == y }
+func ipEqual(x, y system.IP) bool        { return x == y }
+func prefixEqual(x, y netip.Prefix) bool { return x == y }
 
 func mustCaptivePortal(uri string) *ndp.CaptivePortal {
 	cp, err := ndp.NewCaptivePortal(uri)

@@ -736,6 +736,61 @@ func Test_parseRDNSS(t *testing.T) {
 	}
 }
 
+func Test_parsePREF64(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		s    string
+		p    *plugin.PREF64
+		ok   bool
+	}{
+		{
+			name: "bad prefix",
+			s: `
+			[[interfaces]]
+			  [[interfaces.pref64]]
+			  prefix = "xxx"
+			`,
+		},
+		{
+			name: "OK implicit",
+			s: `
+			[[interfaces]]
+			  [[interfaces.pref64]]
+			`,
+			p:  plugin.NewPREF64(netip.MustParsePrefix(defaultPREF64Prefix), 10*time.Minute),
+			ok: true,
+		},
+		{
+			name: "OK empty prefix",
+			s: `
+			[[interfaces]]
+			  [[interfaces.pref64]]
+			  prefix = ""
+			`,
+			p:  plugin.NewPREF64(netip.MustParsePrefix(defaultPREF64Prefix), 10*time.Minute),
+			ok: true,
+		},
+		{
+			name: "OK explicit",
+			s: `
+			[[interfaces]]
+			  [[interfaces.pref64]]
+			  prefix = "64:f9b:dead:beef::/96"
+			`,
+			p:  plugin.NewPREF64(netip.MustParsePrefix("64:f9b:dead:beef::/96"), 10*time.Minute),
+			ok: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pluginDecode(t, tt.s, tt.ok, tt.p)
+		})
+	}
+}
+
 func pluginDecode(t *testing.T, s string, ok bool, want plugin.Plugin) {
 	t.Helper()
 

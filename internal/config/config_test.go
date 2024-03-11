@@ -154,6 +154,9 @@ func TestParse(t *testing.T) {
 			  lifetime = "auto"
 			  domain_names = ["lan.example.com"]
 
+			  [[interfaces.pref64]]
+			  prefix = ""
+
 			[[interfaces]]
 			name = "eth1"
 			min_interval = "auto"
@@ -244,6 +247,7 @@ func TestParse(t *testing.T) {
 							},
 							plugin.NewMTU(1500),
 							&plugin.LLA{},
+							plugin.NewPREF64(netip.MustParsePrefix("64:ff9b::/96"), 10*time.Minute),
 						},
 					},
 					{
