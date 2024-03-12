@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v1.3.0
+March 12, 2024
+
+- CoreRAD now supports the [PREF64 option from RFC 8781](https://datatracker.ietf.org/doc/html/rfc8781).
+  - This option allows CoreRAD to advertise NAT64 prefixes to hosts to aid in
+    IPv4 to IPv6 transition.
+  - Special thanks to @jmbaur for implementing the required changes in both
+    CoreRAD and the underlying `ndp` package.
+
 ## v1.2.2
 April 25, 2023
 
