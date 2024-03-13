@@ -379,7 +379,7 @@ func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 			ips = append(ips, ip)
 		}
 
-		slices.SortStableFunc(ips, func(a, b netip.Addr) bool { return a.Less(b) })
+		slices.SortStableFunc(ips, func(a, b netip.Addr) int { return a.Compare(b) })
 	}
 
 	return &plugin.RDNSS{

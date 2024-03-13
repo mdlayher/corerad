@@ -361,8 +361,8 @@ func (p *Prefix) current() ([]netip.Prefix, error) {
 	}
 
 	// For output consistency.
-	slices.SortStableFunc(prefixes, func(a, b netip.Prefix) bool {
-		return a.Addr().Less(b.Addr())
+	slices.SortStableFunc(prefixes, func(a, b netip.Prefix) int {
+		return a.Addr().Compare(b.Addr())
 	})
 
 	return prefixes, nil
@@ -544,8 +544,8 @@ outer:
 	}
 
 	// For output consistency.
-	slices.SortStableFunc(prefixes, func(a, b netip.Prefix) bool {
-		return a.Addr().Less(b.Addr())
+	slices.SortStableFunc(prefixes, func(a, b netip.Prefix) int {
+		return a.Addr().Compare(b.Addr())
 	})
 
 	return prefixes, nil
