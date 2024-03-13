@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/system"
 	"github.com/mdlayher/ndp"
-	"golang.org/x/exp/slices"
 )
 
 // A Plugin specifies a CoreRAD plugin's configuration.

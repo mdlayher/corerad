@@ -17,11 +17,11 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"slices"
 	"time"
 
 	"github.com/mdlayher/corerad/internal/plugin"
 	"github.com/mdlayher/ndp"
-	"golang.org/x/exp/slices"
 )
 
 // The Well-Known Prefix for IPv4 to IPv6 translation, as specified in RFC
