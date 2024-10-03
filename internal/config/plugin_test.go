@@ -83,7 +83,7 @@ func Test_parseDNSSL(t *testing.T) {
 			  domain_names = ["foo.example.com"]
 			`,
 			d: &plugin.DNSSL{
-				Lifetime:    20 * time.Minute,
+				Lifetime:    30 * time.Minute,
 				DomainNames: []string{"foo.example.com"},
 			},
 			ok: true,
@@ -97,7 +97,7 @@ func Test_parseDNSSL(t *testing.T) {
 			  lifetime = "auto"
 			`,
 			d: &plugin.DNSSL{
-				Lifetime:    20 * time.Minute,
+				Lifetime:    30 * time.Minute,
 				DomainNames: []string{"foo.example.com"},
 			},
 			ok: true,
@@ -669,7 +669,7 @@ func Test_parseRDNSS(t *testing.T) {
 			  servers = ["2001:db8::1"]
 			`,
 			r: &plugin.RDNSS{
-				Lifetime: 20 * time.Minute,
+				Lifetime: 30 * time.Minute,
 				Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 			},
 			ok: true,
@@ -683,7 +683,7 @@ func Test_parseRDNSS(t *testing.T) {
 			  lifetime = "auto"
 			`,
 			r: &plugin.RDNSS{
-				Lifetime: 20 * time.Minute,
+				Lifetime: 30 * time.Minute,
 				Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 			},
 			ok: true,
@@ -696,7 +696,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Auto:     true,
-				Lifetime: 20 * time.Minute,
+				Lifetime: 30 * time.Minute,
 			},
 			ok: true,
 		},
@@ -709,7 +709,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Auto:     true,
-				Lifetime: 20 * time.Minute,
+				Lifetime: 30 * time.Minute,
 			},
 			ok: true,
 		},
@@ -722,7 +722,7 @@ func Test_parseRDNSS(t *testing.T) {
 			`,
 			r: &plugin.RDNSS{
 				Auto:     true,
-				Lifetime: 20 * time.Minute,
+				Lifetime: 30 * time.Minute,
 				Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 			},
 			ok: true,
