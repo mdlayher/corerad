@@ -153,8 +153,8 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 // parseDNSSL parses a DNSSL plugin.
 func parseDNSSL(d rawDNSSL, maxInterval time.Duration) (*plugin.DNSSL, error) {
 	// By default, compute lifetime as recommended by radvd.
-        // As per RFC8106, the default lifetime SHOULD be at least
-        // 3 * MaxRtrAdvInterval.
+	// As per RFC8106, the default lifetime SHOULD be at least
+	// 3 * MaxRtrAdvInterval.
 	lifetime, err := parseDuration(d.Lifetime, 3*maxInterval)
 	if err != nil {
 		return nil, fmt.Errorf("invalid lifetime: %v", err)
@@ -321,8 +321,8 @@ func parseRoute(r rawRoute, epoch time.Time) (*plugin.Route, error) {
 // parseRDNSS parses a RDNSS plugin.
 func parseRDNSS(d rawRDNSS, maxInterval time.Duration) (*plugin.RDNSS, error) {
 	// If auto, compute lifetime as recommended by radvd.
-        // As per RFC8106, the default lifetime SHOULD be at least
-        // 3 * MaxRtrAdvInterval.
+	// As per RFC8106, the default lifetime SHOULD be at least
+	// 3 * MaxRtrAdvInterval.
 	lifetime, err := parseDuration(d.Lifetime, 3*maxInterval)
 	if err != nil {
 		return nil, fmt.Errorf("invalid lifetime: %v", err)
