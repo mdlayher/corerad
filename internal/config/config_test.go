@@ -238,11 +238,11 @@ func TestParse(t *testing.T) {
 								Lifetime:   24 * time.Hour,
 							},
 							&plugin.RDNSS{
-								Lifetime: 20 * time.Minute,
+								Lifetime: 30 * time.Minute,
 								Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
 							},
 							&plugin.DNSSL{
-								Lifetime:    20 * time.Minute,
+								Lifetime:    30 * time.Minute,
 								DomainNames: []string{"lan.example.com"},
 							},
 							plugin.NewMTU(1500),
@@ -265,7 +265,7 @@ func TestParse(t *testing.T) {
 						Plugins: []plugin.Plugin{
 							&plugin.RDNSS{
 								Auto:     true,
-								Lifetime: 8 * time.Second,
+								Lifetime: 12 * time.Second,
 							},
 							&plugin.LLA{},
 						},
