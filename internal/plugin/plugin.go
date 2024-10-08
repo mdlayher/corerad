@@ -95,7 +95,7 @@ func NewPREF64(prefix netip.Prefix, maxInterval time.Duration) *PREF64 {
 	// See https://datatracker.ietf.org/doc/html/rfc8781#section-4.1-2
 	lifetime := maxPref64Lifetime
 	if int(maxInterval.Seconds())*3 < int(lifetime.Seconds()) {
-		lifetimeSeconds := int(maxInterval.Seconds())
+		lifetimeSeconds := int(maxInterval.Seconds()) * 3
 		if r := int(lifetimeSeconds) % 8; r > 0 {
 			lifetimeSeconds += 8 - r
 		}

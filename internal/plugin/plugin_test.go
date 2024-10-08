@@ -856,7 +856,7 @@ func TestNewPREF64(t *testing.T) {
 			want: &PREF64{
 				Inner: &ndp.PREF64{
 					Prefix:   simplePrefix,
-					Lifetime: time.Minute * 10,
+					Lifetime: time.Minute * 30,
 				},
 			},
 		},
@@ -889,7 +889,7 @@ func TestNewPREF64(t *testing.T) {
 			want: &PREF64{
 				Inner: &ndp.PREF64{
 					Prefix:   simplePrefix,
-					Lifetime: time.Second * 16,
+					Lifetime: time.Second * 32,
 				},
 			},
 		},
