@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v1.3.1
+October 8, 2024
+
+This is a minor bug fix release following v1.3.0.
+
+- Fix PREF64 default lifetime per [RFC8781](https://datatracker.ietf.org/doc/html/rfc8781).
+- Fix RDNSS/DNSSL lifetimes per [RFC8106](https://datatracker.ietf.org/doc/html/rfc8106).
+
+Special thanks to @furry13 for the contributions!
+
 ## v1.3.0
 March 12, 2024
 
