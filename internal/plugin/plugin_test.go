@@ -84,6 +84,19 @@ func TestPluginString(t *testing.T) {
 			s: "2001:db8::/96, lifetime: 10m0s",
 		},
 		{
+			name: "PvD",
+			p: &PvD{
+				ID:       "pvd.example.com",
+				HTTPInfo: true,
+				Sequence: 7,
+				Plugins: []Plugin{
+					NewMTU(1500),
+					&DNSSL{Lifetime: time.Minute, DomainNames: []string{"example.com"}},
+				},
+			},
+			s: `id: "pvd.example.com", flags: [http], delay: 0, sequence: 7, inner: [mtu, dnssl]`,
+		},
+		{
 			name: "Prefix",
 			p: &Prefix{
 				Prefix:            netip.MustParsePrefix("2001:db8::/64"),
@@ -223,6 +236,52 @@ func TestBuild(t *testing.T) {
 						DomainNames: []string{
 							"foo.example.com",
 							"bar.example.com",
+						},
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "PvD with MTU inner",
+			plugin: &PvD{
+				ID:       "pvd.example.com",
+				HTTPInfo: true,
+				Sequence: 3,
+				Plugins:  []Plugin{NewMTU(1500)},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.PvD{
+						ID:       "pvd.example.com",
+						HTTPInfo: true,
+						Sequence: 3,
+						RouterAdvertisement: &ndp.RouterAdvertisement{
+							Options: []ndp.Option{ndp.NewMTU(1500)},
+						},
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "PvD propagates Prepare to inner LLA",
+			plugin: &PvD{
+				ID:      "pvd.example.com",
+				Plugins: []Plugin{&LLA{}},
+			},
+			ifi: &net.Interface{
+				HardwareAddr: net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.PvD{
+						ID: "pvd.example.com",
+						RouterAdvertisement: &ndp.RouterAdvertisement{
+							Options: []ndp.Option{&ndp.LinkLayerAddress{
+								Direction: ndp.Source,
+								Addr:      net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad},
+							}},
 						},
 					},
 				},

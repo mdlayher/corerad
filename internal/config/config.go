@@ -83,9 +83,26 @@ type rawInterface struct {
 	RDNSS         []rawRDNSS  `toml:"rdnss"`
 	DNSSL         []rawDNSSL  `toml:"dnssl"`
 	PREF64        []rawPREF64 `toml:"pref64"`
+	PvD           []rawPvD    `toml:"pvd"`
 	MTU           int         `toml:"mtu"`
 	SourceLLA     *bool       `toml:"source_lla"`
 	CaptivePortal string      `toml:"captive_portal"`
+}
+
+// A rawPvD is the raw configuration file representation of a PvD plugin.
+type rawPvD struct {
+	FQDN     string `toml:"fqdn"`
+	HTTP     bool   `toml:"http"`
+	Legacy   bool   `toml:"legacy"`
+	Delay    int    `toml:"delay"`
+	Sequence int    `toml:"sequence"`
+
+	// Nested plugins scoped to this PvD.
+	Prefixes []rawPrefix `toml:"prefix"`
+	Routes   []rawRoute  `toml:"route"`
+	RDNSS    []rawRDNSS  `toml:"rdnss"`
+	DNSSL    []rawDNSSL  `toml:"dnssl"`
+	PREF64   []rawPREF64 `toml:"pref64"`
 }
 
 // A rawPrefix is the raw configuration file representation of a Prefix plugin.

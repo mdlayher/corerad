@@ -128,6 +128,74 @@ func (p *PREF64) Apply(ra *ndp.RouterAdvertisement) error {
 	return nil
 }
 
+// PvD configures a NDP Provisioning Domain ID option, scoping a set of inner
+// plugins to a named provisioning domain per RFC 8801.
+type PvD struct {
+	ID       string
+	HTTPInfo bool
+	Legacy   bool
+	Delay    uint8
+	Sequence uint16
+
+	// Plugins are the inner plugins whose options are scoped to this PvD.
+	Plugins []Plugin
+}
+
+// Name implements Plugin.
+func (*PvD) Name() string { return "pvd" }
+
+// String implements Plugin.
+func (p *PvD) String() string {
+	var flags []string
+	if p.HTTPInfo {
+		flags = append(flags, "http")
+	}
+	if p.Legacy {
+		flags = append(flags, "legacy")
+	}
+
+	inner := make([]string, 0, len(p.Plugins))
+	for _, sub := range p.Plugins {
+		inner = append(inner, sub.Name())
+	}
+
+	return fmt.Sprintf("id: %q, flags: [%s], delay: %d, sequence: %d, inner: [%s]",
+		p.ID, strings.Join(flags, ", "), p.Delay, p.Sequence, strings.Join(inner, ", "))
+}
+
+// Prepare implements Plugin.
+func (p *PvD) Prepare(ifi *net.Interface) error {
+	for _, sub := range p.Plugins {
+		if err := sub.Prepare(ifi); err != nil {
+			return fmt.Errorf("pvd %q: prepare %s: %w", p.ID, sub.Name(), err)
+		}
+	}
+	return nil
+}
+
+// Apply implements Plugin.
+func (p *PvD) Apply(ra *ndp.RouterAdvertisement) error {
+	// Build an embedded RA whose options come from the inner plugins. The
+	// embedded RA header fields are left zero; only options are scoped to
+	// the PvD in this implementation.
+	inner := &ndp.RouterAdvertisement{}
+	for _, sub := range p.Plugins {
+		if err := sub.Apply(inner); err != nil {
+			return fmt.Errorf("pvd %q: apply %s: %w", p.ID, sub.Name(), err)
+		}
+	}
+
+	ra.Options = append(ra.Options, &ndp.PvD{
+		ID:                  p.ID,
+		HTTPInfo:            p.HTTPInfo,
+		Legacy:              p.Legacy,
+		Delay:               p.Delay,
+		Sequence:            p.Sequence,
+		RouterAdvertisement: inner,
+	})
+	return nil
+}
+
 // DNSSL configures a NDP DNS Search List option.
 type DNSSL struct {
 	Lifetime    time.Duration
@@ -279,7 +347,8 @@ func (p *Prefix) String() string {
 		flags = append(flags, "autonomous")
 	}
 
-	return fmt.Sprintf("%s [%s], preferred: %s, valid: %s",
+	return fmt.Sprintf(
+		"%s [%s], preferred: %s, valid: %s",
 		prefix,
 		strings.Join(flags, ", "),
 		durString(p.PreferredLifetime),
@@ -472,7 +541,8 @@ func (r *Route) String() string {
 		deprecated = " [DEPRECATED]"
 	}
 
-	return fmt.Sprintf("%s%s, preference: %s, lifetime: %s",
+	return fmt.Sprintf(
+		"%s%s, preference: %s, lifetime: %s",
 		prefix,
 		deprecated,
 		r.Preference.String(),
@@ -750,9 +820,9 @@ func betterRDNSS(best, current system.IP) system.IP {
 	)
 
 	for _, fn := range []func(netip.Addr) bool{
-		(netip.Addr).IsPrivate,
-		(netip.Addr).IsGlobalUnicast,
-		(netip.Addr).IsLinkLocalUnicast,
+		netip.Addr.IsPrivate,
+		netip.Addr.IsGlobalUnicast,
+		netip.Addr.IsLinkLocalUnicast,
 	} {
 		okC, okB := fn(cIP), fn(bIP)
 		switch {

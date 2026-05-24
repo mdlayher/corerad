@@ -2,6 +2,8 @@ module github.com/mdlayher/corerad
 
 go 1.23
 
+replace github.com/mdlayher/ndp => ../ndp
+
 require (
 	github.com/google/go-cmp v0.6.0
 	github.com/jsimonetti/rtnetlink v1.4.2

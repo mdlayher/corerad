@@ -121,6 +121,111 @@ func TestParse(t *testing.T) {
 			ok: true,
 		},
 		{
+			name: "bad pvd missing fqdn",
+			s: `
+			[[interfaces]]
+			name = "eth0"
+			advertise = true
+			  [[interfaces.pvd]]
+			`,
+		},
+		{
+			name: "bad pvd delay out of range",
+			s: `
+			[[interfaces]]
+			name = "eth0"
+			advertise = true
+			  [[interfaces.pvd]]
+			  fqdn = "pvd.example.com"
+			  delay = 16
+			`,
+		},
+		{
+			name: "bad pvd sequence out of range",
+			s: `
+			[[interfaces]]
+			name = "eth0"
+			advertise = true
+			  [[interfaces.pvd]]
+			  fqdn = "pvd.example.com"
+			  sequence = 65536
+			`,
+		},
+		{
+			name: "bad pvd inner overlap",
+			s: `
+			[[interfaces]]
+			name = "eth0"
+			advertise = true
+			  [[interfaces.pvd]]
+			  fqdn = "pvd.example.com"
+			    [[interfaces.pvd.prefix]]
+			    prefix = "2001:db8::/64"
+			    [[interfaces.pvd.prefix]]
+			    prefix = "2001:db8::/64"
+			`,
+		},
+		{
+			name: "OK pvd",
+			s: `
+			[[interfaces]]
+			name = "eth0"
+			advertise = true
+			max_interval = "10m"
+			min_interval = "6m"
+
+			  [[interfaces.pvd]]
+			  fqdn = "pvd.example.com"
+			  http = true
+			  legacy = false
+			  delay = 3
+			  sequence = 7
+
+			    [[interfaces.pvd.prefix]]
+			    prefix = "2001:db8::/64"
+
+			    [[interfaces.pvd.rdnss]]
+			    servers = ["2001:db8::1"]
+
+			    [[interfaces.pvd.pref64]]
+			`,
+			c: &config.Config{
+				Interfaces: []config.Interface{{
+					Name:            "eth0",
+					Advertise:       true,
+					MinInterval:     6 * time.Minute,
+					MaxInterval:     10 * time.Minute,
+					HopLimit:        64,
+					DefaultLifetime: 30 * time.Minute,
+					Preference:      ndp.Medium,
+					Plugins: []plugin.Plugin{
+						&plugin.LLA{},
+						&plugin.PvD{
+							ID:       "pvd.example.com",
+							HTTPInfo: true,
+							Delay:    3,
+							Sequence: 7,
+							Plugins: []plugin.Plugin{
+								&plugin.Prefix{
+									Prefix:            netip.MustParsePrefix("2001:db8::/64"),
+									OnLink:            true,
+									Autonomous:        true,
+									ValidLifetime:     24 * time.Hour,
+									PreferredLifetime: 4 * time.Hour,
+								},
+								&plugin.RDNSS{
+									Lifetime: 30 * time.Minute,
+									Servers:  []netip.Addr{netip.MustParseAddr("2001:db8::1")},
+								},
+								plugin.NewPREF64(netip.MustParsePrefix("64:ff9b::/96"), 10*time.Minute),
+							},
+						},
+					},
+				}},
+			},
+			ok: true,
+		},
+		{
 			name: "OK all",
 			s: `
 			[[interfaces]]

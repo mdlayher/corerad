@@ -30,8 +30,68 @@ const defaultPREF64Prefix = "64:ff9b::/96"
 
 // parsePlugin parses raw plugin configuration into a slice of plugins.
 func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) ([]plugin.Plugin, error) {
-	prefixes := make([]*plugin.Prefix, 0, len(ifi.Prefixes))
-	for _, p := range ifi.Prefixes {
+	plugins, err := parseCorePlugins(
+		ifi.Prefixes, ifi.Routes, ifi.RDNSS, ifi.DNSSL,
+		maxInterval, epoch,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Loopback has an MTU of 65536 on Linux. Good enough?
+	if ifi.MTU < 0 || ifi.MTU > 65536 {
+		return nil, fmt.Errorf("MTU (%d) must be between 0 and 65536", ifi.MTU)
+	}
+	if ifi.MTU != 0 {
+		plugins = append(plugins, plugin.NewMTU(ifi.MTU))
+	}
+
+	// Always set unless explicitly false.
+	if ifi.SourceLLA == nil || *ifi.SourceLLA {
+		plugins = append(plugins, &plugin.LLA{})
+	}
+
+	// Only set when key is not empty.
+	//
+	// TODO(mdlayher): advertise ndp.Unrestricted by default if empty?
+	if cp := ifi.CaptivePortal; cp != "" {
+		cp, err := plugin.NewCaptivePortal(cp)
+		if err != nil {
+			return nil, err
+		}
+
+		plugins = append(plugins, cp)
+	}
+
+	pref64, err := parsePREF64s(ifi.PREF64, maxInterval)
+	if err != nil {
+		return nil, err
+	}
+	plugins = append(plugins, pref64...)
+
+	for _, raw := range ifi.PvD {
+		pvd, err := parsePvD(raw, maxInterval, epoch)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse pvd %q: %v", raw.FQDN, err)
+		}
+		plugins = append(plugins, pvd)
+	}
+
+	return plugins, nil
+}
+
+// parseCorePlugins parses the plugin types that may appear both at the top
+// level of an interface and nested inside a PvD scope.
+func parseCorePlugins(
+	rawPrefixes []rawPrefix,
+	rawRoutes []rawRoute,
+	rawRDNSSList []rawRDNSS,
+	rawDNSSLList []rawDNSSL,
+	maxInterval time.Duration,
+	epoch time.Time,
+) ([]plugin.Plugin, error) {
+	prefixes := make([]*plugin.Prefix, 0, len(rawPrefixes))
+	for _, p := range rawPrefixes {
 		pfx, err := parsePrefix(p, epoch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse prefix %q: %v", p.Prefix, err)
@@ -58,8 +118,8 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		plugins = append(plugins, p)
 	}
 
-	routes := make([]*plugin.Route, 0, len(ifi.Routes))
-	for _, r := range ifi.Routes {
+	routes := make([]*plugin.Route, 0, len(rawRoutes))
+	for _, r := range rawRoutes {
 		rt, err := parseRoute(r, epoch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse route %q: %v", r.Prefix, err)
@@ -89,7 +149,7 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		plugins = append(plugins, r)
 	}
 
-	for _, r := range ifi.RDNSS {
+	for _, r := range rawRDNSSList {
 		rdnss, err := parseRDNSS(r, maxInterval)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse RDNSS: %v", err)
@@ -98,7 +158,7 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		plugins = append(plugins, rdnss)
 	}
 
-	for _, d := range ifi.DNSSL {
+	for _, d := range rawDNSSLList {
 		dnssl, err := parseDNSSL(d, maxInterval)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse DNSSL: %v", err)
@@ -107,35 +167,15 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 		plugins = append(plugins, dnssl)
 	}
 
-	// Loopback has an MTU of 65536 on Linux. Good enough?
-	if ifi.MTU < 0 || ifi.MTU > 65536 {
-		return nil, fmt.Errorf("MTU (%d) must be between 0 and 65536", ifi.MTU)
-	}
-	if ifi.MTU != 0 {
-		plugins = append(plugins, plugin.NewMTU(ifi.MTU))
-	}
+	return plugins, nil
+}
 
-	// Always set unless explicitly false.
-	if ifi.SourceLLA == nil || *ifi.SourceLLA {
-		plugins = append(plugins, &plugin.LLA{})
-	}
-
-	// Only set when key is not empty.
-	//
-	// TODO(mdlayher): advertise ndp.Unrestricted by default if empty?
-	if cp := ifi.CaptivePortal; cp != "" {
-		cp, err := plugin.NewCaptivePortal(cp)
-		if err != nil {
-			return nil, err
-		}
-
-		plugins = append(plugins, cp)
-	}
-
-	for _, p := range ifi.PREF64 {
+// parsePREF64s parses a list of PREF64 plugins.
+func parsePREF64s(raws []rawPREF64, maxInterval time.Duration) ([]plugin.Plugin, error) {
+	out := make([]plugin.Plugin, 0, len(raws))
+	for _, p := range raws {
 		base := defaultPREF64Prefix
 		if p.Prefix != nil && *p.Prefix != "" {
-			// Use the caller's prefix.
 			base = *p.Prefix
 		}
 
@@ -144,10 +184,45 @@ func parsePlugins(ifi rawInterface, maxInterval time.Duration, epoch time.Time) 
 			return nil, err
 		}
 
-		plugins = append(plugins, plugin.NewPREF64(prefix, maxInterval))
+		out = append(out, plugin.NewPREF64(prefix, maxInterval))
+	}
+	return out, nil
+}
+
+// parsePvD parses a PvD plugin and its nested plugins.
+func parsePvD(raw rawPvD, maxInterval time.Duration, epoch time.Time) (*plugin.PvD, error) {
+	if raw.FQDN == "" {
+		return nil, errors.New("fqdn is required")
+	}
+	if raw.Delay < 0 || raw.Delay > 15 {
+		return nil, fmt.Errorf("delay (%d) must be between 0 and 15", raw.Delay)
+	}
+	if raw.Sequence < 0 || raw.Sequence > 0xffff {
+		return nil, fmt.Errorf("sequence (%d) must be between 0 and 65535", raw.Sequence)
 	}
 
-	return plugins, nil
+	inner, err := parseCorePlugins(
+		raw.Prefixes, raw.Routes, raw.RDNSS, raw.DNSSL,
+		maxInterval, epoch,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	pref64, err := parsePREF64s(raw.PREF64, maxInterval)
+	if err != nil {
+		return nil, err
+	}
+	inner = append(inner, pref64...)
+
+	return &plugin.PvD{
+		ID:       raw.FQDN,
+		HTTPInfo: raw.HTTP,
+		Legacy:   raw.Legacy,
+		Delay:    uint8(raw.Delay),
+		Sequence: uint16(raw.Sequence),
+		Plugins:  inner,
+	}, nil
 }
 
 // parseDNSSL parses a DNSSL plugin.

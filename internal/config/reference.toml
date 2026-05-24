@@ -215,6 +215,42 @@ preference = "medium"
   [[interfaces.pref64]]
   prefix = "64:ff9b::/96"
 
+  # PvD: attach an NDP Provisioning Domain ID option (RFC 8801) which scopes
+  # the nested options to a named provisioning domain. PvD-aware hosts use the
+  # FQDN to distinguish configuration that originates from logically separate
+  # networks sharing the same link (e.g. a VPN overlay versus the ISP network).
+  [[interfaces.pvd]]
+  # The FQDN that identifies this provisioning domain. Required.
+  fqdn = "pvd.example.com"
+
+  # Indicates that PvD Additional Information (JSON) is available at
+  # https://<fqdn>/.well-known/pvd. CoreRAD does not serve this resource; it
+  # is the operator's responsibility to publish it.
+  http = false
+
+  # Indicates that this PvD is associated with IPv4 configuration provided by
+  # DHCPv4 on the same interface.
+  legacy = false
+
+  # Randomized backoff hint for HTTP GET queries, 0-15. Set to 0 unless you
+  # have a specific reason to space out client requests.
+  delay = 0
+
+  # Sequence number of the PvD Additional Information. Increment when the
+  # JSON document at the well-known URL changes so that hosts re-fetch it.
+  sequence = 0
+
+  # Nested options scoped to this PvD. The same prefix/route/rdnss/dnssl/pref64
+  # syntax as above is supported; see those sections for option details.
+    [[interfaces.pvd.prefix]]
+    prefix = "2001:db8:1::/64"
+
+    [[interfaces.pvd.rdnss]]
+    servers = ["2001:db8:1::1"]
+
+    [[interfaces.pvd.dnssl]]
+    domain_names = ["pvd.example.com"]
+
 # Enable or disable the debug HTTP server for facilities such as Prometheus
 # metrics and pprof support.
 #
