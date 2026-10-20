@@ -1,7 +1,7 @@
 # CHANGELOG
 
 ## v1.4.0
-Unreleased
+October 20, 2026
 
 - The automatic `::/0` route configuration now advertises only the IPv6
   loopback routes which cover one of the advertising interface's own
