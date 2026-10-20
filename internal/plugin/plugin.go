@@ -332,18 +332,10 @@ func (p *Prefix) current() ([]netip.Prefix, error) {
 	var prefixes []netip.Prefix
 	seen := make(map[netip.Prefix]struct{})
 	for _, a := range addrs {
-		// Only advertise non-link-local IPv6 prefixes that also have a
-		// matching mask:
+		// Only advertise prefixes derived from usable addresses that also have
+		// a matching mask:
 		// https://tools.ietf.org/html/rfc4861#section-4.6.2.
-		ip := a.Address.Addr()
-		if ip.Is4() || ip.IsLinkLocalUnicast() || a.Address.Bits() != p.Prefix.Bits() {
-			continue
-		}
-
-		// Don't advertise prefixes derived from addresses which are:
-		//  - temporary: short-lived, used for outbound connections
-		//  - tentative: may be awaiting duplicate address detection results
-		if a.Temporary || a.Tentative {
+		if !usableAddr(a) || a.Address.Bits() != p.Prefix.Bits() {
 			continue
 		}
 
@@ -366,6 +358,21 @@ func (p *Prefix) current() ([]netip.Prefix, error) {
 	})
 
 	return prefixes, nil
+}
+
+// usableAddr reports whether a is an interface address which may be used to
+// derive automatic Prefix and Route options.
+func usableAddr(a system.IP) bool {
+	// Only consider non-link-local IPv6 addresses.
+	ip := a.Address.Addr()
+	if ip.Is4() || ip.IsLinkLocalUnicast() {
+		return false
+	}
+
+	// Don't consider addresses which are:
+	//  - temporary: short-lived, used for outbound connections
+	//  - tentative: may be awaiting duplicate address detection results
+	return !a.Temporary && !a.Tentative
 }
 
 // apply unpacks prefixes into ndp.PrefixInformation options within ra.
@@ -444,6 +451,7 @@ type Route struct {
 	// Functions which can be swapped for tests.
 	TimeNow func() time.Time
 	Routes  func() ([]system.Route, error)
+	Addrs   func() ([]system.IP, error)
 }
 
 // Name implements Plugin.
@@ -481,12 +489,15 @@ func (r *Route) String() string {
 }
 
 // Prepare implements Plugin.
-func (r *Route) Prepare(_ *net.Interface) error {
+func (r *Route) Prepare(ifi *net.Interface) error {
 	// Use the real system time.
 	r.TimeNow = time.Now
 
-	// Fetch automatic routes from loopback interfaces when available.
-	r.Routes = system.NewAddresser().LoopbackRoutes
+	// Fetch automatic routes from loopback interfaces when available, and
+	// addresses from the specified interface to filter those routes.
+	a := system.NewAddresser()
+	r.Routes = a.LoopbackRoutes
+	r.Addrs = func() ([]system.IP, error) { return a.AddressesByIndex(ifi.Index) }
 
 	return nil
 }
@@ -514,8 +525,16 @@ func (r *Route) Apply(ra *ndp.RouterAdvertisement) error {
 	return nil
 }
 
-// current fetches the current IPv6 loopback routes from the system.
+// current fetches the current IPv6 loopback routes from the system which
+// cover one of the interface's own addresses.
+//
+// If either Routes or Addrs is unset (Prepare has not been called), current
+// returns an error rather than panicking, so String omits the expanded routes.
 func (r *Route) current() ([]netip.Prefix, error) {
+	if r.Routes == nil || r.Addrs == nil {
+		return nil, errors.New("plugin: route has not been prepared")
+	}
+
 	// Expand ::/N to all loopback routes.
 	//
 	// TODO(mdlayher): if we choose to accept syntax other than ::/0, we'll have
@@ -525,23 +544,17 @@ func (r *Route) current() ([]netip.Prefix, error) {
 		return nil, err
 	}
 
-	var prefixes []netip.Prefix
-outer:
-	for _, rt := range routes {
-		// Skip IPv4 or /128s on loopbacks.
-		if rt.Prefix.Addr().Is4() || rt.Prefix.IsSingleIP() {
-			continue
-		}
-
-		// Prefix covered by larger prefix which is not equal to itself.
-		for _, rt2 := range routes {
-			if rt.Prefix != rt2.Prefix && rt2.Prefix.Contains(rt.Prefix.Addr()) {
-				continue outer
-			}
-		}
-
-		prefixes = append(prefixes, rt.Prefix)
+	addrs, err := r.Addrs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch IP addresses: %v", err)
 	}
+
+	// Only advertise loopback routes which cover one of this interface's
+	// usable addresses, such as a prefix delegated to this router which is
+	// also assigned to this link, as described in RFC 7084 L-3. Other routes
+	// on loopback (blackhole discard prefixes, unrelated aggregates, etc.)
+	// must be configured explicitly.
+	prefixes := uncoveredPrefixes(coveringRoutes(routes, addrs))
 
 	// For output consistency.
 	slices.SortStableFunc(prefixes, func(a, b netip.Prefix) int {
@@ -549,6 +562,63 @@ outer:
 	})
 
 	return prefixes, nil
+}
+
+// coveringRoutes returns the unique IPv6 prefixes from routes which cover one
+// of the usable addresses in addrs, skipping /128s.
+func coveringRoutes(routes []system.Route, addrs []system.IP) []netip.Prefix {
+	var (
+		prefixes []netip.Prefix
+		seen     = make(map[netip.Prefix]struct{})
+	)
+
+	for _, rt := range routes {
+		pfx := rt.Prefix
+		if pfx.Addr().Is4() || pfx.IsSingleIP() {
+			continue
+		}
+
+		if _, ok := seen[pfx]; ok {
+			continue
+		}
+
+		if !coversUsableAddr(pfx, addrs) {
+			continue
+		}
+
+		seen[pfx] = struct{}{}
+		prefixes = append(prefixes, pfx)
+	}
+
+	return prefixes
+}
+
+// coversUsableAddr reports whether prefix contains any usable address in addrs.
+func coversUsableAddr(prefix netip.Prefix, addrs []system.IP) bool {
+	return slices.ContainsFunc(addrs, func(a system.IP) bool {
+		return usableAddr(a) && prefix.Contains(a.Address.Addr())
+	})
+}
+
+// uncoveredPrefixes returns the prefixes which are not covered by a strictly
+// shorter prefix in the same set.
+func uncoveredPrefixes(prefixes []netip.Prefix) []netip.Prefix {
+	var out []netip.Prefix
+	for _, pfx := range prefixes {
+		if !isCovered(pfx, prefixes) {
+			out = append(out, pfx)
+		}
+	}
+
+	return out
+}
+
+// isCovered reports whether prefix is covered by a strictly shorter prefix in
+// prefixes.
+func isCovered(prefix netip.Prefix, prefixes []netip.Prefix) bool {
+	return slices.ContainsFunc(prefixes, func(p netip.Prefix) bool {
+		return p.Bits() < prefix.Bits() && p.Contains(prefix.Addr())
+	})
 }
 
 // apply unpacks routes into ndp.PrefixInformation options within ra.

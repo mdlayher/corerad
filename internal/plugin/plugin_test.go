@@ -130,8 +130,23 @@ func TestPluginString(t *testing.T) {
 						{Prefix: netip.MustParsePrefix("2001:db8::/32")},
 					}, nil
 				},
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
+						{Address: netip.MustParsePrefix("2001:db8::1/64")},
+						{Address: netip.MustParsePrefix("fd00::1/64")},
+					}, nil
+				},
 			},
 			s: "::/0 [2001:db8::/32, fd00::/48], preference: Medium, lifetime: 10m0s",
+		},
+		{
+			name: "Route wildcard unprepared",
+			p: &Route{
+				Auto:     true,
+				Prefix:   netip.MustParsePrefix("::/0"),
+				Lifetime: 10 * time.Minute,
+			},
+			s: "::/0, preference: Medium, lifetime: 10m0s",
 		},
 		{
 			name: "RDNSS",
@@ -468,6 +483,12 @@ func TestBuild(t *testing.T) {
 						{Prefix: netip.MustParsePrefix("2001:db8::/32")},
 					}, nil
 				},
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
+						{Address: netip.MustParsePrefix("192.0.2.1/24")},
+						{Address: netip.MustParsePrefix("2001:db8:ffff::1/64")},
+					}, nil
+				},
 			},
 			ra: &ndp.RouterAdvertisement{
 				Options: []ndp.Option{
@@ -476,6 +497,204 @@ func TestBuild(t *testing.T) {
 						Preference:    ndp.Medium,
 						RouteLifetime: 10 * time.Second,
 						Prefix:        netip.MustParseAddr("2001:db8::"),
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "automatic routes covering interface address",
+			plugin: &Route{
+				Auto:     true,
+				Lifetime: 10 * time.Second,
+				Routes: func() ([]system.Route, error) {
+					return []system.Route{
+						// Covers an interface address and is advertised.
+						{Prefix: netip.MustParsePrefix("2001:db8:1::/48")},
+						// Covers no interface address and is dropped.
+						{Prefix: netip.MustParsePrefix("2001:db8:2::/48")},
+					}, nil
+				},
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
+						{Address: netip.MustParsePrefix("fe80::1/64")},
+						{Address: netip.MustParsePrefix("2001:db8:1::1/64")},
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  48,
+						Preference:    ndp.Medium,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        netip.MustParseAddr("2001:db8:1::"),
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "automatic routes no usable interface addresses",
+			plugin: &Route{
+				Auto:     true,
+				Lifetime: 10 * time.Second,
+				Routes: func() ([]system.Route, error) {
+					return []system.Route{
+						{Prefix: netip.MustParsePrefix("fe80::/64")},
+						{Prefix: netip.MustParsePrefix("2001:db8:1::/48")},
+						{Prefix: netip.MustParsePrefix("2001:db8:2::/48")},
+					}, nil
+				},
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
+						// Link-local, temporary, and tentative addresses are
+						// not considered.
+						{Address: netip.MustParsePrefix("fe80::1/64")},
+						{
+							Address:   netip.MustParsePrefix("2001:db8:1::1/64"),
+							Temporary: true,
+						},
+						{
+							Address:   netip.MustParsePrefix("2001:db8:2::1/64"),
+							Tentative: true,
+						},
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{},
+			ok: true,
+		},
+		{
+			name: "automatic routes covered prefix",
+			plugin: &Route{
+				Auto:     true,
+				Lifetime: 10 * time.Second,
+				Routes: func() ([]system.Route, error) {
+					return []system.Route{
+						// Both cover the interface address, but the /56 is
+						// covered by the /48 and should be skipped.
+						{Prefix: netip.MustParsePrefix("2001:db8:1:100::/56")},
+						{Prefix: netip.MustParsePrefix("2001:db8:1::/48")},
+					}, nil
+				},
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
+						{Address: netip.MustParsePrefix("2001:db8:1:100::1/64")},
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  48,
+						Preference:    ndp.Medium,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        netip.MustParseAddr("2001:db8:1::"),
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "automatic routes covered prefix aligned",
+			plugin: &Route{
+				Auto:     true,
+				Lifetime: 10 * time.Second,
+				Routes: func() ([]system.Route, error) {
+					return []system.Route{
+						// The /56 shares the /48's network address and is
+						// covered by the /48, so only the /48 is advertised.
+						{Prefix: netip.MustParsePrefix("2001:db8:1::/56")},
+						{Prefix: netip.MustParsePrefix("2001:db8:1::/48")},
+					}, nil
+				},
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
+						{Address: netip.MustParsePrefix("2001:db8:1::1/64")},
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  48,
+						Preference:    ndp.Medium,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        netip.MustParseAddr("2001:db8:1::"),
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "automatic routes duplicate",
+			plugin: &Route{
+				Auto:     true,
+				Lifetime: 10 * time.Second,
+				Routes: func() ([]system.Route, error) {
+					return []system.Route{
+						// The same route may appear more than once, such as
+						// with different metrics, but is advertised once.
+						{Prefix: netip.MustParsePrefix("2001:db8:1::/48")},
+						{Prefix: netip.MustParsePrefix("2001:db8:1::/48")},
+					}, nil
+				},
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
+						{Address: netip.MustParsePrefix("2001:db8:1::1/64")},
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  48,
+						Preference:    ndp.Medium,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        netip.MustParseAddr("2001:db8:1::"),
+					},
+				},
+			},
+			ok: true,
+		},
+		{
+			name: "automatic routes delegated and unrelated",
+			plugin: &Route{
+				Auto:     true,
+				Lifetime: 10 * time.Second,
+				Routes: func() ([]system.Route, error) {
+					return []system.Route{
+						// RFC 6666 discard prefix installed as a blackhole.
+						{Prefix: netip.MustParsePrefix("100::/64")},
+						// Delegated prefix from an upstream DHCPv6-PD server.
+						{Prefix: netip.MustParsePrefix("2001:db8:aa00::/56")},
+						// Site prefix and an unrelated aggregate.
+						{Prefix: netip.MustParsePrefix("fd00:1::/48")},
+						{Prefix: netip.MustParsePrefix("fd00:2::/48")},
+					}, nil
+				},
+				Addrs: func() ([]system.IP, error) {
+					return []system.IP{
+						{Address: netip.MustParsePrefix("fe80::1/64")},
+						{Address: netip.MustParsePrefix("2001:db8:aa00:10::1/64")},
+						{Address: netip.MustParsePrefix("fd00:1:0:10::1/64")},
+					}, nil
+				},
+			},
+			ra: &ndp.RouterAdvertisement{
+				Options: []ndp.Option{
+					&ndp.RouteInformation{
+						PrefixLength:  56,
+						Preference:    ndp.Medium,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        netip.MustParseAddr("2001:db8:aa00::"),
+					},
+					&ndp.RouteInformation{
+						PrefixLength:  48,
+						Preference:    ndp.Medium,
+						RouteLifetime: 10 * time.Second,
+						Prefix:        netip.MustParseAddr("fd00:1::"),
 					},
 				},
 			},
@@ -824,6 +1043,150 @@ func Test_betterRDNSS(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if diff := cmp.Diff(tt.better, betterRDNSS(tt.best, tt.current), cmp.Comparer(ipEqual)); diff != "" {
 				t.Fatalf("unexpected better result (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_coveringRoutes(t *testing.T) {
+	var (
+		gua  = system.IP{Address: netip.MustParsePrefix("2001:db8:1:10::1/64")}
+		ula  = system.IP{Address: netip.MustParsePrefix("fd00:1:0:10::1/64")}
+		lla  = system.IP{Address: netip.MustParsePrefix("fe80::1/64")}
+		temp = system.IP{
+			Address:   netip.MustParsePrefix("2001:db8:2::1/64"),
+			Temporary: true,
+		}
+		tent = system.IP{
+			Address:   netip.MustParsePrefix("2001:db8:3::1/64"),
+			Tentative: true,
+		}
+
+		ipv4    = system.Route{Prefix: netip.MustParsePrefix("192.0.2.0/24")}
+		lo      = system.Route{Prefix: netip.MustParsePrefix("::1/128")}
+		gua48   = system.Route{Prefix: netip.MustParsePrefix("2001:db8:1::/48")}
+		gua56   = system.Route{Prefix: netip.MustParsePrefix("2001:db8:1::/56")}
+		ula48   = system.Route{Prefix: netip.MustParsePrefix("fd00:1::/48")}
+		other48 = system.Route{Prefix: netip.MustParsePrefix("fd00:2::/48")}
+		discard = system.Route{Prefix: netip.MustParsePrefix("100::/64")}
+		temp48  = system.Route{Prefix: netip.MustParsePrefix("2001:db8:2::/48")}
+		tent48  = system.Route{Prefix: netip.MustParsePrefix("2001:db8:3::/48")}
+		lla64   = system.Route{Prefix: netip.MustParsePrefix("fe80::/64")}
+	)
+
+	tests := []struct {
+		name     string
+		routes   []system.Route
+		addrs    []system.IP
+		prefixes []netip.Prefix
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name:   "no addresses",
+			routes: []system.Route{gua48},
+		},
+		{
+			name:  "no routes",
+			addrs: []system.IP{gua},
+		},
+		{
+			name:   "IPv4 and /128 skipped",
+			routes: []system.Route{ipv4, lo},
+			addrs:  []system.IP{gua, ula},
+		},
+		{
+			name:   "unusable addresses",
+			routes: []system.Route{lla64, temp48, tent48},
+			addrs:  []system.IP{lla, temp, tent},
+		},
+		{
+			name:   "covering",
+			routes: []system.Route{discard, gua48, ula48, other48},
+			addrs:  []system.IP{lla, gua, ula},
+			prefixes: []netip.Prefix{
+				gua48.Prefix,
+				ula48.Prefix,
+			},
+		},
+		{
+			name:   "nested both covering",
+			routes: []system.Route{gua56, gua48},
+			addrs:  []system.IP{gua},
+			prefixes: []netip.Prefix{
+				gua56.Prefix,
+				gua48.Prefix,
+			},
+		},
+		{
+			name:   "duplicates",
+			routes: []system.Route{gua48, gua48, ula48},
+			addrs:  []system.IP{gua, ula},
+			prefixes: []netip.Prefix{
+				gua48.Prefix,
+				ula48.Prefix,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if diff := cmp.Diff(tt.prefixes, coveringRoutes(tt.routes, tt.addrs), cmp.Comparer(prefixEqual)); diff != "" {
+				t.Fatalf("unexpected covering routes (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_uncoveredPrefixes(t *testing.T) {
+	var (
+		gua32   = netip.MustParsePrefix("2001:db8::/32")
+		gua48   = netip.MustParsePrefix("2001:db8:1::/48")
+		gua56   = netip.MustParsePrefix("2001:db8:1::/56")
+		gua56b  = netip.MustParsePrefix("2001:db8:1:100::/56")
+		other48 = netip.MustParsePrefix("2001:db8:2::/48")
+		ula48   = netip.MustParsePrefix("fd00:1::/48")
+	)
+
+	tests := []struct {
+		name          string
+		prefixes, out []netip.Prefix
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name:     "single",
+			prefixes: []netip.Prefix{gua48},
+			out:      []netip.Prefix{gua48},
+		},
+		{
+			name:     "disjoint",
+			prefixes: []netip.Prefix{gua48, other48, ula48},
+			out:      []netip.Prefix{gua48, other48, ula48},
+		},
+		{
+			name:     "aligned nested",
+			prefixes: []netip.Prefix{gua56, gua48},
+			out:      []netip.Prefix{gua48},
+		},
+		{
+			name:     "unaligned nested",
+			prefixes: []netip.Prefix{gua48, gua56b},
+			out:      []netip.Prefix{gua48},
+		},
+		{
+			name:     "multiple levels",
+			prefixes: []netip.Prefix{gua56, gua48, gua32, other48, ula48},
+			out:      []netip.Prefix{gua32, ula48},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if diff := cmp.Diff(tt.out, uncoveredPrefixes(tt.prefixes), cmp.Comparer(prefixEqual)); diff != "" {
+				t.Fatalf("unexpected uncovered prefixes (-want +got):\n%s", diff)
 			}
 		})
 	}

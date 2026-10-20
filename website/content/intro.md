@@ -48,7 +48,8 @@ advertise = true
   # also enables stateless address autoconfiguration (SLAAC) for clients.
   [[interfaces.prefix]]
 
-  # Serve route information for IPv6 routes destined to the loopback interface.
+  # Serve route information for loopback routes that cover one of this
+  # interface's addresses.
   [[interfaces.route]]
 
   # Inform clients of a recursive DNS server running on this interface.

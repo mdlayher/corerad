@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v1.4.0
+Unreleased
+
+- The automatic `::/0` route configuration now advertises only the IPv6
+  loopback routes which cover one of the advertising interface's own
+  addresses, per [RFC 7084 L-3](https://datatracker.ietf.org/doc/html/rfc7084#section-4.3)
+  and matching odhcpd. Unrelated loopback routes, such as a blackhole route
+  for the RFC 6666 discard prefix `100::/64`, are no longer advertised and
+  must be configured as explicit `[[interfaces.route]]` entries. An interface
+  with no global addresses now advertises no automatic routes.
+
 ## v1.3.1
 October 8, 2024
 

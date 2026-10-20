@@ -147,13 +147,13 @@ preference = "medium"
 
   # Route: attaches an NDP Route Information option to the router advertisement.
   [[interfaces.route]]
-  # Serve Route Information options for each IPv6 destination route configured
-  # on system loopback interfaces, meaning this router owns that route and can
-  # be the authority on how traffic is routed to that prefix. This is a typical
-  # configuration for DHCPv6 Prefix Delegation; for example, an ISP router
-  # delegates a /48 prefix on a WAN interface. The router will configure a /48
-  # unreachable route on loopback (as it owns the entire delegated prefix), but
-  # it can advertise more specific /64 prefixes on each LAN.
+  # Serve Route Information options for the IPv6 routes on system loopback
+  # interfaces which cover one of this interface's own addresses (excluding
+  # link-local, temporary, and tentative addresses), per RFC 7084 L-3. This is
+  # typical for DHCPv6 Prefix Delegation: a router delegated a /48 configures a
+  # /48 unreachable route on loopback and assigns a /64 from it to each LAN, so
+  # each LAN learns that this router owns the /48. Other loopback routes, such
+  # as blackhole discard prefixes, must be configured as explicit route entries.
   #
   # Only ::/0 is allowed for this special case. If prefix is an empty string or
   # omitted, "::/0" is assumed.
